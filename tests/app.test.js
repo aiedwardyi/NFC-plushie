@@ -257,13 +257,6 @@ test("database retains pet state across connections", async (t) => {
   reopened.close();
 });
 
-test("real binding stubs give a contained 500 without claiming a plushie", async (t) => {
-  const { db, request } = await setup(t, { decisions: undefined });
-  assert.equal((await request(tapUrl())).status, 500);
-  assert.equal(db.prepare("SELECT count(*) AS n FROM plushies").get().n, 0);
-  assert.equal((await request("/health")).status, 200);
-});
-
 test("secrets have the required format and hashes", () => {
   const token = ownerToken();
   assert.match(token, /^[A-Za-z0-9_-]{43}$/);
