@@ -24,7 +24,8 @@ export function resolveTap(row, cookieToken, hashFn) {
  * Returns false for no row, no cookie, a wrong cookie, or no owner hash.
  */
 export function canRename(row, cookieToken, hashFn) {
-  return Boolean(row?.owner_token_hash && cookieToken && timingSafeStringEqual(hashFn(cookieToken), row.owner_token_hash));
+  if (!row?.owner_token_hash || typeof cookieToken !== "string" || !cookieToken) return false;
+  return timingSafeStringEqual(hashFn(cookieToken), row.owner_token_hash);
 }
 
 /**
