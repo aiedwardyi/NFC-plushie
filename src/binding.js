@@ -4,7 +4,8 @@
  * or STRANGER for an existing row with a missing/wrong cookie or no owner hash.
  */
 export function resolveTap(row, cookieToken, hashFn) {
-  throw new Error("not implemented");
+  if (!row) return "NEW";
+  return canRename(row, cookieToken, hashFn) ? "OWNER" : "STRANGER";
 }
 
 /**
@@ -13,7 +14,7 @@ export function resolveTap(row, cookieToken, hashFn) {
  * Returns false for no row, no cookie, a wrong cookie, or no owner hash.
  */
 export function canRename(row, cookieToken, hashFn) {
-  throw new Error("not implemented");
+  return Boolean(row?.owner_token_hash && cookieToken && hashFn(cookieToken) === row.owner_token_hash);
 }
 
 /**
@@ -22,5 +23,7 @@ export function canRename(row, cookieToken, hashFn) {
  * Return false for no row, no recovery hash, missing/non-string/empty code, or mismatch.
  */
 export function verifyClaim(row, code, hashFn) {
-  throw new Error("not implemented");
+  if (!row?.recovery_code_hash || typeof code !== "string") return false;
+  const normalized = code.replace(/\s/g, "").toUpperCase();
+  return Boolean(normalized && hashFn(normalized) === row.recovery_code_hash);
 }
