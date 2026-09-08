@@ -34,6 +34,8 @@ for (const [label, inputRow, code, expected] of [
   ["lowercase code", row, "abc234", true],
   ["code with spaces", row, " a b C 2 3 4 ", true],
   ["code with tabs and newlines", row, "\taBc\n234 ", true],
+  ["code with dashes", row, "ABC-234", true],
+  ["code with dashes and spaces", row, "A B C - 2 3 4", true],
   ["null row", null, "ABC234", false],
   ["no recovery hash", { ...row, recovery_code_hash: null }, "ABC234", false],
   ["null code", row, null, false],
