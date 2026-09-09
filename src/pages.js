@@ -30,7 +30,7 @@ export function page(row, content, waving = false) {
 }
 
 export function petPage(row, code = null) {
-  const greeting = row.pet_name ? `다시 만나서 반가워요, ${escapeHtml(row.pet_name)}!` : "안녕하세요! 날 찾아줘서 정말 기뻐요.";
+  const greeting = row.pet_name ? `다시 만나서 반가워요, ${escapeHtml(row.pet_name)}!` : "안녕하세요! 나를 찾아줘서 정말 기뻐요.";
   const recovery = code ? `<aside class="recovery"><h2>우리 안심 코드</h2>
     <p>꼭 적어두세요. 새 폰으로 나를 데려갈 때 꼭 필요해요.</p>
     <strong class="code">${escapeHtml(code)}</strong><p>지금만 볼 수 있어요. 이름을 짓거나 창을 닫기 전에 꼭 챙겨두세요.</p></aside>` : "";
@@ -49,10 +49,10 @@ export function strangerPage(row, message = "") {
     <button type="button" id="claim-toggle" aria-expanded="${Boolean(message)}" aria-controls="claim-form">제가 주인이에요</button>
     <form action="/claim" method="post" id="claim-form" ${message ? "" : "hidden"}>
       <input type="hidden" name="uid" value="${escapeHtml(row.uid)}">
-      <label for="code">우리 안심 코드</label>
+      <label for="code">안심 코드</label>
       <input id="code" name="code" required autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="claim-help">
-      <p id="claim-help">처음 만났을 때 적어둔 코드를 넣어주세요.</p>
-      <button type="submit">내 친구 데려올래요!</button>
+      <p id="claim-help">처음 만났을 때 적어둔 안심 코드를 넣어주세요.</p>
+      <button type="submit">내 친구를 데려올래요!</button>
     </form>`);
 }
 
@@ -61,5 +61,5 @@ export const fakeUids = ["04AAAAAAAAAAA1", "04BBBBBBBBBBB2", "04CCCCCCCCCCC3"];
 export function devPage() {
   return page(null, `<p class="intro">연습용 친구들을 만나보세요</p>
     <nav aria-label="연습용 친구들">${fakeUids.map((uid, i) => `<a class="button" href="/t?uid=${uid}">인형 친구 ${String.fromCharCode(65 + i)} <small>${uid}</small></a>`).join("")}</nav>
-    <form action="/dev/reset" method="post"><button class="secondary" type="submit">연습용 친구들 모두 처음으로 돌리기</button></form>`);
+    <form action="/dev/reset" method="post"><button class="secondary" type="submit">연습용 친구들을 모두 처음으로 돌리기</button></form>`);
 }

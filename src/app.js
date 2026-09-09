@@ -81,7 +81,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const time = now();
       const attempt = db.prepare("SELECT * FROM claim_attempts WHERE uid = ?").get(uid);
       const active = attempt && time - attempt.window_start < cooldown;
-      if (active && attempt.attempts >= 5) return { status: 429, row, message: "너무 여러 번 시도했어요. 15분 뒤에 다시 해보세요." };
+      if (active && attempt.attempts >= 5) return { status: 429, row, message: "너무 여러 번 시도했어요. 처음 시도한 때로부터 15분이 지나면 다시 해볼 수 있어요." };
       if (decisions.verifyClaim(row, code, hash)) {
         const token = ownerToken();
         db.prepare("UPDATE plushies SET owner_token_hash = ? WHERE uid = ?").run(hash(token), uid);
@@ -93,8 +93,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       db.prepare(`INSERT INTO claim_attempts (uid, attempts, window_start) VALUES (?, ?, ?)
         ON CONFLICT(uid) DO UPDATE SET attempts = excluded.attempts, window_start = excluded.window_start`).run(uid, count, active ? attempt.window_start : time);
       return { status: count >= 5 ? 429 : 403, row, message: count >= 5
-        ? "너무 여러 번 시도했어요. 15분 뒤에 다시 해보세요."
-        : "코드가 맞지 않아요." };
+        ? "너무 여러 번 시도했어요. 처음 시도한 때로부터 15분이 지나면 다시 해볼 수 있어요."
+        : "안심 코드가 맞지 않아요." };
     })();
     if (result.token) {
       setOwner(res, result.token);
