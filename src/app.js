@@ -30,7 +30,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   const setOwner = (res, token) => res.cookie("owner_token", token, {
     httpOnly: true, sameSite: "lax", secure: production, maxAge: cookieAge, path: "/",
   });
-  const invalidUid = (res) => res.status(400).send(page(null, "<p>This tap link is not quite right. Please try the link on your plushie.</p>"));
+  const invalidUid = (res) => res.status(400).send(page(null, "<p>태그 링크가 올바르지 않아요. 인형에 있는 링크로 다시 시도해 주세요.</p>"));
 
   app.get("/health", (req, res) => res.type("text").send("ok"));
   app.get("/t", (req, res) => {
@@ -63,11 +63,11 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     if (!validUid(uid)) return invalidUid(res);
     const row = getRow(uid);
     if (!decisions.canRename(row, req.cookies.owner_token || null, hash)) {
-      return res.status(403).send(row ? strangerPage(row) : page(null, "<p>Meet your plushie with its tap link first.</p>"));
+      return res.status(403).send(row ? strangerPage(row) : page(null, "<p>먼저 인형에 있는 링크로 친구를 만나보세요.</p>"));
     }
     const trimmed = typeof name === "string" ? name.trim() : "";
     if (!trimmed || Array.from(trimmed).length > 24) {
-      return res.status(400).send(page(row, `<p>Please choose a name with 1 to 24 characters.</p><a class="button" href="/t?uid=${uid}">Try again</a>`));
+      return res.status(400).send(page(row, `<p>이름은 1자에서 24자 사이로 지어주세요.</p><a class="button" href="/t?uid=${uid}">다시 시도하기</a>`));
     }
     db.prepare("UPDATE plushies SET pet_name = ? WHERE uid = ?").run(trimmed, uid);
     res.redirect(303, `/t?uid=${uid}`);
@@ -81,7 +81,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const time = now();
       const attempt = db.prepare("SELECT * FROM claim_attempts WHERE uid = ?").get(uid);
       const active = attempt && time - attempt.window_start < cooldown;
-      if (active && attempt.attempts >= 5) return { status: 429, row, message: "Too many tries. Please wait 15 minutes from your first attempt, then try again." };
+      if (active && attempt.attempts >= 5) return { status: 429, row, message: "시도가 너무 많았어요. 첫 시도로부터 15분이 지난 뒤에 다시 시도해 주세요." };
       if (decisions.verifyClaim(row, code, hash)) {
         const token = ownerToken();
         db.prepare("UPDATE plushies SET owner_token_hash = ? WHERE uid = ?").run(hash(token), uid);
@@ -93,14 +93,14 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       db.prepare(`INSERT INTO claim_attempts (uid, attempts, window_start) VALUES (?, ?, ?)
         ON CONFLICT(uid) DO UPDATE SET attempts = excluded.attempts, window_start = excluded.window_start`).run(uid, count, active ? attempt.window_start : time);
       return { status: count >= 5 ? 429 : 403, row, message: count >= 5
-        ? "Too many tries. Please wait 15 minutes from your first attempt, then try again."
-        : "that code did not match" };
+        ? "시도가 너무 많았어요. 첫 시도로부터 15분이 지난 뒤에 다시 시도해 주세요."
+        : "코드가 맞지 않아요." };
     })();
     if (result.token) {
       setOwner(res, result.token);
       return res.redirect(303, `/t?uid=${uid}`);
     }
-    res.status(result.status).send(result.row ? strangerPage(result.row, result.message) : page(null, "<p>Meet your plushie with its tap link first.</p>"));
+    res.status(result.status).send(result.row ? strangerPage(result.row, result.message) : page(null, "<p>먼저 인형에 있는 링크로 친구를 만나보세요.</p>"));
   });
 
   if (!production) {
@@ -111,12 +111,12 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       res.redirect(303, "/dev");
     });
   }
-  app.use((req, res) => res.status(404).send(page(null, "<p>This friend is waiting at the link on your plushie.</p>")));
+  app.use((req, res) => res.status(404).send(page(null, "<p>이 친구는 인형에 있는 링크에서 기다리고 있어요.</p>")));
   app.use((error, req, res, next) => {
     const status = error.status >= 400 && error.status < 500 ? error.status : 500;
     res.status(status).send(page(null, status === 500
-      ? "<p>Your friend cannot wake up just yet. Please try again later.</p>"
-      : "<p>That request could not be read. Please try again.</p>"));
+      ? "<p>친구가 아직 깨어나지 못했어요. 잠시 후에 다시 찾아와 주세요.</p>"
+      : "<p>요청을 확인할 수 없어요. 다시 시도해 주세요.</p>"));
   });
   return app;
 }

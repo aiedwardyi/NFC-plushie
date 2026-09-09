@@ -47,7 +47,7 @@ test("scripted route flow: first meeting, naming, transfer, and separate plushie
   const first = await request(tapUrl());
   pages.push(first.html);
   assert.equal(first.status, 200);
-  assert.match(first.html, /What would you like to call me/);
+  assert.match(first.html, /내 이름을 뭐라고 지어줄래요/);
   const code = first.html.match(/class="code">([A-Z2-9]{6})</)[1];
   const token = first.cookie.split("=")[1];
   let row = db.prepare("SELECT * FROM plushies WHERE uid = ?").get(A);
@@ -69,17 +69,17 @@ test("scripted route flow: first meeting, naming, transfer, and separate plushie
   answers.tap = "OWNER";
   const owner = await request(tapUrl(), { cookie: first.cookie });
   pages.push(owner.html);
-  assert.match(owner.html, /Hello again, Mochi!/);
-  assert.match(owner.html, /2 happy taps/);
+  assert.match(owner.html, /다시 만나서 반가워요, Mochi!/);
+  assert.match(owner.html, /행복한 토닥임 2번/);
   assert.equal(calls.at(-1)[2], token);
   const reload = await request(tapUrl(), { cookie: first.cookie });
   pages.push(reload.html);
-  assert.match(reload.html, /3 happy taps/);
+  assert.match(reload.html, /행복한 토닥임 3번/);
 
   answers.tap = "STRANGER";
   const stranger = await request(tapUrl());
   pages.push(stranger.html);
-  assert.match(stranger.html, /already belongs to someone/);
+  assert.match(stranger.html, /이미 주인이 있어요/);
   assert.equal(db.prepare("SELECT tap_count FROM plushies WHERE uid = ?").get(A).tap_count, 3);
   answers.claim = true;
   const claimed = await request("/claim", { body: { uid: A, code } });
@@ -96,11 +96,11 @@ test("scripted route flow: first meeting, naming, transfer, and separate plushie
   answers.tap = "OWNER";
   const moved = await request(tapUrl(), { cookie: claimed.cookie });
   pages.push(moved.html);
-  assert.match(moved.html, /Hello again, Mochi!/);
+  assert.match(moved.html, /다시 만나서 반가워요, Mochi!/);
   answers.tap = "STRANGER";
   const oldPhone = await request(tapUrl(), { cookie: first.cookie });
   pages.push(oldPhone.html);
-  assert.match(oldPhone.html, /already belongs to someone/);
+  assert.match(oldPhone.html, /이미 주인이 있어요/);
   assert.equal(calls.at(-1)[2], token);
 
   const before = db.prepare("SELECT * FROM plushies WHERE uid = ?").get(A);
@@ -120,8 +120,8 @@ test("unnamed owner sees name prompt without a recovery code", async (t) => {
   const first = await request(tapUrl());
   answers.tap = "OWNER";
   const next = await request(tapUrl(), { cookie: first.cookie });
-  assert.match(next.html, /What would you like to call me/);
-  assert.doesNotMatch(next.html, /class="code"|keep-safe code/);
+  assert.match(next.html, /내 이름을 뭐라고 지어줄래요/);
+  assert.doesNotMatch(next.html, /class="code"|안심 코드/);
 });
 
 test("five failed claims trigger persistent per-uid cooldown and expiry", async (t) => {
@@ -131,7 +131,7 @@ test("five failed claims trigger persistent per-uid cooldown and expiry", async 
   for (let i = 1; i <= 5; i++) {
     const wrong = await request("/claim", { body: { uid: A, code: "WRONG" } });
     assert.equal(wrong.status, i === 5 ? 429 : 403);
-    assert.match(wrong.html, i === 5 ? /wait 15 minutes/ : /that code did not match/);
+    assert.match(wrong.html, i === 5 ? /15분/ : /코드가 맞지 않아요/);
   }
   const reopened = openDatabase(dir);
   assert.equal(reopened.prepare("SELECT attempts FROM claim_attempts WHERE uid = ?").get(A).attempts, 5);
