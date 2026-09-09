@@ -70,11 +70,11 @@ test("scripted route flow: first meeting, naming, transfer, and separate plushie
   const owner = await request(tapUrl(), { cookie: first.cookie });
   pages.push(owner.html);
   assert.match(owner.html, /다시 만나서 반가워요, Mochi!/);
-  assert.match(owner.html, /행복한 토닥임 2번/);
+  assert.match(owner.html, /우리 2번 토닥였어요!/);
   assert.equal(calls.at(-1)[2], token);
   const reload = await request(tapUrl(), { cookie: first.cookie });
   pages.push(reload.html);
-  assert.match(reload.html, /행복한 토닥임 3번/);
+  assert.match(reload.html, /우리 3번 토닥였어요!/);
 
   answers.tap = "STRANGER";
   const stranger = await request(tapUrl());
