@@ -3,7 +3,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import * as binding from "./binding.js";
 import { hash, ownerToken, recoveryCode } from "./secrets.js";
-import { devPage, page, petPage, strangerPage } from "./pages.js";
+import { devPage, page, petPage, previewPetPage, strangerPage } from "./pages.js";
 
 const cookieAge = 400 * 24 * 60 * 60 * 1000;
 const cooldown = 15 * 60 * 1000;
@@ -128,6 +128,15 @@ export function createApp({ db, decisions = binding, production = process.env.NO
 
   if (!production) {
     app.get("/dev", (req, res) => res.send(devPage()));
+    app.get("/dev/preview", (req, res) => {
+      const kind = req.query.kind;
+      const count = Number(req.query.count);
+      const allowedCount = count === 10 || count === 100;
+      if ((kind !== "claim" && kind !== "milestone") || !allowedCount) {
+        return res.status(404).send(page(null, "<p>이 친구는 인형에 있는 링크에서 기다리고 있어요.</p>"));
+      }
+      res.send(previewPetPage({ kind, count }));
+    });
     app.post("/dev/reset", (req, res) => {
       db.prepare("DELETE FROM plushies").run();
       res.clearCookie("owner_token", { path: "/", httpOnly: true, sameSite: "lax" });

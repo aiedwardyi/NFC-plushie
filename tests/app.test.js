@@ -330,3 +330,74 @@ test("unnamed returning owner has no tap count and no celebrate", async (t) => {
   assert.doesNotMatch(next.html, /data-tap-count/);
   assert.doesNotMatch(next.html, /data-celebrate/);
 });
+
+test("returning owner count keeps final number as plain text in HTML", async (t) => {
+  const { answers, request } = await setup(t);
+  const first = await request(tapUrl());
+  await request("/name", { cookie: first.cookie, body: { uid: A, name: "Mochi" } });
+  answers.tap = "OWNER";
+  const owner = await request(tapUrl(), { cookie: first.cookie });
+  assert.match(owner.html, /우리 \d+번 토닥였어요!/);
+  assert.match(owner.html, /data-tap-count="\d+"/);
+  assert.match(owner.html, /<span class="count-final">우리 \d+번 토닥였어요!<\/span>/);
+});
+
+test("stranger pages expose no celebration or evolution hooks", async (t) => {
+  const { answers, request } = await setup(t);
+  await request(tapUrl());
+  answers.tap = "STRANGER";
+  const stranger = await request(tapUrl());
+  assert.doesNotMatch(stranger.html, /data-celebrate/);
+  assert.doesNotMatch(stranger.html, /data-tap-count/);
+  assert.doesNotMatch(stranger.html, /count-final|evo-overlay|evolution|data-evo/);
+  assert.doesNotMatch(stranger.html, /class="milestone"/);
+});
+
+test("milestone celebrate only when named pet hits a milestone count", async (t) => {
+  const { db, answers, request } = await setup(t);
+  const first = await request(tapUrl());
+  await request("/name", { cookie: first.cookie, body: { uid: A, name: "Mochi" } });
+  db.prepare("UPDATE plushies SET tap_count = 9 WHERE uid = ?").run(A);
+  answers.tap = "OWNER";
+  const ten = await request(tapUrl(), { cookie: first.cookie });
+  assert.match(ten.html, /data-celebrate="milestone"/);
+  assert.match(ten.html, /벌써 열 번이에요!/);
+  db.prepare("UPDATE plushies SET tap_count = 11 WHERE uid = ?").run(A);
+  const twelve = await request(tapUrl(), { cookie: first.cookie });
+  assert.doesNotMatch(twelve.html, /data-celebrate/);
+});
+
+test("dev preview celebration routes render and stay hidden in production", async (t) => {
+  const { request } = await setup(t);
+  const claim = await request("/dev/preview?kind=claim&count=10");
+  assert.equal(claim.status, 200);
+  assert.match(claim.html, /data-celebrate="claim"/);
+  assert.match(claim.html, /data-tap-count="10"/);
+  assert.match(claim.html, /count-final">우리 10번 토닥였어요!</);
+
+  const mile10 = await request("/dev/preview?kind=milestone&count=10");
+  assert.equal(mile10.status, 200);
+  assert.match(mile10.html, /data-celebrate="milestone"/);
+  assert.match(mile10.html, /data-tap-count="10"/);
+  assert.match(mile10.html, /벌써 열 번이에요!/);
+
+  const mile100 = await request("/dev/preview?kind=milestone&count=100");
+  assert.equal(mile100.status, 200);
+  assert.match(mile100.html, /data-celebrate="milestone"/);
+  assert.match(mile100.html, /data-tap-count="100"/);
+  assert.match(mile100.html, /백 번 만났어요!/);
+
+  const bad = await request("/dev/preview?kind=nope&count=10");
+  assert.equal(bad.status, 404);
+
+  const hub = await request("/dev");
+  assert.match(hub.html, /\/dev\/preview\?kind=claim/);
+  assert.match(hub.html, /\/dev\/preview\?kind=milestone&count=10/);
+  assert.match(hub.html, /\/dev\/preview\?kind=milestone&count=100/);
+
+  const { request: prodRequest } = await setup(t, { production: true });
+  assert.equal((await prodRequest("/dev")).status, 404);
+  assert.equal((await prodRequest("/dev/preview?kind=claim&count=10")).status, 404);
+  assert.equal((await prodRequest("/dev/preview?kind=milestone&count=10")).status, 404);
+  assert.equal((await prodRequest("/dev/preview?kind=milestone&count=100")).status, 404);
+});
