@@ -642,7 +642,10 @@ function runCelebrate() {
       enhanceRollingCounter({ duration: 0, goldPop: false });
       return;
     }
-    runEvolutionGlow();
+    document.body.classList.add("is-levelup-glow");
+    runEvolutionGlow({
+      onComplete: () => document.body.classList.remove("is-levelup-glow"),
+    });
     return;
   }
 

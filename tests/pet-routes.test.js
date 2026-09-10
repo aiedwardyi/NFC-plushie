@@ -134,7 +134,7 @@ test("reload within 30 minutes is unrewarded and writes nothing but tap_count", 
   const reload = await ctx.request(`/t?uid=${A}`, { jar });
   assert.match(reload.html, /data-rewarded="0"/);
   assert.match(reload.html, /data-reason="cooldown"/);
-  assert.match(reload.html, /방금 토닥여서 기분 좋아! 잠깐 있다 다시 토닥여줘\./);
+  assert.match(reload.html, /방금 토닥여줘서 기분 좋아! 잠깐 있다 다시 토닥여줘\./);
   assert.doesNotMatch(reload.html, /<p class="gift /);
   assert.doesNotMatch(reload.html, /행복이 가득/);
   const after = ctx.row();
@@ -382,10 +382,10 @@ test("celebration priority: levelup over milestone, reunion over milestone, rare
   ctx.db.prepare("UPDATE plushies SET tap_count = 9, xp = 90, last_rewarded_at = NULL WHERE uid = ?").run(A);
   const both = await ctx.request(`/t?uid=${A}`, { jar });
   assert.match(both.html, /data-celebrate="levelup"/);
-  assert.match(both.html, /성장했어! 이제 Lv\. 2이야!/);
+  assert.match(both.html, /쑥쑥 컸어! 이제 Lv\. 2!/);
   assert.match(both.html, /벌써 열 번이야!/);
   assert.match(both.html, /Lv\. 2/);
-  assert.match(both.html, /pet-moments[\s\S]*성장했어![\s\S]*벌써 열 번이야![\s\S]*pet-stats/);
+  assert.match(both.html, /pet-moments[\s\S]*쑥쑥 컸어![\s\S]*벌써 열 번이야![\s\S]*pet-stats/);
   assert.match(both.html, /xp-fill" style="width:(\d+)%"/);
   const xpPct = Number(both.html.match(/xp-fill" style="width:(\d+)%"/)[1]);
   assert.ok(xpPct < 50, `expected near-empty XP after level-up, got ${xpPct}%`);

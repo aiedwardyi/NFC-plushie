@@ -402,8 +402,8 @@ test("dev preview celebration routes render and stay hidden in production", asyn
   assert.equal(levelup.status, 200);
   assert.match(levelup.html, /data-celebrate="levelup"/);
   assert.match(levelup.html, /Lv\. 2/);
-  assert.match(levelup.html, /성장했어! 이제 Lv\. 2이야!/);
-  assert.match(levelup.html, /xp-fill" style="width:5%"/);
+  assert.match(levelup.html, /쑥쑥 컸어! 이제 Lv\. 2!/);
+  assert.match(levelup.html, /xp-fill" style="width:0%"/);
 
   const reunion = await request("/dev/preview?kind=reunion&count=10");
   assert.equal(reunion.status, 200);
@@ -422,7 +422,7 @@ test("dev preview celebration routes render and stay hidden in production", asyn
 
   const coolPrev = await request("/dev/preview?kind=gift&count=10&reason=cooldown");
   assert.equal(coolPrev.status, 200);
-  assert.match(coolPrev.html, /방금 토닥여서 기분 좋아! 잠깐 있다 다시 토닥여줘\./);
+  assert.match(coolPrev.html, /방금 토닥여줘서 기분 좋아! 잠깐 있다 다시 토닥여줘\./);
   assert.doesNotMatch(coolPrev.html, /<p class="gift /);
 
   const lonely = await request("/dev/preview?kind=lonely&count=10");

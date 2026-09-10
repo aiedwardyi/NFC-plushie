@@ -198,12 +198,12 @@ export function previewPetPage({ kind, count, tier = "common", reason = "" }) {
     : "오늘도 와줘서 고마워!";
   const tierClass = tier === "rare" ? "is-rare" : tier === "special" ? "is-special" : "is-common";
   const unrewarded = {
-    cooldown: "방금 토닥여서 기분 좋아! 잠깐 있다 다시 토닥여줘.",
+    cooldown: "방금 토닥여줘서 기분 좋아! 잠깐 있다 다시 토닥여줘.",
     cap: "오늘은 실컷 놀았어! 내일 또 만나자!",
     stale: "폰으로 진짜 나를 톡 해줘!",
   };
   const moments = [];
-  if (kind === "levelup") moments.push(`<p class="pet-line is-levelup">성장했어! 이제 Lv. 2이야!</p>`);
+  if (kind === "levelup") moments.push(`<p class="pet-line is-levelup">쑥쑥 컸어! 이제 Lv. 2!</p>`);
   if (kind === "reunion") moments.push(`<p class="pet-line is-reunion">보고 싶었어! 진짜로!</p>`);
   if (mile) moments.push(`<p class="milestone">${escapeHtml(mile)}</p>`);
   if (kind === "lonely") moments.push(`<p class="pet-line is-lonely-line">혼자 있어서 심심했어...</p>`);
@@ -217,7 +217,7 @@ export function previewPetPage({ kind, count, tier = "common", reason = "" }) {
     : "";
   const stats = heartRow(kind === "lonely" ? 20 : kind === "reunion" ? 70 : 80, { animate: kind === "reunion", before: kind === "reunion" ? 20 : null })
     + `<p class="level-line"><span class="level-badge">Lv. ${kind === "levelup" ? 2 : 1}</span>`
-    + `<span class="xp-bar"><span class="xp-fill" style="width:${kind === "levelup" ? 5 : 40}%"></span></span></p>`
+    + `<span class="xp-bar"><span class="xp-fill" style="width:${kind === "levelup" ? 0 : 40}%"></span></span></p>`
     + `<p class="days-line">함께한 지 12일</p><p class="gift-count">선물 7/30</p>`;
   const visual = kind === "gift" ? (tier === "rare" ? "rare" : tier === "special" ? "special" : "") : kind === "lonely" ? "" : kind;
   const greeting = kind === "claim"
