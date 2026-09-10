@@ -27,7 +27,8 @@ export function currentMood(state, now) {
 }
 
 export function levelForXp(xp) {
-  const total = Math.max(0, Math.floor(Number(xp) || 0));
+  const n = Number(xp);
+  const total = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
   let level = 1;
   while (xpForLevel(level + 1) <= total) level += 1;
   return level;
@@ -41,7 +42,8 @@ export function xpProgress(xp) {
   const level = levelForXp(xp);
   const base = xpForLevel(level);
   const next = xpForLevel(level + 1);
-  const total = Math.max(0, Math.floor(Number(xp) || 0));
+  const n = Number(xp);
+  const total = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
   return { level, base, next, into: total - base, span: next - base };
 }
 
