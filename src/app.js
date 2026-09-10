@@ -13,8 +13,8 @@ const cooldown = 15 * 60 * 1000;
 const skipAge = 2 * 60 * 1000;
 const validUid = (uid) => typeof uid === "string" && /^[0-9A-F]{14}$/.test(uid);
 
-const STALE_LINE = "폰으로 진짜 저를 톡 해 주세요!";
-const COOLDOWN_LINE = "방금 토닥여줘서 기분 좋아요! 잠깐 있다 다시 토닥여 주세요.";
+const STALE_LINE = "폰을 진짜 저한테 톡 대 주세요!";
+const COOLDOWN_LINE = "방금 토닥여 줘서 기분 좋아요! 조금 있다가 또 토닥여 주세요.";
 const UNREWARDED_LINES = {
   cooldown: COOLDOWN_LINE,
   cap: "오늘은 실컷 놀았어요! 내일 또 만나요!",

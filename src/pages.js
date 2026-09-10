@@ -122,7 +122,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
     ${petMarkup({ waving, away, lonely })}
     ${countHtml}
     ${content}
-    <footer>살짝 토닥. 다정한 친구.</footer>
+    <footer>토닥이면 깨어나는 작은 친구</footer>
   </main>
 </body>
 </html>`;
@@ -136,11 +136,11 @@ export function petPage(row, code = null, { celebrate = "", pet = null } = {}) {
       : `다시 만나서 반가워요, ${escapeHtml(row.pet_name)}!`)
     : "안녕하세요! 찾아와 줘서 정말 기뻐요.";
   const recovery = code ? `<aside class="recovery"><h2>우리 안심 코드</h2>
-    <p>꼭 적어두세요. 새 폰으로 나를 데려갈 때 꼭 필요해요.</p>
+    <p>꼭 적어두세요. 새 폰으로 저를 데려갈 때 꼭 필요해요.</p>
     <strong class="code">${escapeHtml(code)}</strong><p>지금만 볼 수 있어요. 이름을 짓거나 창을 닫기 전에 꼭 챙겨두세요.</p></aside>` : "";
   const prompt = row.pet_name ? "" : `<form action="/name" method="post">
     <input type="hidden" name="uid" value="${escapeHtml(row.uid)}">
-    <label for="name">내 이름을 뭐라고 지어줄래요?</label>
+    <label for="name">제 이름을 뭐라고 지어 줄래요?</label>
     <input id="name" name="name" required maxlength="24" autocomplete="off" placeholder="친구 이름">
     <button type="submit">이 이름으로 지어줄게요!</button>
   </form>`;
@@ -193,14 +193,14 @@ export function previewPetPage({ kind, count, tier = "common", reason = "" }) {
   };
   const mile = kind === "milestone" ? milestoneLine(n) : "";
   const countHtml = `<p class="count" data-tap-count="${n}"><span class="count-final">우리 ${n}번 토닥였어요!</span></p>`;
-  const giftLine = tier === "rare" ? "별빛이 반짝여요. 오늘 선물이에요!"
+  const giftLine = tier === "rare" ? "별똥별을 주웠어요! 소원 하나 빌어요!"
     : tier === "special" ? "고마움이 가득가득 넘쳐요!"
     : "오늘도 와줘서 고마워요!";
   const tierClass = tier === "rare" ? "is-rare" : tier === "special" ? "is-special" : "is-common";
   const unrewarded = {
-    cooldown: "방금 토닥여줘서 기분 좋아요! 잠깐 있다 다시 토닥여 주세요.",
+    cooldown: "방금 토닥여 줘서 기분 좋아요! 조금 있다가 또 토닥여 주세요.",
     cap: "오늘은 실컷 놀았어요! 내일 또 만나요!",
-    stale: "폰으로 진짜 저를 톡 해 주세요!",
+    stale: "폰을 진짜 저한테 톡 대 주세요!",
   };
   const moments = [];
   if (kind === "levelup") moments.push(`<p class="pet-line is-levelup">쑥쑥 컸어요! 이제 Lv. 2!</p>`);

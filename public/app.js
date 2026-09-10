@@ -14,7 +14,7 @@ window.addEventListener("pageshow", (event) => {
 
 const TIME_LINES = {
   morning: "좋은 아침이에요",
-  day: "한낮에도 반가워요",
+  day: "즐거운 오후예요",
   evening: "좋은 저녁이에요",
   night: "잘 자요",
 };

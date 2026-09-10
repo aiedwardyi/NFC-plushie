@@ -134,7 +134,7 @@ test("reload within 30 minutes is unrewarded and writes nothing but tap_count", 
   const reload = await ctx.request(`/t?uid=${A}`, { jar });
   assert.match(reload.html, /data-rewarded="0"/);
   assert.match(reload.html, /data-reason="cooldown"/);
-  assert.match(reload.html, /방금 토닥여줘서 기분 좋아요! 잠깐 있다 다시 토닥여 주세요\./);
+  assert.match(reload.html, /방금 토닥여 줘서 기분 좋아요! 조금 있다가 또 토닥여 주세요\./);
   assert.doesNotMatch(reload.html, /<p class="gift /);
   assert.doesNotMatch(reload.html, /행복이 가득/);
   const after = ctx.row();
@@ -183,7 +183,7 @@ test("a repeated or lower counter is stale, and the mirror never lowers", async 
   const same = await ctx.request(`/t?uid=${A}x00000A`, { jar });
   assert.match(same.html, /data-rewarded="0"/);
   assert.match(same.html, /data-reason="stale"/);
-  assert.match(same.html, /폰으로 진짜 저를 톡 해 주세요!/);
+  assert.match(same.html, /폰을 진짜 저한테 톡 대 주세요!/);
   const lower = await ctx.request(`/t?uid=${A}x000009`, { jar });
   assert.match(lower.html, /data-reason="stale"/);
   assert.equal(ctx.row().last_counter, 10);
@@ -197,7 +197,7 @@ test("a uid-only tap on a mirrored plushie is stale", async (t) => {
   const bare = await ctx.request(`/t?uid=${A}`, { jar });
   assert.match(bare.html, /data-rewarded="0"/);
   assert.match(bare.html, /data-reason="stale"/);
-  assert.match(bare.html, /폰으로 진짜 저를 톡 해 주세요!/);
+  assert.match(bare.html, /폰을 진짜 저한테 톡 대 주세요!/);
 });
 
 test("a null mirror keeps uid-only behavior exactly", async (t) => {
@@ -234,7 +234,7 @@ test("unnamed owner taps stay non-rewarded until named", async (t) => {
   const jar = {};
   await request(`/t?uid=${A}`, { jar }).then((r) => updateJar(jar, r.setCookies));
   const next = await request(`/t?uid=${A}`, { jar });
-  assert.match(next.html, /내 이름을 뭐라고 지어줄래요/);
+  assert.match(next.html, /제 이름을 뭐라고 지어 줄래요/);
   assert.doesNotMatch(next.html, /data-pet-state/);
   assert.equal(ctx.row().xp, 0);
 });

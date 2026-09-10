@@ -55,7 +55,7 @@ test("scripted route flow: first meeting, naming, transfer, and separate plushie
   const first = await request(tapUrl());
   pages.push(first.html);
   assert.equal(first.status, 200);
-  assert.match(first.html, /내 이름을 뭐라고 지어줄래요/);
+  assert.match(first.html, /제 이름을 뭐라고 지어 줄래요/);
   assert.doesNotMatch(first.html, /data-tap-count/);
   assert.doesNotMatch(first.html, /data-celebrate/);
   const code = first.html.match(/class="code">([A-Z2-9]{6})</)[1];
@@ -140,7 +140,7 @@ test("unnamed owner sees name prompt without a recovery code", async (t) => {
   const first = await request(tapUrl());
   answers.tap = "OWNER";
   const next = await request(tapUrl(), { cookie: first.cookie });
-  assert.match(next.html, /내 이름을 뭐라고 지어줄래요/);
+  assert.match(next.html, /제 이름을 뭐라고 지어 줄래요/);
   assert.doesNotMatch(next.html, /class="code"|안심 코드/);
 });
 
@@ -331,7 +331,7 @@ test("unnamed returning owner has no tap count and no celebrate", async (t) => {
   const first = await request(tapUrl());
   answers.tap = "OWNER";
   const next = await request(tapUrl(), { cookie: first.cookie });
-  assert.match(next.html, /내 이름을 뭐라고 지어줄래요/);
+  assert.match(next.html, /제 이름을 뭐라고 지어 줄래요/);
   assert.doesNotMatch(next.html, /data-tap-count/);
   assert.doesNotMatch(next.html, /data-celebrate/);
 });
@@ -422,7 +422,7 @@ test("dev preview celebration routes render and stay hidden in production", asyn
 
   const coolPrev = await request("/dev/preview?kind=gift&count=10&reason=cooldown");
   assert.equal(coolPrev.status, 200);
-  assert.match(coolPrev.html, /방금 토닥여줘서 기분 좋아요! 잠깐 있다 다시 토닥여 주세요\./);
+  assert.match(coolPrev.html, /방금 토닥여 줘서 기분 좋아요! 조금 있다가 또 토닥여 주세요\./);
   assert.doesNotMatch(coolPrev.html, /<p class="gift /);
 
   const lonely = await request("/dev/preview?kind=lonely&count=10");
