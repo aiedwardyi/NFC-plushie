@@ -4,8 +4,42 @@ export function escapeHtml(value) {
   })[char]);
 }
 
-export function page(row, content, waving = false) {
+export function milestoneLine(count) {
+  const n = Number(count);
+  if (n === 10) return "벌써 열 번이에요!";
+  if (n === 25) return "스물다섯 번이에요!";
+  if (n === 50) return "오십 번이에요!";
+  if (n === 100) return "백 번 만났어요!";
+  if (n > 100 && n % 100 === 0) return `${n}번이에요!`;
+  return "";
+}
+
+function petMarkup({ waving = false, away = false } = {}) {
+  if (away) {
+    const awayAlt = "다정한 인형 친구가 등을 보이고 있어요";
+    return `<div class="pet pet-away" data-pet="away" role="img" aria-label="${awayAlt}">
+      <span class="pet-motion">
+        <img class="pet-frame is-show" src="/mascot-duck-away-512.png" width="220" height="220" alt="" decoding="async">
+      </span>
+    </div>`;
+  }
+  const alt = "다정한 인형 친구가 방긋 웃어요";
+  const enterClass = waving ? " enter" : "";
+  return `<div class="pet${enterClass}" data-pet="alive">
+      <button type="button" class="pet-hit" aria-label="${alt}">
+        <span class="pet-motion">
+          <img class="pet-frame is-show" data-frame="canon" src="/mascot-duck-512.png" width="220" height="220" alt="${alt}" decoding="async">
+          <img class="pet-frame" data-frame="blink" src="/mascot-duck-blink-512.png" width="220" height="220" alt="" aria-hidden="true" decoding="async">
+          <img class="pet-frame" data-frame="react" src="/mascot-duck-react-512.png" width="220" height="220" alt="" aria-hidden="true" decoding="async">
+          <img class="pet-frame" data-frame="sleepy" src="/mascot-duck-sleepy-512.png" width="220" height="220" alt="" aria-hidden="true" decoding="async">
+        </span>
+      </button>
+    </div>`;
+}
+
+export function page(row, content, { waving = false, away = false, timeLine = false } = {}) {
   const title = escapeHtml(row?.pet_name || "새 친구");
+  const timeEl = timeLine ? `<p class="time-line" data-time-line></p>` : "";
   return `<!doctype html>
 <html lang="ko">
 <head>
@@ -19,9 +53,8 @@ export function page(row, content, waving = false) {
   <main>
     <p class="eyebrow">살포시 전하는 안녕</p>
     <h1>${title}</h1>
-    <div class="pet ${waving ? "waving" : "idle"}" role="img" aria-label="${waving ? "다정한 인형 친구가 손을 흔들어요" : "다정한 인형 친구가 방긋 웃어요"}">
-      <div class="arm"></div><div class="blob"><span class="eyes"></span><span class="smile"></span></div>
-    </div>
+    ${timeEl}
+    ${petMarkup({ waving, away })}
     ${content}
     <footer>작은 토닥임. 다정한 친구.</footer>
   </main>
@@ -40,7 +73,14 @@ export function petPage(row, code = null) {
     <input id="name" name="name" required maxlength="24" autocomplete="off" placeholder="친구 이름">
     <button type="submit">이 이름으로 지어줄게요!</button>
   </form>`;
-  return page(row, `<p class="intro">${greeting}</p>${recovery}${prompt}<p class="count">우리 ${row.tap_count}번 토닥였어요!</p>`, Boolean(code));
+  const returning = Boolean(row.pet_name) && !code;
+  const mile = returning ? milestoneLine(row.tap_count) : "";
+  const mileHtml = mile ? `<p class="milestone">${escapeHtml(mile)}</p>` : "";
+  return page(
+    row,
+    `<p class="intro">${greeting}</p>${recovery}${prompt}<p class="count">우리 ${row.tap_count}번 토닥였어요!</p>${mileHtml}`,
+    { waving: Boolean(code), timeLine: true },
+  );
 }
 
 export function strangerPage(row, message = "") {
@@ -53,7 +93,7 @@ export function strangerPage(row, message = "") {
       <input id="code" name="code" required autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="claim-help">
       <p id="claim-help">처음 만났을 때 적어둔 안심 코드를 넣어주세요.</p>
       <button type="submit">내 친구를 데려올래요!</button>
-    </form>`);
+    </form>`, { away: true });
 }
 
 export const fakeUids = ["04AAAAAAAAAAA1", "04BBBBBBBBBBB2", "04CCCCCCCCCCC3"];

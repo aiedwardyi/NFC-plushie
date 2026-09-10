@@ -24,7 +24,13 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   app.use(express.urlencoded({ extended: false, limit: "4kb" }));
   app.use(express.json({ limit: "4kb" }));
   app.use(cookieParser());
-  app.use(express.static(fileURLToPath(new URL("../public", import.meta.url))));
+  app.use(express.static(fileURLToPath(new URL("../public", import.meta.url)), {
+    setHeaders(res, filePath) {
+      if (/\.(?:png|jpe?g|gif|webp|svg|ico)$/i.test(filePath)) {
+        res.setHeader("Cache-Control", "public, max-age=86400");
+      }
+    },
+  }));
 
   const getRow = (uid) => db.prepare("SELECT * FROM plushies WHERE uid = ?").get(uid) || null;
   const setOwner = (res, token) => res.cookie("owner_token", token, {
