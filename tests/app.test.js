@@ -36,7 +36,15 @@ async function setup(t, options = {}) {
       headers: { ...(cookie ? { Cookie: cookie } : {}), ...(body ? { "Content-Type": "application/json" } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    return { status: res.status, html: await res.text(), headers: res.headers, cookie: res.headers.get("set-cookie")?.split(";")[0] };
+    const setCookies = typeof res.headers.getSetCookie === "function" ? res.headers.getSetCookie() : [];
+    const primary = setCookies[0]?.split(";")[0] || res.headers.get("set-cookie")?.split(";")[0];
+    return {
+      status: res.status,
+      html: await res.text(),
+      headers: res.headers,
+      cookie: primary,
+      setCookies,
+    };
   }
   return { db, calls, answers, request, dir, advance: (ms) => { time += ms; } };
 }
@@ -48,6 +56,8 @@ test("scripted route flow: first meeting, naming, transfer, and separate plushie
   pages.push(first.html);
   assert.equal(first.status, 200);
   assert.match(first.html, /내 이름을 뭐라고 지어줄래요/);
+  assert.doesNotMatch(first.html, /data-tap-count/);
+  assert.doesNotMatch(first.html, /data-celebrate/);
   const code = first.html.match(/class="code">([A-Z2-9]{6})</)[1];
   const token = first.cookie.split("=")[1];
   let row = db.prepare("SELECT * FROM plushies WHERE uid = ?").get(A);
@@ -64,22 +74,30 @@ test("scripted route flow: first meeting, naming, transfer, and separate plushie
   pages.push(named.html);
   assert.equal(named.status, 303);
   assert.equal(named.headers.get("location"), tapUrl());
+  assert.match(named.setCookies.join("\n"), /celebrate=claim/);
   assert.equal(calls.at(-1)[0], "rename");
   assert.equal(calls.at(-1)[2], token);
   answers.tap = "OWNER";
-  const owner = await request(tapUrl(), { cookie: first.cookie });
+  const claimJar = [first.cookie, "celebrate=claim"].join("; ");
+  const owner = await request(tapUrl(), { cookie: claimJar });
   pages.push(owner.html);
   assert.match(owner.html, /다시 만나서 반가워요, Mochi!/);
+  assert.match(owner.html, /data-tap-count/);
   assert.match(owner.html, /우리 2번 토닥였어요!/);
+  assert.match(owner.html, /data-celebrate="claim"/);
+  assert.match(owner.setCookies.join("\n"), /celebrate=/);
   assert.equal(calls.at(-1)[2], token);
   const reload = await request(tapUrl(), { cookie: first.cookie });
   pages.push(reload.html);
   assert.match(reload.html, /우리 3번 토닥였어요!/);
+  assert.doesNotMatch(reload.html, /data-celebrate/);
 
   answers.tap = "STRANGER";
   const stranger = await request(tapUrl());
   pages.push(stranger.html);
   assert.match(stranger.html, /이미 주인이 있어요/);
+  assert.doesNotMatch(stranger.html, /data-tap-count/);
+  assert.doesNotMatch(stranger.html, /data-celebrate/);
   assert.equal(db.prepare("SELECT tap_count FROM plushies WHERE uid = ?").get(A).tap_count, 3);
   answers.claim = true;
   const claimed = await request("/claim", { body: { uid: A, code } });
@@ -97,6 +115,7 @@ test("scripted route flow: first meeting, naming, transfer, and separate plushie
   const moved = await request(tapUrl(), { cookie: claimed.cookie });
   pages.push(moved.html);
   assert.match(moved.html, /다시 만나서 반가워요, Mochi!/);
+  assert.doesNotMatch(moved.html, /data-celebrate="claim"/);
   answers.tap = "STRANGER";
   const oldPhone = await request(tapUrl(), { cookie: first.cookie });
   pages.push(oldPhone.html);
@@ -269,4 +288,45 @@ test("secrets have the required format and hashes", () => {
   assert.notEqual(ownerToken(), token);
   for (let i = 0; i < 100; i++) assert.match(recoveryCode(), /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/);
   assert.equal(hash("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+});
+
+test("claim celebrate flash is server-consumed and missing on the next tap", async (t) => {
+  const { answers, request } = await setup(t);
+  const first = await request(tapUrl());
+  const named = await request("/name", { cookie: first.cookie, body: { uid: A, name: "Mochi" } });
+  assert.equal(named.status, 303);
+  assert.match(named.setCookies.join("\n"), /celebrate=claim/);
+  answers.tap = "OWNER";
+  const celebrated = await request(tapUrl(), { cookie: `${first.cookie}; celebrate=claim` });
+  assert.match(celebrated.html, /data-celebrate="claim"/);
+  assert.match(celebrated.setCookies.join("\n"), /celebrate=/);
+  const again = await request(tapUrl(), { cookie: first.cookie });
+  assert.doesNotMatch(again.html, /data-celebrate/);
+});
+
+test("returning milestone page marks celebrate and keeps distinct lines", async (t) => {
+  const { db, answers, request } = await setup(t);
+  const first = await request(tapUrl());
+  await request("/name", { cookie: first.cookie, body: { uid: A, name: "Mochi" } });
+  db.prepare("UPDATE plushies SET tap_count = 49 WHERE uid = ?").run(A);
+  answers.tap = "OWNER";
+  const mile = await request(tapUrl(), { cookie: first.cookie });
+  assert.match(mile.html, /data-celebrate="milestone"/);
+  assert.match(mile.html, /data-tap-count/);
+  assert.match(mile.html, /우리 50번 토닥였어요!/);
+  assert.match(mile.html, /오십 번이에요!/);
+  const next = await request(tapUrl(), { cookie: first.cookie });
+  assert.doesNotMatch(next.html, /data-celebrate/);
+  assert.match(next.html, /우리 51번 토닥였어요!/);
+  assert.doesNotMatch(next.html, /오십 번이에요!/);
+});
+
+test("unnamed returning owner has no tap count and no celebrate", async (t) => {
+  const { answers, request } = await setup(t);
+  const first = await request(tapUrl());
+  answers.tap = "OWNER";
+  const next = await request(tapUrl(), { cookie: first.cookie });
+  assert.match(next.html, /내 이름을 뭐라고 지어줄래요/);
+  assert.doesNotMatch(next.html, /data-tap-count/);
+  assert.doesNotMatch(next.html, /data-celebrate/);
 });
