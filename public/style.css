@@ -149,9 +149,10 @@ a { color: var(--cap-blue-deep); }
   .code { font-size: 1.85rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pet[data-pet="alive"] .pet-motion,
-  .pet[data-pet="alive"].enter .pet-motion,
-  .pet[data-pet="alive"].is-night .pet-motion,
+  .pet[data-pet="alive"]:not(.is-press) .pet-motion,
+  .pet[data-pet="alive"].is-night:not(.is-press) .pet-motion,
+  .pet[data-pet="alive"].enter:not(.is-press) .pet-motion,
+  .pet[data-pet="alive"].is-night.enter:not(.is-press) .pet-motion,
   .pet[data-pet="alive"].is-press .pet-motion {
     animation: none;
     opacity: 1;
