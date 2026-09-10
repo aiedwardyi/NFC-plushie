@@ -43,15 +43,16 @@ export function heartRow(mood, { animate = false, before = null } = {}) {
   const start = animate && before !== null
     ? Math.max(1, Math.min(10, Math.ceil(Number(before) / 10) || 1))
     : halves;
+  const shown = animate && before !== null ? start : halves;
   let hearts = "";
   for (let i = 1; i <= 5; i++) {
-    const fill = Math.max(0, Math.min(2, halves - (i - 1) * 2));
+    const fill = Math.max(0, Math.min(2, shown - (i - 1) * 2));
     const begin = Math.max(0, Math.min(2, start - (i - 1) * 2));
     const cls = fill === 2 ? "is-full" : fill === 1 ? "is-half" : "is-empty";
     hearts += `<span class="heart ${cls}" data-heart="${i}" data-fill="${fill}" data-start="${begin}" aria-hidden="true"><svg viewBox="0 0 24 22"><path class="heart-bg" d="M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z"/><path class="heart-fill" d="M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z"/></svg></span>`;
   }
   const anim = animate ? ` data-hearts-animate="1" data-mood-before="${start}" data-mood-after="${halves}"` : "";
-  return `<div class="hearts" role="img" aria-label="기분 ${halves}단계" data-hearts="${halves}"${anim}>${hearts}</div>`;
+  return `<div class="hearts" role="img" aria-label="기분 ${halves}단계" data-hearts="${shown}"${anim}>${hearts}</div>`;
 }
 
 function petStats(pet) {
@@ -68,7 +69,7 @@ function petStats(pet) {
   }
   return `<section class="pet-stats" aria-label="돌봄 상태">
     ${heartRow(pet.moodAfter, { animate: pet.rewarded, before: pet.moodBefore })}
-    ${pet.lonely ? `<p class="mood-word">외로워요</p>` : ""}
+    ${pet.lonely ? `<p class="mood-word">외로워</p>` : ""}
     <p class="level-line"><span class="level-badge">Lv. ${pet.level}</span>
       <span class="xp-bar" role="img" aria-label="다음 단계까지 ${pet.xpSpan - pet.xpInto}"><span class="xp-fill" style="width:${pct}%"></span></span></p>
     <p class="days-line">함께한 지 ${pet.days}일</p>
@@ -166,21 +167,21 @@ export function previewPetPage({ kind, count, tier = "common", reason = "" }) {
   const mile = kind === "milestone" ? milestoneLine(n) : "";
   const mileHtml = mile ? `<p class="milestone">${escapeHtml(mile)}</p>` : "";
   const countHtml = `<p class="count" data-tap-count="${n}"><span class="count-final">우리 ${n}번 토닥였어요!</span></p>`;
-  const giftLine = tier === "rare" ? "별들이 속삭였어요. 당신이 제 사람이라고."
-    : tier === "special" ? "당신을 만나러 온 건 제 인생 최고의 모험이에요."
-    : "오늘도 와줘서 고마워요!";
+  const giftLine = tier === "rare" ? "별들이 속삭였어. 우린 짝꿍이래!"
+    : tier === "special" ? "고마움이 가득가득 넘쳐!"
+    : "오늘도 와줘서 고마워!";
   const tierClass = tier === "rare" ? "is-rare" : tier === "special" ? "is-special" : "is-common";
   const unrewarded = {
-    cooldown: "배불러요! 조금 있다가 다시 토닥여주세요.",
-    cap: "오늘은 실컷 놀았어요. 내일 또 만나요!",
-    stale: "인형 자체를 톡 토닥여야 돌봐줄 수 있어요.",
+    cooldown: "행복이 가득 찼어! 잠깐 있다 다시 토닥여줘.",
+    cap: "오늘은 실컷 놀았어! 내일 또 만나자!",
+    stale: "오리를 콕 찍고 토닥여줘!",
   };
   const stats = heartRow(kind === "lonely" ? 20 : kind === "reunion" ? 70 : 80, { animate: kind === "reunion", before: kind === "reunion" ? 20 : null })
     + `<p class="level-line"><span class="level-badge">Lv. ${kind === "levelup" ? 2 : 1}</span>`
     + `<span class="xp-bar"><span class="xp-fill" style="width:${kind === "levelup" ? 5 : 40}%"></span></span></p>`
     + `<p class="days-line">함께한 지 12일</p><p class="gift-count">선물 7/30</p>`
-    + (kind === "reunion" ? `<p class="pet-line is-reunion">보고 싶었어요! 진짜루요!</p>` : "")
-    + (kind === "lonely" ? `<p class="pet-line is-lonely-line">혼자 있어서 심심했어요...</p><p class="mood-word">외로워요</p>` : "")
+    + (kind === "reunion" ? `<p class="pet-line is-reunion">보고 싶었어! 진짜로!</p>` : "")
+    + (kind === "lonely" ? `<p class="pet-line is-lonely-line">혼자 있어서 심심했어...</p><p class="mood-word">외로워</p>` : "")
     + (kind === "gift" ? `<p class="gift ${tierClass}" data-gift="${tier}"><span class="gift-label">오늘의 선물</span> ${escapeHtml(giftLine)}</p>` : "")
     + (reason ? `<p class="pet-line is-soft">${escapeHtml(unrewarded[reason] || "")}</p>` : "");
   const visual = kind === "gift" ? (tier === "rare" ? "rare" : tier === "special" ? "special" : "") : kind === "lonely" ? "" : kind;

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import Database from "better-sqlite3";
@@ -99,7 +100,7 @@ test("the post-naming render is not a pet tap", async (t) => {
   assert.match(skip.html, /data-celebrate="claim"/);
   assert.doesNotMatch(skip.html, /data-pet-state/);
   assert.doesNotMatch(skip.html, /오늘의 선물/);
-  assert.doesNotMatch(skip.html, /배불러요|내일 또 만나요|톡 토닥여야/);
+  assert.doesNotMatch(skip.html, /행복이 가득|내일 또 만나자|콕 찍고/);
   assert.equal(ctx.row().tap_count, 2);
   assert.equal(ctx.row().xp, 0);
   assert.equal(ctx.row().mood_value, 100);
@@ -112,7 +113,7 @@ test("first tap after claim is rewarded with first-of-day bonus and a gift", asy
   updateJar(jar, tap.setCookies);
   assert.match(tap.html, /data-rewarded="1"/);
   assert.match(tap.html, /data-gift="common"/);
-  assert.match(tap.html, /오늘도 와줘서 고마워요!/);
+  assert.match(tap.html, /오늘도 와줘서 고마워!/);
   assert.match(tap.html, /선물 1\/30/);
   assert.match(tap.html, /함께한 지 1일/);
   assert.match(tap.html, /Lv\. 1/);
@@ -131,7 +132,7 @@ test("reload within 30 minutes is unrewarded and writes nothing but tap_count", 
   const reload = await ctx.request(`/t?uid=${A}`, { jar });
   assert.match(reload.html, /data-rewarded="0"/);
   assert.match(reload.html, /data-reason="cooldown"/);
-  assert.match(reload.html, /배불러요! 조금 있다가 다시 토닥여주세요\./);
+  assert.match(reload.html, /행복이 가득 찼어! 잠깐 있다 다시 토닥여줘\./);
   const after = ctx.row();
   assert.equal(after.tap_count, before.tap_count + 1);
   assert.equal(after.xp, before.xp);
@@ -152,7 +153,7 @@ test("the 7th eligible tap in a Seoul day hits the daily cap", async (t) => {
   const capped = await ctx.request(`/t?uid=${A}`, { jar });
   assert.match(capped.html, /data-rewarded="0"/);
   assert.match(capped.html, /data-reason="cap"/);
-  assert.match(capped.html, /오늘은 실컷 놀았어요\. 내일 또 만나요!/);
+  assert.match(capped.html, /오늘은 실컷 놀았어! 내일 또 만나자!/);
 });
 
 test("uid-only and uid+counter map to the same plushie", async (t) => {
@@ -178,7 +179,7 @@ test("a repeated or lower counter is stale, and the mirror never lowers", async 
   const same = await ctx.request(`/t?uid=${A}x00000A`, { jar });
   assert.match(same.html, /data-rewarded="0"/);
   assert.match(same.html, /data-reason="stale"/);
-  assert.match(same.html, /인형 자체를 톡 토닥여야 돌봐줄 수 있어요\./);
+  assert.match(same.html, /오리를 콕 찍고 토닥여줘!/);
   const lower = await ctx.request(`/t?uid=${A}x000009`, { jar });
   assert.match(lower.html, /data-reason="stale"/);
   assert.equal(ctx.row().last_counter, 10);
@@ -192,7 +193,7 @@ test("a uid-only tap on a mirrored plushie is stale", async (t) => {
   const bare = await ctx.request(`/t?uid=${A}`, { jar });
   assert.match(bare.html, /data-rewarded="0"/);
   assert.match(bare.html, /data-reason="stale"/);
-  assert.match(bare.html, /인형 자체를 톡 토닥여야 돌봐줄 수 있어요\./);
+  assert.match(bare.html, /오리를 콕 찍고 토닥여줘!/);
 });
 
 test("a null mirror keeps uid-only behavior exactly", async (t) => {
@@ -326,6 +327,10 @@ test("migration keeps identity and backfills pet fields", async (t) => {
   assert.equal(row.last_counter, null);
   assert.equal(row.reward_day_count, 0);
   db.close();
+  const reopened = openDatabase(dir);
+  const again = reopened.prepare("SELECT * FROM plushies WHERE uid = ?").get(A);
+  assert.deepEqual(again, row);
+  reopened.close();
 });
 
 test("dev prime and preview cover the pet states", async (t) => {
@@ -351,4 +356,86 @@ test("dev prime and preview cover the pet states", async (t) => {
     assert.equal((await request(path)).status, 200, path);
   }
   assert.equal((await request("/dev/preview?kind=nope&count=10")).status, 404);
+});
+
+test("reunion tap from mood 25 shows reunion with no lonely marker", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  ctx.db.prepare("UPDATE plushies SET mood_value = 25, mood_updated_at = ?, last_rewarded_at = NULL WHERE uid = ?")
+    .run(T0, A);
+  const tap = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.match(tap.html, /data-rewarded="1"/);
+  assert.match(tap.html, /data-reunion="1"/);
+  assert.match(tap.html, /data-lonely="0"/);
+  assert.match(tap.html, /보고 싶었어! 진짜로!/);
+  assert.doesNotMatch(tap.html, /is-lonely/);
+  assert.doesNotMatch(tap.html, /외로워/);
+});
+
+test("celebration priority: levelup over milestone, reunion over milestone, rare over special", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  ctx.db.prepare("UPDATE plushies SET tap_count = 9, xp = 90, last_rewarded_at = NULL WHERE uid = ?").run(A);
+  const both = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.match(both.html, /data-celebrate="levelup"/);
+  assert.match(both.html, /벌써 열 번이에요!/);
+  assert.match(both.html, /Lv\. 2/);
+
+  const ctx2 = await setup(t);
+  const { jar: jar2 } = await meet(ctx2, A, "Mochi");
+  ctx2.db.prepare("UPDATE plushies SET tap_count = 9, mood_value = 20, mood_updated_at = ?, last_rewarded_at = NULL WHERE uid = ?")
+    .run(T0, A);
+  const reunion = await ctx2.request(`/t?uid=${A}`, { jar: jar2 });
+  assert.match(reunion.html, /data-celebrate="reunion"/);
+  assert.match(reunion.html, /벌써 열 번이에요!/);
+  assert.match(reunion.html, /보고 싶었어! 진짜로!/);
+
+  const ctx3 = await setup(t);
+  const { jar: jar3 } = await meet(ctx3, A, "Mochi");
+  await ctx3.request("/dev/prime", { body: { uid: A, tier: "rare" } });
+  const rare = await ctx3.request(`/t?uid=${A}`, { jar: jar3 });
+  assert.match(rare.html, /data-celebrate="rare"/);
+  assert.match(rare.html, /data-gift="rare"/);
+
+  const ctx4 = await setup(t);
+  const { jar: jar4 } = await meet(ctx4, A, "Mochi");
+  await ctx4.request("/dev/prime", { body: { uid: A, tier: "special" } });
+  const special = await ctx4.request(`/t?uid=${A}`, { jar: jar4 });
+  assert.match(special.html, /data-celebrate="special"/);
+  assert.match(special.html, /data-gift="special"/);
+});
+
+test("days_together counts distinct Seoul days with rewarded taps", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  assert.equal(ctx.row().days_together, 1);
+  await ctx.request(`/t?uid=${A}`, { jar });
+  assert.equal(ctx.row().days_together, 1);
+  ctx.advance(24 * 60 * MIN);
+  const next = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.match(next.html, /함께한 지 2일/);
+  assert.equal(ctx.row().days_together, 2);
+  ctx.advance(31 * MIN);
+  const again = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.match(again.html, /함께한 지 2일/);
+  assert.equal(ctx.row().days_together, 2);
+});
+
+test("claim render carries the claim marker and the client claim path is not empty", async (t) => {
+  const ctx = await setup(t);
+  const { request } = ctx;
+  const jar = {};
+  const first = await request(`/t?uid=${A}`, { jar });
+  updateJar(jar, first.setCookies);
+  await request("/name", { jar, body: { uid: A, name: "Mochi" } }).then((r) => updateJar(jar, r.setCookies));
+  const skip = await request(`/t?uid=${A}`, { jar });
+  assert.match(skip.html, /data-celebrate="claim"/);
+  const client = readFileSync(new URL("../public/app.js", import.meta.url), "utf-8");
+  const block = client.match(/if \(kind === "claim"\) \{[\s\S]*?\n  \}/);
+  assert.ok(block, "claim handler exists in client");
+  assert.match(block[0], /pulseFlash/);
+  assert.match(block[0], /shakeScreen/);
+  assert.match(block[0], /burstConfetti/);
+  assert.match(block[0], /mode: "claim"/);
+  assert.match(block[0], /enhanceRollingCounter/);
 });

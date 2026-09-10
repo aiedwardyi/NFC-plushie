@@ -23,18 +23,20 @@ const petColumns = [
 ];
 
 export function migratePetColumns(db, migrationMs = Date.now()) {
-  const existing = new Set(db.prepare("PRAGMA table_info(plushies)").all().map((c) => c.name));
-  for (const def of petColumns) {
-    if (!existing.has(def.split(" ")[0])) db.exec(`ALTER TABLE plushies ADD COLUMN ${def}`);
-  }
-  db.prepare("UPDATE plushies SET mood_value = 70 WHERE mood_value IS NULL").run();
-  db.prepare("UPDATE plushies SET mood_updated_at = ? WHERE mood_updated_at IS NULL").run(migrationMs);
-  db.prepare("UPDATE plushies SET xp = 0 WHERE xp IS NULL").run();
-  db.prepare("UPDATE plushies SET reward_day_count = 0 WHERE reward_day_count IS NULL").run();
-  db.prepare("UPDATE plushies SET gift_seen = ? WHERE gift_seen IS NULL").run(EMPTY_SEEN);
-  db.prepare("UPDATE plushies SET gift_found = ? WHERE gift_found IS NULL").run(EMPTY_FOUND);
-  db.prepare("UPDATE plushies SET days_together = 1 WHERE days_together IS NULL").run();
-  db.prepare("UPDATE plushies SET last_active_day = ? WHERE last_active_day IS NULL").run(seoulDayKey(migrationMs));
+  db.transaction(() => {
+    const existing = new Set(db.prepare("PRAGMA table_info(plushies)").all().map((c) => c.name));
+    for (const def of petColumns) {
+      if (!existing.has(def.split(" ")[0])) db.exec(`ALTER TABLE plushies ADD COLUMN ${def}`);
+    }
+    db.prepare("UPDATE plushies SET mood_value = 70 WHERE mood_value IS NULL").run();
+    db.prepare("UPDATE plushies SET mood_updated_at = ? WHERE mood_updated_at IS NULL").run(migrationMs);
+    db.prepare("UPDATE plushies SET xp = 0 WHERE xp IS NULL").run();
+    db.prepare("UPDATE plushies SET reward_day_count = 0 WHERE reward_day_count IS NULL").run();
+    db.prepare("UPDATE plushies SET gift_seen = ? WHERE gift_seen IS NULL").run(EMPTY_SEEN);
+    db.prepare("UPDATE plushies SET gift_found = ? WHERE gift_found IS NULL").run(EMPTY_FOUND);
+    db.prepare("UPDATE plushies SET days_together = 1 WHERE days_together IS NULL").run();
+    db.prepare("UPDATE plushies SET last_active_day = ? WHERE last_active_day IS NULL").run(seoulDayKey(migrationMs));
+  })();
 }
 
 export function openDatabase(dataDir = process.env.DATA_DIR || "./data") {

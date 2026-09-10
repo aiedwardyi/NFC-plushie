@@ -504,19 +504,17 @@ function animateHearts() {
     paintHearts(hearts, Number.isFinite(after) ? after : before);
     return;
   }
+  paintHearts(hearts, before);
   const DURATION = 900;
   const started = performance.now();
-  let frame = 0;
   function tick(now) {
     const t = Math.min(1, (now - started) / DURATION);
     paintHearts(hearts, Math.round(before + (after - before) * t));
     if (t < 1) {
-      frame = window.requestAnimationFrame(tick);
-    } else {
-      window.cancelAnimationFrame(frame);
+      window.requestAnimationFrame(tick);
     }
   }
-  frame = window.requestAnimationFrame(tick);
+  window.requestAnimationFrame(tick);
 }
 
 function heartBurst() {
@@ -563,7 +561,6 @@ function heartBurst() {
   canvas.addEventListener("celebrate-stop", teardown);
   function drawHeart(s) {
     ctx.save();
-    ctx.translate(0, 0);
     ctx.scale(s / 24, s / 24);
     ctx.beginPath();
     ctx.moveTo(12, 21);

@@ -400,7 +400,7 @@ test("dev preview celebration routes render and stay hidden in production", asyn
   const reunion = await request("/dev/preview?kind=reunion&count=10");
   assert.equal(reunion.status, 200);
   assert.match(reunion.html, /data-celebrate="reunion"/);
-  assert.match(reunion.html, /보고 싶었어요/);
+  assert.match(reunion.html, /보고 싶었어/);
 
   const gift = await request("/dev/preview?kind=gift&count=10&tier=rare");
   assert.equal(gift.status, 200);
@@ -408,7 +408,8 @@ test("dev preview celebration routes render and stay hidden in production", asyn
 
   const lonely = await request("/dev/preview?kind=lonely&count=10");
   assert.equal(lonely.status, 200);
-  assert.match(lonely.html, /외로워요/);
+  assert.match(lonely.html, /외로워/);
+  assert.match(lonely.html, /is-lonely/);
 
   const bad = await request("/dev/preview?kind=nope&count=10");
   assert.equal(bad.status, 404);

@@ -4,25 +4,24 @@ import cookieParser from "cookie-parser";
 import * as binding from "./binding.js";
 import { hash, ownerToken, recoveryCode } from "./secrets.js";
 import { EMPTY_FOUND, EMPTY_SEEN } from "./db.js";
-import { GIFTS } from "./gifts.js";
+import { GIFT_COUNT as GIFT_TOTAL, GIFT_TIERS, GIFTS } from "./gifts.js";
 import { PET, applyTap, currentMood, parseTapUid, seoulDayKey, xpProgress } from "./pet.js";
 import { devPage, milestoneLine, page, petPage, previewPetPage, strangerPage } from "./pages.js";
-
-export { PET };
 
 const cookieAge = 400 * 24 * 60 * 60 * 1000;
 const cooldown = 15 * 60 * 1000;
 const skipAge = 2 * 60 * 1000;
 const validUid = (uid) => typeof uid === "string" && /^[0-9A-F]{14}$/.test(uid);
 
+const STALE_LINE = "오리를 콕 찍고 토닥여줘!";
+const COOLDOWN_LINE = "행복이 가득 찼어! 잠깐 있다 다시 토닥여줘.";
 const UNREWARDED_LINES = {
-  cooldown: "배불러요! 조금 있다가 다시 토닥여주세요.",
-  cap: "오늘은 실컷 놀았어요. 내일 또 만나요!",
-  stale: "인형 자체를 톡 토닥여야 돌봐줄 수 있어요.",
+  cooldown: COOLDOWN_LINE,
+  cap: "오늘은 실컷 놀았어! 내일 또 만나자!",
+  stale: STALE_LINE,
 };
-const LONELY_LINE = "혼자 있어서 심심했어요...";
-const REUNION_LINE = "보고 싶었어요! 진짜루요!";
-const GIFT_TOTAL = GIFTS.common.length + GIFTS.special.length + GIFTS.rare.length;
+const LONELY_LINE = "혼자 있어서 심심했어...";
+const REUNION_LINE = "보고 싶었어! 진짜로!";
 
 function parseSeen(text) {
   const clean = (v) => (Array.isArray(v) ? v.filter((s) => typeof s === "string") : []);
@@ -56,7 +55,7 @@ function petState(row, t) {
     lastGiftDay: row.last_gift_day ?? null,
     lastActiveDay: row.last_active_day ?? null,
     lastCounter: row.last_counter ?? null,
-    nextGiftTier: ["common", "special", "rare"].includes(row.next_gift_tier) ? row.next_gift_tier : null,
+    nextGiftTier: GIFT_TIERS.includes(row.next_gift_tier) ? row.next_gift_tier : null,
     seen_common: seen.common,
     seen_special: seen.special,
     seen_rare: seen.rare,
@@ -139,7 +138,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       reason: out.reason || "",
       moodBefore: Math.round(moodBefore * 10) / 10,
       moodAfter: Math.round(moodAfter * 10) / 10,
-      lonely: moodBefore <= PET.moodLonelyAt,
+      lonely: moodAfter <= PET.moodLonelyAt,
       reunion: Boolean(out.rewarded && out.reunion),
       level: out.rewarded ? extra.after.level : xpNow.level,
       xpInto: out.rewarded ? extra.after.into : xpNow.into,
@@ -149,7 +148,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       giftTotal: GIFT_TOTAL,
       days: fresh.days_together ?? 1,
       unrewardedLine: out.rewarded ? "" : (UNREWARDED_LINES[out.reason] || ""),
-      lonelyLine: !out.rewarded && moodBefore <= PET.moodLonelyAt ? LONELY_LINE : "",
+      lonelyLine: !out.rewarded && moodAfter <= PET.moodLonelyAt ? LONELY_LINE : "",
       reunionLine: out.rewarded && out.reunion ? REUNION_LINE : "",
     };
   }
