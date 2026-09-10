@@ -35,7 +35,7 @@ function fresh(over = {}) {
   };
 }
 
-const noCounter = { present: false, missing: false, value: null };
+const noCounter = { present: false, missing: true, value: null };
 
 test("decay curve and floor", () => {
   assert.equal(currentMood(fresh(), T0), 100);

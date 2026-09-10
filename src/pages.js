@@ -43,16 +43,14 @@ export function heartRow(mood, { animate = false, before = null } = {}) {
   const start = animate && before !== null
     ? Math.max(1, Math.min(10, Math.ceil(Number(before) / 10) || 1))
     : halves;
-  const shown = animate && before !== null ? start : halves;
   let hearts = "";
   for (let i = 1; i <= 5; i++) {
-    const fill = Math.max(0, Math.min(2, shown - (i - 1) * 2));
-    const begin = Math.max(0, Math.min(2, start - (i - 1) * 2));
+    const fill = Math.max(0, Math.min(2, start - (i - 1) * 2));
     const cls = fill === 2 ? "is-full" : fill === 1 ? "is-half" : "is-empty";
-    hearts += `<span class="heart ${cls}" data-heart="${i}" data-fill="${fill}" data-start="${begin}" aria-hidden="true"><svg viewBox="0 0 24 22"><path class="heart-bg" d="M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z"/><path class="heart-fill" d="M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z"/></svg></span>`;
+    hearts += `<span class="heart ${cls}" data-heart="${i}" data-fill="${fill}" aria-hidden="true"><svg viewBox="0 0 24 22"><path class="heart-bg" d="M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z"/><path class="heart-fill" d="M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z"/></svg></span>`;
   }
   const anim = animate ? ` data-hearts-animate="1" data-mood-before="${start}" data-mood-after="${halves}"` : "";
-  return `<div class="hearts" role="img" aria-label="기분 ${halves}단계" data-hearts="${shown}"${anim}>${hearts}</div>`;
+  return `<div class="hearts" role="img" aria-label="기분 ${halves}단계" data-hearts="${start}"${anim}>${hearts}</div>`;
 }
 
 function petStats(pet) {

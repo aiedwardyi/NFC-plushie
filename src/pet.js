@@ -66,7 +66,7 @@ export function pickGift(state, rng, forcedTier) {
   const seen = new Set((state[`seen_${tier}`] || []));
   let unseen = pool.filter((g) => !seen.has(g.id));
   if (unseen.length === 0) unseen = pool.slice();
-  const gift = unseen[Math.floor(rng() * unseen.length) % unseen.length];
+  const gift = unseen[Math.floor(rng() * unseen.length)];
   return { tier, gift };
 }
 
