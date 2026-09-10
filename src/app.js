@@ -13,15 +13,15 @@ const cooldown = 15 * 60 * 1000;
 const skipAge = 2 * 60 * 1000;
 const validUid = (uid) => typeof uid === "string" && /^[0-9A-F]{14}$/.test(uid);
 
-const STALE_LINE = "폰으로 진짜 나를 톡 해줘!";
-const COOLDOWN_LINE = "방금 토닥여줘서 기분 좋아! 잠깐 있다 다시 토닥여줘.";
+const STALE_LINE = "폰으로 진짜 저를 톡 해 주세요!";
+const COOLDOWN_LINE = "방금 토닥여줘서 기분 좋아요! 잠깐 있다 다시 토닥여 주세요.";
 const UNREWARDED_LINES = {
   cooldown: COOLDOWN_LINE,
-  cap: "오늘은 실컷 놀았어! 내일 또 만나자!",
+  cap: "오늘은 실컷 놀았어요! 내일 또 만나요!",
   stale: STALE_LINE,
 };
-const LONELY_LINE = "혼자 있어서 심심했어...";
-const REUNION_LINE = "보고 싶었어! 진짜로!";
+const LONELY_LINE = "혼자 있어서 심심했어요...";
+const REUNION_LINE = "보고 싶었어요! 진짜로요!";
 
 function parseSeen(text) {
   const clean = (v) => (Array.isArray(v) ? v.filter((s) => typeof s === "string") : []);
@@ -144,7 +144,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       reunion: Boolean(out.rewarded && out.reunion),
       leveledUp,
       level,
-      levelUpLine: leveledUp ? `쑥쑥 컸어! 이제 Lv. ${level}!` : "",
+      levelUpLine: leveledUp ? `쑥쑥 컸어요! 이제 Lv. ${level}!` : "",
       xpInto: out.rewarded ? extra.after.into : xpNow.into,
       xpSpan: out.rewarded ? extra.after.span : xpNow.span,
       gift: out.gift || null,
