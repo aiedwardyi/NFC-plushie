@@ -12,16 +12,45 @@ window.addEventListener("pageshow", (event) => {
   if (event.persisted) window.location.reload();
 });
 
-const pet = document.querySelector("[data-pet]");
+const TIME_LINES = {
+  morning: "아침 인사예요",
+  day: "한낮의 안녕",
+  evening: "저녁 인사예요",
+  night: "잘 자요",
+};
+
+function currentBand(date = new Date()) {
+  const h = date.getHours();
+  if (h >= 5 && h < 11) return "morning";
+  if (h >= 11 && h < 18) return "day";
+  if (h >= 18 && h < 22) return "evening";
+  return "night";
+}
+
+function applyTimeBand() {
+  const band = currentBand();
+  document.body.dataset.time = band;
+  const line = document.querySelector("[data-time-line]");
+  if (line) line.textContent = TIME_LINES[band] || "";
+  return band;
+}
+
+const pet = document.querySelector('[data-pet="alive"]');
 if (pet) {
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const frames = {
     canon: pet.querySelector('[data-frame="canon"]'),
     blink: pet.querySelector('[data-frame="blink"]'),
     react: pet.querySelector('[data-frame="react"]'),
+    sleepy: pet.querySelector('[data-frame="sleepy"]'),
   };
   let pressTimer = 0;
   let blinkTimer = 0;
+  let band = applyTimeBand();
+
+  function restingFrame() {
+    return band === "night" ? "sleepy" : "canon";
+  }
 
   function showFrame(name) {
     for (const [key, el] of Object.entries(frames)) {
@@ -30,20 +59,30 @@ if (pet) {
   }
 
   function scheduleBlink() {
-    if (reduceMotion) return;
     clearTimeout(blinkTimer);
+    if (reduceMotion || band === "night") return;
     blinkTimer = window.setTimeout(() => {
-      if (pet.classList.contains("is-press")) {
+      if (pet.classList.contains("is-press") || band === "night") {
         scheduleBlink();
         return;
       }
       showFrame("blink");
       window.setTimeout(() => {
-        if (!pet.classList.contains("is-press")) showFrame("canon");
+        if (!pet.classList.contains("is-press")) showFrame(restingFrame());
         scheduleBlink();
       }, 120);
     }, 3000 + Math.random() * 4000);
   }
+
+  function syncBand() {
+    band = applyTimeBand();
+    pet.classList.toggle("is-night", band === "night");
+    if (!pet.classList.contains("is-press")) showFrame(restingFrame());
+    scheduleBlink();
+  }
+
+  syncBand();
+  setInterval(syncBand, 60 * 1000);
 
   pet.querySelector(".pet-hit")?.addEventListener("pointerdown", () => {
     try {
@@ -56,9 +95,9 @@ if (pet) {
     showFrame("react");
     pressTimer = window.setTimeout(() => {
       pet.classList.remove("is-press");
-      showFrame("canon");
+      showFrame(restingFrame());
     }, 700);
   });
-
-  scheduleBlink();
+} else {
+  applyTimeBand();
 }

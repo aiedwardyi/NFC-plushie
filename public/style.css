@@ -9,15 +9,32 @@
   --cap-blue-soft-2: #d2e3f0;
   --cap-blue-line: #9eb0c0;
   --muted: #6b7a88;
+  --page-bg: #faf8f1;
 }
 * { box-sizing: border-box; }
-body { margin: 0; }
+body { margin: 0; background: var(--page-bg); }
+body[data-time="morning"] { --page-bg: #fff6e8; }
+body[data-time="day"] { --page-bg: #faf8f1; }
+body[data-time="evening"] { --page-bg: #f0e6dc; }
+body[data-time="night"] { --page-bg: #e6eaf0; }
 main { max-width: 440px; margin: auto; padding: 40px 24px 24px; text-align: center; }
 .eyebrow { color: var(--muted); font-size: .8rem; letter-spacing: .06em; }
+.time-line {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: .9rem;
+  min-height: 1.2em;
+}
 h1 { margin: 8px 0; font-size: 2.25rem; overflow-wrap: anywhere; }
 h2 { font-size: 1rem; margin: 0; }
 p { line-height: 1.6; }
 .intro { font-size: 1.15rem; }
+.milestone {
+  margin: 4px 0 0;
+  color: var(--cap-blue-deep);
+  font-weight: 600;
+  font-size: .95rem;
+}
 .pet {
   position: relative;
   width: 180px;
@@ -63,14 +80,26 @@ p { line-height: 1.6; }
   -webkit-user-drag: none;
 }
 .pet-frame.is-show { opacity: 1; }
-.pet:not(.is-press) .pet-motion { animation: bob 3s ease-in-out infinite; }
-.pet.enter:not(.is-press) .pet-motion {
+.pet[data-pet="alive"]:not(.is-press) .pet-motion { animation: bob 3s ease-in-out infinite; }
+.pet[data-pet="alive"].is-night:not(.is-press) .pet-motion { animation: bob-slow 5.5s ease-in-out infinite; }
+.pet[data-pet="alive"].enter:not(.is-press) .pet-motion {
   animation: enter .55s ease-out, bob 3s ease-in-out .55s infinite;
 }
-.pet.is-press .pet-motion { animation: squash .7s ease; }
+.pet[data-pet="alive"].is-night.enter:not(.is-press) .pet-motion {
+  animation: enter .55s ease-out, bob-slow 5.5s ease-in-out .55s infinite;
+}
+.pet[data-pet="alive"].is-press .pet-motion { animation: squash .7s ease; }
+.pet-away .pet-motion {
+  animation: none;
+  filter: saturate(0.7) brightness(0.93);
+}
 @keyframes bob {
   0%, 100% { transform: translateY(0) scale(1); }
   50% { transform: translateY(3px) scale(0.985); }
+}
+@keyframes bob-slow {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(2px) scale(0.99); }
 }
 @keyframes enter {
   from { opacity: 0; transform: scale(0.8); }
@@ -120,8 +149,9 @@ a { color: var(--cap-blue-deep); }
   .code { font-size: 1.85rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pet:not(.is-press) .pet-motion,
-  .pet.enter:not(.is-press) .pet-motion {
+  .pet[data-pet="alive"]:not(.is-press) .pet-motion,
+  .pet[data-pet="alive"].enter:not(.is-press) .pet-motion,
+  .pet[data-pet="alive"].is-night:not(.is-press) .pet-motion {
     animation: none;
     opacity: 1;
     transform: none;
