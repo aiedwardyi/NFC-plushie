@@ -38,7 +38,7 @@ main { max-width: 440px; margin: auto; padding: 40px 24px 24px; text-align: cent
   font-size: .9rem;
   min-height: 1.2em;
 }
-h1 { margin: 8px 0; font-size: 2.25rem; overflow-wrap: anywhere; }
+h1 { margin: 8px 0; font-size: 2.25rem; overflow-wrap: break-word; }
 h2 { font-size: 1rem; margin: 0; }
 p { line-height: 1.6; }
 .intro { font-size: 1.15rem; }
