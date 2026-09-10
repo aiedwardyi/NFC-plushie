@@ -24,8 +24,13 @@ body {
   margin: 0;
   min-height: 100vh;
   background: var(--page-bg);
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 main { max-width: 440px; margin: auto; padding: 40px 24px 24px; text-align: center; }
+.eyebrow, .time-line, .intro, .milestone, .count, .pet-line, .gift, footer {
+  text-wrap: balance;
+}
 .eyebrow { color: var(--muted); font-size: .8rem; letter-spacing: .06em; }
 .time-line {
   margin: 0 0 4px;
@@ -33,7 +38,7 @@ main { max-width: 440px; margin: auto; padding: 40px 24px 24px; text-align: cent
   font-size: .9rem;
   min-height: 1.2em;
 }
-h1 { margin: 8px 0; font-size: 2.25rem; overflow-wrap: anywhere; }
+h1 { margin: 8px 0; font-size: 2.25rem; overflow-wrap: break-word; }
 h2 { font-size: 1rem; margin: 0; }
 p { line-height: 1.6; }
 .intro { font-size: 1.15rem; }

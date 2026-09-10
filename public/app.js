@@ -13,10 +13,10 @@ window.addEventListener("pageshow", (event) => {
 });
 
 const TIME_LINES = {
-  morning: "아침 인사야",
-  day: "한낮의 안녕",
-  evening: "저녁 인사야",
-  night: "잘 자",
+  morning: "좋은 아침이에요",
+  day: "즐거운 오후예요",
+  evening: "좋은 저녁이에요",
+  night: "잘 자요",
 };
 
 function currentBand(date = new Date()) {
@@ -345,10 +345,10 @@ function enhanceRollingCounter({ duration = 400, goldPop = false } = {}) {
   const finalValue = Number(countEl.getAttribute("data-tap-count"));
   if (!Number.isFinite(finalValue)) return;
   const finalNode = countEl.querySelector(".count-final") || countEl;
-  countEl.setAttribute("aria-label", `우리 ${finalValue}번 토닥였어!`);
+  countEl.setAttribute("aria-label", `우리 ${finalValue}번 토닥였어요!`);
 
   if (prefersReducedMotion()) {
-    finalNode.textContent = `우리 ${finalValue}번 토닥였어!`;
+    finalNode.textContent = `우리 ${finalValue}번 토닥였어요!`;
     return;
   }
 
@@ -375,7 +375,7 @@ function enhanceRollingCounter({ duration = 400, goldPop = false } = {}) {
   });
 
   finalNode.replaceChildren();
-  finalNode.append("우리 ", ...strips, "번 토닥였어!");
+  finalNode.append("우리 ", ...strips, "번 토닥였어요!");
 
   window.setTimeout(() => {
     if (goldPop) {
