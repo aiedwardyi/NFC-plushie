@@ -15,14 +15,15 @@ export function milestoneLine(count) {
 }
 
 function petMarkup({ waving = false, away = false } = {}) {
-  const alt = waving ? "다정한 인형 친구가 손을 흔들어요" : "다정한 인형 친구가 방긋 웃어요";
   if (away) {
-    return `<div class="pet pet-away idle" data-pet="away" role="img" aria-label="${alt}">
+    const awayAlt = "다정한 인형 친구가 등을 보이고 있어요";
+    return `<div class="pet pet-away" data-pet="away" role="img" aria-label="${awayAlt}">
       <span class="pet-motion">
-        <img class="pet-frame is-show" src="/mascot-duck-away-512.png" width="220" height="220" alt="${alt}" decoding="async">
+        <img class="pet-frame is-show" src="/mascot-duck-away-512.png" width="220" height="220" alt="${awayAlt}" decoding="async">
       </span>
     </div>`;
   }
+  const alt = waving ? "다정한 인형 친구가 손을 흔들어요" : "다정한 인형 친구가 방긋 웃어요";
   const enterClass = waving ? " enter" : "";
   return `<div class="pet ${waving ? "waving" : "idle"}${enterClass}" data-pet="alive">
       <button type="button" class="pet-hit" aria-label="${alt}">
