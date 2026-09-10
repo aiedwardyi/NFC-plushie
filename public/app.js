@@ -13,10 +13,10 @@ window.addEventListener("pageshow", (event) => {
 });
 
 const TIME_LINES = {
-  morning: "아침 인사예요",
+  morning: "아침 인사야",
   day: "한낮의 안녕",
-  evening: "저녁 인사예요",
-  night: "잘 자요",
+  evening: "저녁 인사야",
+  night: "잘 자",
 };
 
 function currentBand(date = new Date()) {
@@ -345,10 +345,10 @@ function enhanceRollingCounter({ duration = 400, goldPop = false } = {}) {
   const finalValue = Number(countEl.getAttribute("data-tap-count"));
   if (!Number.isFinite(finalValue)) return;
   const finalNode = countEl.querySelector(".count-final") || countEl;
-  countEl.setAttribute("aria-label", `우리 ${finalValue}번 토닥였어요!`);
+  countEl.setAttribute("aria-label", `우리 ${finalValue}번 토닥였어!`);
 
   if (prefersReducedMotion()) {
-    finalNode.textContent = `우리 ${finalValue}번 토닥였어요!`;
+    finalNode.textContent = `우리 ${finalValue}번 토닥였어!`;
     return;
   }
 
@@ -375,7 +375,7 @@ function enhanceRollingCounter({ duration = 400, goldPop = false } = {}) {
   });
 
   finalNode.replaceChildren();
-  finalNode.append("우리 ", ...strips, "번 토닥였어요!");
+  finalNode.append("우리 ", ...strips, "번 토닥였어!");
 
   window.setTimeout(() => {
     if (goldPop) {
@@ -483,9 +483,144 @@ function runEvolutionGlow({ onComplete } = {}) {
   window.setTimeout(() => overlay.classList.add("is-sweeping"), 180);
 }
 
+function paintHearts(container, halves) {
+  const kids = container.querySelectorAll(".heart");
+  kids.forEach((el, i) => {
+    const fill = Math.max(0, Math.min(2, halves - i * 2));
+    el.dataset.fill = String(fill);
+    el.classList.toggle("is-full", fill === 2);
+    el.classList.toggle("is-half", fill === 1);
+    el.classList.toggle("is-empty", fill === 0);
+  });
+  container.dataset.hearts = String(halves);
+}
+
+function animateHearts() {
+  const hearts = document.querySelector("[data-hearts-animate]");
+  if (!hearts) return;
+  const before = Number(hearts.dataset.moodBefore);
+  const after = Number(hearts.dataset.moodAfter);
+  if (!Number.isFinite(before) || !Number.isFinite(after) || before >= after || prefersReducedMotion()) {
+    paintHearts(hearts, Number.isFinite(after) ? after : before);
+    return;
+  }
+  paintHearts(hearts, before);
+  const DURATION = 900;
+  const started = performance.now();
+  function tick(now) {
+    const t = Math.min(1, (now - started) / DURATION);
+    paintHearts(hearts, Math.round(before + (after - before) * t));
+    if (t < 1) {
+      window.requestAnimationFrame(tick);
+    }
+  }
+  window.requestAnimationFrame(tick);
+}
+
+function heartBurst() {
+  if (prefersReducedMotion()) return;
+  const layer = ensureCelebrateCanvas();
+  if (!layer) return;
+  const { canvas, ctx } = layer;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.floor(window.innerWidth * dpr);
+  canvas.height = Math.floor(window.innerHeight * dpr);
+  canvas.style.width = `${window.innerWidth}px`;
+  canvas.style.height = `${window.innerHeight}px`;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const pet = document.querySelector('[data-pet="alive"]');
+  const rect = pet?.getBoundingClientRect();
+  const ox = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+  const oy = rect ? rect.top + rect.height * 0.3 : window.innerHeight * 0.3;
+  const pieces = [];
+  const colors = ["#e86a8a", "#f2a6b0", "#d94f70", "#f5d76e"];
+  for (let i = 0; i < 26; i++) {
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.2;
+    const speed = 4 + Math.random() * 6;
+    pieces.push({
+      x: ox, y: oy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 4,
+      size: 8 + Math.random() * 10,
+      rot: (Math.random() - 0.5) * 0.8,
+      vr: (Math.random() - 0.5) * 0.1,
+      color: colors[(Math.random() * colors.length) | 0],
+    });
+  }
+  const DURATION = 1400;
+  const started = performance.now();
+  let last = started;
+  let frame = 0;
+  let stopped = false;
+  function teardown() {
+    if (stopped) return;
+    stopped = true;
+    window.cancelAnimationFrame(frame);
+    canvas.remove();
+  }
+  canvas.addEventListener("celebrate-stop", teardown);
+  function drawHeart(s) {
+    ctx.save();
+    ctx.scale(s / 24, s / 24);
+    ctx.beginPath();
+    ctx.moveTo(12, 21);
+    ctx.bezierCurveTo(4, 15, 1, 11, 1, 7);
+    ctx.bezierCurveTo(1, 3, 4, 1, 7, 1);
+    ctx.bezierCurveTo(9.5, 1, 11, 2.5, 12, 4.5);
+    ctx.bezierCurveTo(13, 2.5, 14.5, 1, 17, 1);
+    ctx.bezierCurveTo(20, 1, 23, 3, 23, 7);
+    ctx.bezierCurveTo(23, 11, 20, 15, 12, 21);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  function tick(now) {
+    if (stopped) return;
+    const elapsed = now - started;
+    const dt = Math.min(now - last, 50) / FRAME_MS;
+    last = now;
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    for (const p of pieces) {
+      p.vy += 0.14 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.rot += p.vr * dt;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.globalAlpha = Math.max(0, 1 - elapsed / DURATION);
+      ctx.fillStyle = p.color;
+      drawHeart(p.size);
+      ctx.restore();
+    }
+    if (elapsed < DURATION) {
+      frame = window.requestAnimationFrame(tick);
+    } else {
+      teardown();
+    }
+  }
+  frame = window.requestAnimationFrame(tick);
+}
+
+function reunionJump() {
+  const pet = document.querySelector('[data-pet="alive"]');
+  if (!pet || prefersReducedMotion()) return;
+  pet.classList.add("is-reunion-jump");
+  tryVibrate([40, 60, 40]);
+  window.setTimeout(() => pet.classList.remove("is-reunion-jump"), 900);
+}
+
+function glowGift() {
+  const gift = document.querySelector("[data-gift]");
+  if (!gift || prefersReducedMotion()) return;
+  gift.classList.add("is-glow");
+  window.setTimeout(() => gift.classList.remove("is-glow"), 1200);
+}
+
 function runCelebrate() {
+  animateHearts();
   const kind = document.body.dataset.celebrate;
-  if (kind !== "claim" && kind !== "milestone") {
+  if (kind !== "claim" && kind !== "levelup" && kind !== "reunion" && kind !== "milestone" && kind !== "rare" && kind !== "special") {
     if (document.querySelector("[data-tap-count]")) {
       enhanceRollingCounter({ duration: 400, goldPop: false });
     }
@@ -502,15 +637,52 @@ function runCelebrate() {
     return;
   }
 
-  if (prefersReducedMotion()) {
-    enhanceRollingCounter({ duration: 0, goldPop: false });
-    const mileEl = document.querySelector(".milestone");
-    mileEl?.classList.add("is-glow");
-    window.setTimeout(() => mileEl?.classList.remove("is-glow"), 400);
+  if (kind === "levelup") {
+    if (prefersReducedMotion()) {
+      enhanceRollingCounter({ duration: 0, goldPop: false });
+      return;
+    }
+    document.body.classList.add("is-levelup-glow");
+    runEvolutionGlow({
+      onComplete: () => document.body.classList.remove("is-levelup-glow"),
+    });
     return;
   }
 
-  runEvolutionGlow();
+  if (kind === "reunion") {
+    reunionJump();
+    heartBurst();
+    enhanceRollingCounter({ duration: 400, goldPop: false });
+    return;
+  }
+
+  if (kind === "milestone") {
+    if (prefersReducedMotion()) {
+      enhanceRollingCounter({ duration: 0, goldPop: false });
+      const mileEl = document.querySelector(".milestone");
+      mileEl?.classList.add("is-glow");
+      window.setTimeout(() => mileEl?.classList.remove("is-glow"), 400);
+      return;
+    }
+    const mileEl = document.querySelector(".milestone");
+    mileEl?.classList.add("is-glow");
+    window.setTimeout(() => mileEl?.classList.remove("is-glow"), 1200);
+    burstConfetti({ mode: "milestone" });
+    enhanceRollingCounter({ duration: 1000, goldPop: true });
+    return;
+  }
+
+  if (kind === "rare") {
+    glowGift();
+    burstConfetti({ mode: "milestone" });
+    enhanceRollingCounter({ duration: 400, goldPop: false });
+    return;
+  }
+
+  if (kind === "special") {
+    glowGift();
+    enhanceRollingCounter({ duration: 400, goldPop: false });
+  }
 }
 
 runCelebrate();

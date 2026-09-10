@@ -81,15 +81,16 @@ test("scripted route flow: first meeting, naming, transfer, and separate plushie
   const claimJar = [first.cookie, "celebrate=claim"].join("; ");
   const owner = await request(tapUrl(), { cookie: claimJar });
   pages.push(owner.html);
-  assert.match(owner.html, /다시 만나서 반가워요, Mochi!/);
+  assert.match(owner.html, /만나서 반가워, Mochi!/);
+  assert.doesNotMatch(owner.html, /다시 만나서 반가워/);
   assert.match(owner.html, /data-tap-count/);
-  assert.match(owner.html, /우리 2번 토닥였어요!/);
+  assert.match(owner.html, /우리 2번 토닥였어!/);
   assert.match(owner.html, /data-celebrate="claim"/);
   assert.match(owner.setCookies.join("\n"), /celebrate=;|celebrate=.*Max-Age=0/);
   assert.equal(calls.at(-1)[2], token);
   const reload = await request(tapUrl(), { cookie: first.cookie });
   pages.push(reload.html);
-  assert.match(reload.html, /우리 3번 토닥였어요!/);
+  assert.match(reload.html, /우리 3번 토닥였어!/);
   assert.doesNotMatch(reload.html, /data-celebrate/);
 
   answers.tap = "STRANGER";
@@ -114,7 +115,7 @@ test("scripted route flow: first meeting, naming, transfer, and separate plushie
   answers.tap = "OWNER";
   const moved = await request(tapUrl(), { cookie: claimed.cookie });
   pages.push(moved.html);
-  assert.match(moved.html, /다시 만나서 반가워요, Mochi!/);
+  assert.match(moved.html, /다시 만나서 반가워, Mochi!/);
   assert.doesNotMatch(moved.html, /data-celebrate="claim"/);
   answers.tap = "STRANGER";
   const oldPhone = await request(tapUrl(), { cookie: first.cookie });
@@ -313,12 +314,16 @@ test("returning milestone page marks celebrate and keeps distinct lines", async 
   const mile = await request(tapUrl(), { cookie: first.cookie });
   assert.match(mile.html, /data-celebrate="milestone"/);
   assert.match(mile.html, /data-tap-count/);
-  assert.match(mile.html, /우리 50번 토닥였어요!/);
-  assert.match(mile.html, /오십 번이에요!/);
+  assert.match(mile.html, /우리 50번 토닥였어!/);
+  assert.match(mile.html, /오십 번이야!/);
+  assert.doesNotMatch(mile.html, /data-celebrate="levelup"/);
+  db.prepare("UPDATE plushies SET tap_count = 50, xp = 90, last_rewarded_at = NULL WHERE uid = ?").run(A);
+  const level = await request(tapUrl(), { cookie: first.cookie });
+  assert.match(level.html, /data-celebrate="levelup"/);
+  assert.match(level.html, /Lv\. 2/);
   const next = await request(tapUrl(), { cookie: first.cookie });
-  assert.doesNotMatch(next.html, /data-celebrate/);
-  assert.match(next.html, /우리 51번 토닥였어요!/);
-  assert.doesNotMatch(next.html, /오십 번이에요!/);
+  assert.match(next.html, /우리 52번 토닥였어!/);
+  assert.doesNotMatch(next.html, /오십 번이야!/);
 });
 
 test("unnamed returning owner has no tap count and no celebrate", async (t) => {
@@ -337,9 +342,9 @@ test("returning owner count keeps final number as plain text in HTML", async (t)
   await request("/name", { cookie: first.cookie, body: { uid: A, name: "Mochi" } });
   answers.tap = "OWNER";
   const owner = await request(tapUrl(), { cookie: first.cookie });
-  assert.match(owner.html, /우리 \d+번 토닥였어요!/);
+  assert.match(owner.html, /우리 \d+번 토닥였어!/);
   assert.match(owner.html, /data-tap-count="\d+"/);
-  assert.match(owner.html, /<span class="count-final">우리 \d+번 토닥였어요!<\/span>/);
+  assert.match(owner.html, /<span class="count-final">우리 \d+번 토닥였어!<\/span>/);
 });
 
 test("stranger pages expose no celebration or evolution hooks", async (t) => {
@@ -357,11 +362,12 @@ test("milestone celebrate only when named pet hits a milestone count", async (t)
   const { db, answers, request } = await setup(t);
   const first = await request(tapUrl());
   await request("/name", { cookie: first.cookie, body: { uid: A, name: "Mochi" } });
-  db.prepare("UPDATE plushies SET tap_count = 9 WHERE uid = ?").run(A);
+  db.prepare("UPDATE plushies SET tap_count = 9, last_rewarded_at = NULL WHERE uid = ?").run(A);
   answers.tap = "OWNER";
   const ten = await request(tapUrl(), { cookie: first.cookie });
   assert.match(ten.html, /data-celebrate="milestone"/);
-  assert.match(ten.html, /벌써 열 번이에요!/);
+  assert.match(ten.html, /벌써 열 번이야!/);
+  assert.doesNotMatch(ten.html, /data-celebrate="levelup"/);
   db.prepare("UPDATE plushies SET tap_count = 11 WHERE uid = ?").run(A);
   const twelve = await request(tapUrl(), { cookie: first.cookie });
   assert.doesNotMatch(twelve.html, /data-celebrate/);
@@ -373,19 +379,58 @@ test("dev preview celebration routes render and stay hidden in production", asyn
   assert.equal(claim.status, 200);
   assert.match(claim.html, /data-celebrate="claim"/);
   assert.match(claim.html, /data-tap-count="10"/);
-  assert.match(claim.html, /count-final">우리 10번 토닥였어요!</);
+  assert.match(claim.html, /count-final">우리 10번 토닥였어!</);
 
   const mile10 = await request("/dev/preview?kind=milestone&count=10");
   assert.equal(mile10.status, 200);
   assert.match(mile10.html, /data-celebrate="milestone"/);
   assert.match(mile10.html, /data-tap-count="10"/);
-  assert.match(mile10.html, /벌써 열 번이에요!/);
+  assert.match(mile10.html, /벌써 열 번이야!/);
 
   const mile100 = await request("/dev/preview?kind=milestone&count=100");
   assert.equal(mile100.status, 200);
   assert.match(mile100.html, /data-celebrate="milestone"/);
   assert.match(mile100.html, /data-tap-count="100"/);
-  assert.match(mile100.html, /백 번 만났어요!/);
+  assert.match(mile100.html, /백 번 만났어!/);
+
+  const claimPreview = await request("/dev/preview?kind=claim&count=10");
+  assert.equal(claimPreview.status, 200);
+  assert.match(claimPreview.html, /만나서 반가워, 미리보기!/);
+  assert.doesNotMatch(claimPreview.html, /다시 만나서 반가워/);
+
+  const levelup = await request("/dev/preview?kind=levelup&count=10");
+  assert.equal(levelup.status, 200);
+  assert.match(levelup.html, /data-celebrate="levelup"/);
+  assert.match(levelup.html, /Lv\. 2/);
+  assert.match(levelup.html, /쑥쑥 컸어! 이제 Lv\. 2!/);
+  assert.match(levelup.html, /xp-fill" style="width:0%"/);
+
+  const reunion = await request("/dev/preview?kind=reunion&count=10");
+  assert.equal(reunion.status, 200);
+  assert.match(reunion.html, /data-celebrate="reunion"/);
+  assert.match(reunion.html, /보고 싶었어/);
+
+  const gift = await request("/dev/preview?kind=gift&count=10&tier=rare");
+  assert.equal(gift.status, 200);
+  assert.match(gift.html, /data-gift="rare"/);
+  assert.match(gift.html, /반짝 선물/);
+
+  const giftSpecial = await request("/dev/preview?kind=gift&count=10&tier=special");
+  assert.equal(giftSpecial.status, 200);
+  assert.match(giftSpecial.html, /data-gift="special"/);
+  assert.match(giftSpecial.html, /특별한 선물/);
+
+  const coolPrev = await request("/dev/preview?kind=gift&count=10&reason=cooldown");
+  assert.equal(coolPrev.status, 200);
+  assert.match(coolPrev.html, /방금 토닥여줘서 기분 좋아! 잠깐 있다 다시 토닥여줘\./);
+  assert.doesNotMatch(coolPrev.html, /<p class="gift /);
+
+  const lonely = await request("/dev/preview?kind=lonely&count=10");
+  assert.equal(lonely.status, 200);
+  assert.doesNotMatch(lonely.html, /mood-word|>외로워</);
+  assert.match(lonely.html, /혼자 있어서 심심했어/);
+  assert.match(lonely.html, /is-lonely/);
+  assert.match(lonely.html, /pet-moments/);
 
   const bad = await request("/dev/preview?kind=nope&count=10");
   assert.equal(bad.status, 404);
@@ -394,10 +439,16 @@ test("dev preview celebration routes render and stay hidden in production", asyn
   assert.match(hub.html, /\/dev\/preview\?kind=claim/);
   assert.match(hub.html, /\/dev\/preview\?kind=milestone&count=10/);
   assert.match(hub.html, /\/dev\/preview\?kind=milestone&count=100/);
+  assert.match(hub.html, /\/dev\/preview\?kind=levelup/);
+  assert.match(hub.html, /\/dev\/preview\?kind=reunion/);
+  assert.match(hub.html, /\/dev\/preview\?kind=gift&count=10&tier=special/);
 
   const { request: prodRequest } = await setup(t, { production: true });
   assert.equal((await prodRequest("/dev")).status, 404);
   assert.equal((await prodRequest("/dev/preview?kind=claim&count=10")).status, 404);
   assert.equal((await prodRequest("/dev/preview?kind=milestone&count=10")).status, 404);
   assert.equal((await prodRequest("/dev/preview?kind=milestone&count=100")).status, 404);
+  assert.equal((await prodRequest("/dev/preview?kind=levelup&count=10")).status, 404);
+  assert.equal((await prodRequest("/dev/preview?kind=reunion&count=10")).status, 404);
+  assert.equal((await prodRequest("/dev/prime", { body: { uid: A } })).status, 404);
 });
