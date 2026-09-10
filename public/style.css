@@ -402,14 +402,11 @@ body.is-evo-dim::before {
   font-size: .85rem;
   color: var(--muted);
 }
-body.is-evo-dim.is-levelup-glow .pet-stats {
-  position: relative;
-  z-index: 26;
-  isolation: isolate;
-}
+body.is-evo-dim.is-levelup-glow .pet-line.is-levelup,
 body.is-evo-dim.is-levelup-glow .level-line {
   position: relative;
   z-index: 26;
+  isolation: isolate;
 }
 body.is-evo-dim.is-levelup-glow .level-badge,
 body.is-evo-dim.is-levelup-glow .xp-bar {
@@ -447,7 +444,9 @@ body.is-evo-dim.is-levelup-glow .xp-bar {
   width: 120px;
   height: 8px;
   border-radius: 999px;
-  background: #e8e2d8;
+  background: var(--cap-blue-soft);
+  border: 1px solid var(--cap-blue-soft-2);
+  box-sizing: border-box;
   overflow: hidden;
 }
 .xp-fill {
