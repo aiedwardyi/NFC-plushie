@@ -27,7 +27,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   app.use(express.static(fileURLToPath(new URL("../public", import.meta.url)), {
     setHeaders(res, filePath) {
       if (/\.(?:png|jpe?g|gif|webp|svg|ico)$/i.test(filePath)) {
-        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        res.setHeader("Cache-Control", "public, max-age=86400");
       }
     },
   }));
