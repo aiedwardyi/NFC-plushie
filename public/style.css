@@ -64,10 +64,17 @@ p { line-height: 1.6; }
   font-weight: inherit;
   text-align: center;
   box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 .pet-hit:hover,
 .pet-hit:focus-visible {
   background: transparent;
+}
+.pet-hit:focus:not(:focus-visible) {
+  outline: none;
 }
 .pet-motion {
   position: relative;
@@ -85,7 +92,10 @@ p { line-height: 1.6; }
   opacity: 0;
   pointer-events: none;
   user-select: none;
+  -webkit-user-select: none;
   -webkit-user-drag: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 .pet-frame.is-show { opacity: 1; }
 .pet[data-pet="alive"]:not(.is-press) .pet-motion { animation: bob 3s ease-in-out infinite; }
