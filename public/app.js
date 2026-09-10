@@ -29,6 +29,7 @@ function currentBand(date = new Date()) {
 
 function applyTimeBand() {
   const band = currentBand();
+  document.documentElement.dataset.time = band;
   document.body.dataset.time = band;
   const line = document.querySelector("[data-time-line]");
   if (line) line.textContent = TIME_LINES[band] || "";
@@ -37,7 +38,8 @@ function applyTimeBand() {
 
 const pet = document.querySelector('[data-pet="alive"]');
 if (pet) {
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let reduceMotion = motionQuery.matches;
   const frames = {
     canon: pet.querySelector('[data-frame="canon"]'),
     blink: pet.querySelector('[data-frame="blink"]'),
@@ -81,6 +83,29 @@ if (pet) {
     scheduleBlink();
   }
 
+  function onMotionChange() {
+    reduceMotion = motionQuery.matches;
+    scheduleBlink();
+  }
+  if (typeof motionQuery.addEventListener === "function") {
+    motionQuery.addEventListener("change", onMotionChange);
+  } else if (typeof motionQuery.addListener === "function") {
+    motionQuery.addListener(onMotionChange);
+  }
+
+  if (pet.classList.contains("enter")) {
+    const motion = pet.querySelector(".pet-motion");
+    const clearEnter = () => pet.classList.remove("enter");
+    const onEnterEnd = (event) => {
+      if (event.animationName === "enter") {
+        motion?.removeEventListener("animationend", onEnterEnd);
+        clearEnter();
+      }
+    };
+    motion?.addEventListener("animationend", onEnterEnd);
+    window.setTimeout(clearEnter, 600);
+  }
+
   syncBand();
   setInterval(syncBand, 60 * 1000);
 
@@ -101,8 +126,13 @@ if (pet) {
 
   const hit = pet.querySelector(".pet-hit");
   let skipClick = false;
-  hit?.addEventListener("pointerdown", () => {
+  hit?.addEventListener("pointerdown", (event) => {
     skipClick = true;
+    try {
+      hit.setPointerCapture(event.pointerId);
+    } catch (_) {
+      /* ignore */
+    }
     react();
   });
   hit?.addEventListener("pointerup", () => {
