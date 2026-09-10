@@ -179,7 +179,7 @@ test("a repeated or lower counter is stale, and the mirror never lowers", async 
   const same = await ctx.request(`/t?uid=${A}x00000A`, { jar });
   assert.match(same.html, /data-rewarded="0"/);
   assert.match(same.html, /data-reason="stale"/);
-  assert.match(same.html, /오리를 콕 찍고 토닥여줘!/);
+  assert.match(same.html, /폰으로 진짜 나를 톡 해줘!/);
   const lower = await ctx.request(`/t?uid=${A}x000009`, { jar });
   assert.match(lower.html, /data-reason="stale"/);
   assert.equal(ctx.row().last_counter, 10);
@@ -193,7 +193,7 @@ test("a uid-only tap on a mirrored plushie is stale", async (t) => {
   const bare = await ctx.request(`/t?uid=${A}`, { jar });
   assert.match(bare.html, /data-rewarded="0"/);
   assert.match(bare.html, /data-reason="stale"/);
-  assert.match(bare.html, /오리를 콕 찍고 토닥여줘!/);
+  assert.match(bare.html, /폰으로 진짜 나를 톡 해줘!/);
 });
 
 test("a null mirror keeps uid-only behavior exactly", async (t) => {
@@ -378,7 +378,7 @@ test("celebration priority: levelup over milestone, reunion over milestone, rare
   ctx.db.prepare("UPDATE plushies SET tap_count = 9, xp = 90, last_rewarded_at = NULL WHERE uid = ?").run(A);
   const both = await ctx.request(`/t?uid=${A}`, { jar });
   assert.match(both.html, /data-celebrate="levelup"/);
-  assert.match(both.html, /벌써 열 번이에요!/);
+  assert.match(both.html, /벌써 열 번이야!/);
   assert.match(both.html, /Lv\. 2/);
 
   const ctx2 = await setup(t);
@@ -387,7 +387,7 @@ test("celebration priority: levelup over milestone, reunion over milestone, rare
     .run(T0, A);
   const reunion = await ctx2.request(`/t?uid=${A}`, { jar: jar2 });
   assert.match(reunion.html, /data-celebrate="reunion"/);
-  assert.match(reunion.html, /벌써 열 번이에요!/);
+  assert.match(reunion.html, /벌써 열 번이야!/);
   assert.match(reunion.html, /보고 싶었어! 진짜로!/);
 
   const ctx3 = await setup(t);

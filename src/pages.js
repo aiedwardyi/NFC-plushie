@@ -6,11 +6,11 @@ export function escapeHtml(value) {
 
 export function milestoneLine(count) {
   const n = Number(count);
-  if (n === 10) return "벌써 열 번이에요!";
-  if (n === 25) return "스물다섯 번이에요!";
-  if (n === 50) return "오십 번이에요!";
-  if (n === 100) return "백 번 만났어요!";
-  if (n > 100 && n % 100 === 0) return `${n}번이에요!`;
+  if (n === 10) return "벌써 열 번이야!";
+  if (n === 25) return "스물다섯 번이야!";
+  if (n === 50) return "오십 번이야!";
+  if (n === 100) return "백 번 만났어!";
+  if (n > 100 && n % 100 === 0) return `${n}번이야!`;
   return "";
 }
 
@@ -108,7 +108,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
 }
 
 export function petPage(row, code = null, { celebrate = "", pet = null } = {}) {
-  const greeting = row.pet_name ? `다시 만나서 반가워요, ${escapeHtml(row.pet_name)}!` : "안녕하세요! 나를 찾아줘서 정말 기뻐요.";
+  const greeting = row.pet_name ? `다시 만나서 반가워, ${escapeHtml(row.pet_name)}!` : "안녕! 나를 찾아줘서 정말 기뻐.";
   const recovery = code ? `<aside class="recovery"><h2>우리 안심 코드</h2>
     <p>꼭 적어두세요. 새 폰으로 나를 데려갈 때 꼭 필요해요.</p>
     <strong class="code">${escapeHtml(code)}</strong><p>지금만 볼 수 있어요. 이름을 짓거나 창을 닫기 전에 꼭 챙겨두세요.</p></aside>` : "";
@@ -122,7 +122,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null } = {}) {
   const mile = returning ? milestoneLine(row.tap_count) : "";
   const mileHtml = mile ? `<p class="milestone">${escapeHtml(mile)}</p>` : "";
   const countHtml = returning
-    ? `<p class="count" data-tap-count="${row.tap_count}"><span class="count-final">우리 ${row.tap_count}번 토닥였어요!</span></p>`
+    ? `<p class="count" data-tap-count="${row.tap_count}"><span class="count-final">우리 ${row.tap_count}번 토닥였어!</span></p>`
     : "";
   const petAttr = pet
     ? ` data-pet-state="1" data-rewarded="${pet.rewarded ? 1 : 0}" data-reason="${escapeHtml(pet.reason)}" data-mood-before="${pet.moodBefore}" data-mood-after="${pet.moodAfter}" data-lonely="${pet.lonely ? 1 : 0}" data-reunion="${pet.reunion ? 1 : 0}" data-gift="${pet.gift ? escapeHtml(pet.gift.tier) : ""}"`
@@ -166,7 +166,7 @@ export function previewPetPage({ kind, count, tier = "common", reason = "" }) {
   };
   const mile = kind === "milestone" ? milestoneLine(n) : "";
   const mileHtml = mile ? `<p class="milestone">${escapeHtml(mile)}</p>` : "";
-  const countHtml = `<p class="count" data-tap-count="${n}"><span class="count-final">우리 ${n}번 토닥였어요!</span></p>`;
+  const countHtml = `<p class="count" data-tap-count="${n}"><span class="count-final">우리 ${n}번 토닥였어!</span></p>`;
   const giftLine = tier === "rare" ? "별들이 속삭였어. 우린 짝꿍이래!"
     : tier === "special" ? "고마움이 가득가득 넘쳐!"
     : "오늘도 와줘서 고마워!";
@@ -174,7 +174,7 @@ export function previewPetPage({ kind, count, tier = "common", reason = "" }) {
   const unrewarded = {
     cooldown: "행복이 가득 찼어! 잠깐 있다 다시 토닥여줘.",
     cap: "오늘은 실컷 놀았어! 내일 또 만나자!",
-    stale: "오리를 콕 찍고 토닥여줘!",
+    stale: "폰으로 진짜 나를 톡 해줘!",
   };
   const stats = heartRow(kind === "lonely" ? 20 : kind === "reunion" ? 70 : 80, { animate: kind === "reunion", before: kind === "reunion" ? 20 : null })
     + `<p class="level-line"><span class="level-badge">Lv. ${kind === "levelup" ? 2 : 1}</span>`
@@ -187,7 +187,7 @@ export function previewPetPage({ kind, count, tier = "common", reason = "" }) {
   const visual = kind === "gift" ? (tier === "rare" ? "rare" : tier === "special" ? "special" : "") : kind === "lonely" ? "" : kind;
   return page(
     row,
-    `<p class="intro">다시 만나서 반가워요, ${escapeHtml(row.pet_name)}!</p>${mileHtml}<section class="pet-stats" aria-label="돌봄 상태">${stats}</section>`,
+    `<p class="intro">다시 만나서 반가워, ${escapeHtml(row.pet_name)}!</p>${mileHtml}<section class="pet-stats" aria-label="돌봄 상태">${stats}</section>`,
     { timeLine: true, celebrate: visual, countHtml, lonely: kind === "lonely" },
   );
 }
