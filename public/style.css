@@ -408,6 +408,9 @@ body.is-evo-dim.is-levelup-glow .level-line {
   z-index: 26;
   isolation: isolate;
 }
+body.is-evo-dim.is-levelup-glow .pet-line.is-levelup {
+  color: #faf8f1;
+}
 body.is-evo-dim.is-levelup-glow .level-badge,
 body.is-evo-dim.is-levelup-glow .xp-bar {
   position: relative;
@@ -573,5 +576,8 @@ body.is-evo-dim.is-levelup-glow .xp-bar {
   body.is-evo-dim::before,
   .evo-overlay {
     display: none;
+  }
+  body.is-evo-dim.is-levelup-glow .pet-line.is-levelup {
+    color: var(--cap-blue-deep);
   }
 }
