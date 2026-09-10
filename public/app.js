@@ -200,7 +200,7 @@ function spawnCannonBurst(pieces, originX, originY, count, big) {
     pieces.push({
       x: originX + (Math.random() - 0.5) * 24,
       y: originY + (Math.random() - 0.5) * 16,
-      vx: Math.cos(angle) * speed * (big ? 1 : 1),
+      vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - (big ? 5 : 2.5),
       w: 4 + Math.random() * 6,
       h: 6 + Math.random() * 8,
@@ -399,7 +399,7 @@ function runEvolutionGlow({ onComplete } = {}) {
   }
 
   const duckSrc = currentDuckSrc(pet);
-  pet.style.setProperty("--duck-src", `url("${duckSrc}")`);
+  pet.style.setProperty("--duck-src", `url("${duckSrc.replace(/"/g, "%22")}")`);
 
   const overlay = document.createElement("div");
   overlay.className = "evo-overlay";

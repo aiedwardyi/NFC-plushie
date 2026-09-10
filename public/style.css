@@ -287,7 +287,6 @@ body.is-evo-dim::before {
   opacity: 1;
   filter: drop-shadow(0 0 4px #fff) drop-shadow(0 0 14px #fff) drop-shadow(0 0 28px rgba(240, 200, 74, 0.95)) drop-shadow(0 0 48px rgba(240, 180, 40, 0.7));
 }
-.evo-overlay.is-silhouette ~ .pet-hit .pet-frame,
 .pet.is-evolving:has(.evo-overlay.is-silhouette) .pet-frame.is-show {
   opacity: 0 !important;
 }
