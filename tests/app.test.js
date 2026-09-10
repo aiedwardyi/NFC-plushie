@@ -177,7 +177,7 @@ test("name boundaries and HTML escaping", async (t) => {
   }
   answers.tap = "OWNER";
   const res = await request(tapUrl());
-  assert.doesNotMatch(res.html, /<img src=x onerror=x>/);
+  assert.doesNotMatch(res.html, /<img[^>]*onerror/i);
   assert.match(res.html, /&lt;img src=x onerror=x&gt;/);
 });
 
