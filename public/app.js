@@ -105,6 +105,14 @@ if (pet) {
     skipClick = true;
     react();
   });
+  hit?.addEventListener("pointerup", () => {
+    setTimeout(() => {
+      skipClick = false;
+    }, 0);
+  });
+  hit?.addEventListener("pointercancel", () => {
+    skipClick = false;
+  });
   hit?.addEventListener("click", (event) => {
     if (skipClick) {
       skipClick = false;
