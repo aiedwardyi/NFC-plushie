@@ -81,7 +81,7 @@ export function petPage(row, code = null, { celebrate = "" } = {}) {
   const mile = returning ? milestoneLine(row.tap_count) : "";
   const mileHtml = mile ? `<p class="milestone">${escapeHtml(mile)}</p>` : "";
   const countHtml = returning
-    ? `<p class="count" data-tap-count>우리 ${row.tap_count}번 토닥였어요!</p>`
+    ? `<p class="count" data-tap-count="${row.tap_count}"><span class="count-final">우리 ${row.tap_count}번 토닥였어요!</span></p>`
     : "";
   let kind = celebrate;
   if (!kind && mile) kind = "milestone";
@@ -107,8 +107,30 @@ export function strangerPage(row, message = "") {
 
 export const fakeUids = ["04AAAAAAAAAAA1", "04BBBBBBBBBBB2", "04CCCCCCCCCCC3"];
 
+export function previewPetPage({ kind, count }) {
+  const n = Number(count);
+  const row = {
+    uid: "04PREVIEW00001",
+    pet_name: "미리보기",
+    tap_count: n,
+  };
+  const mile = kind === "milestone" ? milestoneLine(n) : "";
+  const mileHtml = mile ? `<p class="milestone">${escapeHtml(mile)}</p>` : "";
+  const countHtml = `<p class="count" data-tap-count="${n}"><span class="count-final">우리 ${n}번 토닥였어요!</span></p>`;
+  return page(
+    row,
+    `<p class="intro">다시 만나서 반가워요, ${escapeHtml(row.pet_name)}!</p>${mileHtml}`,
+    { timeLine: true, celebrate: kind, countHtml },
+  );
+}
+
 export function devPage() {
   return page(null, `<p class="intro">연습용 친구들을 만나보세요</p>
     <nav aria-label="연습용 친구들">${fakeUids.map((uid, i) => `<a class="button" href="/t?uid=${uid}">인형 친구 ${String.fromCharCode(65 + i)} <small>${uid}</small></a>`).join("")}</nav>
+    <nav aria-label="축하 미리보기" class="dev-preview">
+      <a class="button secondary" href="/dev/preview?kind=claim&count=10">이름 짓기 축하 미리보기</a>
+      <a class="button secondary" href="/dev/preview?kind=milestone&count=10">10번 이정표 미리보기</a>
+      <a class="button secondary" href="/dev/preview?kind=milestone&count=100">100번 이정표 미리보기</a>
+    </nav>
     <form action="/dev/reset" method="post"><button class="secondary" type="submit">연습용 친구들을 모두 처음으로 돌리기</button></form>`);
 }
