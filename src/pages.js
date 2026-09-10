@@ -37,9 +37,12 @@ function petMarkup({ waving = false, away = false } = {}) {
     </div>`;
 }
 
-export function page(row, content, { waving = false, away = false, timeLine = false } = {}) {
+export function page(row, content, { waving = false, away = false, timeLine = false, celebrate = "", countHtml = "" } = {}) {
   const title = escapeHtml(row?.pet_name || "새 친구");
   const timeEl = timeLine ? `<p class="time-line" data-time-line></p>` : "";
+  const celebrateAttr = celebrate === "claim" || celebrate === "milestone"
+    ? ` data-celebrate="${celebrate}"`
+    : "";
   return `<!doctype html>
 <html lang="ko">
 <head>
@@ -49,12 +52,13 @@ export function page(row, content, { waving = false, away = false, timeLine = fa
   <link rel="stylesheet" href="/style.css">
   <script src="/app.js" defer></script>
 </head>
-<body>
+<body${celebrateAttr}>
   <main>
     <p class="eyebrow">살포시 전하는 안녕</p>
     <h1>${title}</h1>
     ${timeEl}
     ${petMarkup({ waving, away })}
+    ${countHtml}
     ${content}
     <footer>작은 토닥임. 다정한 친구.</footer>
   </main>
@@ -62,7 +66,7 @@ export function page(row, content, { waving = false, away = false, timeLine = fa
 </html>`;
 }
 
-export function petPage(row, code = null) {
+export function petPage(row, code = null, { celebrate = "" } = {}) {
   const greeting = row.pet_name ? `다시 만나서 반가워요, ${escapeHtml(row.pet_name)}!` : "안녕하세요! 나를 찾아줘서 정말 기뻐요.";
   const recovery = code ? `<aside class="recovery"><h2>우리 안심 코드</h2>
     <p>꼭 적어두세요. 새 폰으로 나를 데려갈 때 꼭 필요해요.</p>
@@ -76,10 +80,15 @@ export function petPage(row, code = null) {
   const returning = Boolean(row.pet_name) && !code;
   const mile = returning ? milestoneLine(row.tap_count) : "";
   const mileHtml = mile ? `<p class="milestone">${escapeHtml(mile)}</p>` : "";
+  const countHtml = returning
+    ? `<p class="count" data-tap-count>우리 ${row.tap_count}번 토닥였어요!</p>`
+    : "";
+  let kind = celebrate;
+  if (!kind && mile) kind = "milestone";
   return page(
     row,
-    `<p class="intro">${greeting}</p>${recovery}${prompt}<p class="count">우리 ${row.tap_count}번 토닥였어요!</p>${mileHtml}`,
-    { waving: Boolean(code), timeLine: true },
+    `<p class="intro">${greeting}</p>${recovery}${prompt}${mileHtml}`,
+    { waving: Boolean(code), timeLine: true, celebrate: kind, countHtml },
   );
 }
 
