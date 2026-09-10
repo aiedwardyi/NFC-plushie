@@ -399,7 +399,7 @@ function runEvolutionGlow({ onComplete } = {}) {
   }
 
   const duckSrc = currentDuckSrc(pet);
-  pet.style.setProperty("--duck-src", `url("${duckSrc.replace(/"/g, "%22")}")`);
+  pet.style.setProperty("--duck-src", `url("${duckSrc.replace(/["()]/g, encodeURIComponent)}")`);
 
   const overlay = document.createElement("div");
   overlay.className = "evo-overlay";

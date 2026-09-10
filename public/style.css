@@ -152,18 +152,10 @@ small { display: block; font-size: .8rem; font-weight: 400; margin-top: 4px; }
 .milestone.is-glow {
   animation: mile-glow .85s ease;
 }
-.count.is-pulse {
-  animation: count-pulse .55s ease;
-}
 @keyframes mile-glow {
   0% { transform: scale(0.96); text-shadow: 0 0 0 transparent; opacity: 0.65; }
   45% { transform: scale(1.04); text-shadow: 0 0 12px rgba(61, 111, 148, 0.45); opacity: 1; }
   100% { transform: scale(1); text-shadow: 0 0 0 transparent; opacity: 1; }
-}
-@keyframes count-pulse {
-  0% { transform: scale(1); }
-  40% { transform: scale(1.08); }
-  100% { transform: scale(1); }
 }
 canvas.celebrate-layer {
   position: fixed;
@@ -218,9 +210,10 @@ body.is-evo-dim::before {
   background: rgba(12, 16, 24, 0.6);
 }
 .pet.is-evolving {
+  /* above dim (20); below confetti (40) and flash (50) */
   z-index: 25;
   isolation: isolate;
-  overflow: hidden;
+  overflow: visible;
 }
 .pet.is-evolving .pet-hit {
   position: relative;
@@ -231,14 +224,14 @@ body.is-evo-dim::before {
   inset: 0;
   z-index: 3;
   pointer-events: none;
-  overflow: hidden;
+  overflow: visible;
 }
 .evo-rays {
   position: absolute;
   left: 50%;
-  top: 55%;
-  width: 160%;
-  height: 160%;
+  top: 58%;
+  width: 140%;
+  height: 140%;
   margin: 0;
   transform: translate(-50%, -50%);
   z-index: 0;
@@ -249,23 +242,27 @@ body.is-evo-dim::before {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 10px;
-  height: 48%;
-  margin-left: -5px;
+  width: 14px;
+  height: 36%;
+  margin-left: -7px;
   transform-origin: 50% 0;
   transform: rotate(var(--ray-rot, 0deg));
-  background: linear-gradient(to bottom, rgba(245, 215, 110, 0.55) 0%, rgba(245, 215, 110, 0.22) 42%, transparent 100%);
+  background: linear-gradient(
+    to bottom,
+    rgba(245, 215, 110, 0.65) 0%,
+    rgba(245, 215, 110, 0.35) 28%,
+    rgba(245, 215, 110, 0.12) 58%,
+    transparent 100%
+  );
   border-radius: 999px;
-  opacity: 0.9;
-  filter: blur(0.4px);
-  clip-path: polygon(35% 0, 65% 0, 100% 100%, 0 100%);
+  opacity: 0.95;
+  filter: blur(0.6px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 35%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 35%, transparent 100%);
 }
 @keyframes evo-spin {
   from { transform: translate(-50%, -50%) rotate(0deg) scale(0.94); }
   to { transform: translate(-50%, -50%) rotate(140deg) scale(1.02); }
-}
-.pet.is-evolving .pet-frame.is-show {
-  opacity: 0.35;
 }
 .evo-silhouette {
   position: absolute;
@@ -375,8 +372,7 @@ body.is-evo-dim::before {
     opacity: 1;
     transform: none;
   }
-  .milestone.is-glow,
-  .count.is-pulse {
+  .milestone.is-glow {
     animation: none;
   }
   body.is-evo-dim::before,
