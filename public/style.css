@@ -3,12 +3,12 @@
   color: #3a4550;
   background: #faf8f1;
   font-synthesis: none;
-  --cap-blue: #5a8fb8;
-  --cap-blue-deep: #4a7a9e;
+  --cap-blue: #3d6f94;
+  --cap-blue-deep: #2f5a7a;
   --cap-blue-soft: #e3eef6;
   --cap-blue-soft-2: #d2e3f0;
   --cap-blue-line: #9eb0c0;
-  --muted: #6b7a88;
+  --muted: #5a6876;
   --page-bg: #faf8f1;
 }
 * { box-sizing: border-box; }
@@ -149,9 +149,10 @@ a { color: var(--cap-blue-deep); }
   .code { font-size: 1.85rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pet[data-pet="alive"]:not(.is-press) .pet-motion,
-  .pet[data-pet="alive"].enter:not(.is-press) .pet-motion,
-  .pet[data-pet="alive"].is-night:not(.is-press) .pet-motion {
+  .pet[data-pet="alive"] .pet-motion,
+  .pet[data-pet="alive"].enter .pet-motion,
+  .pet[data-pet="alive"].is-night .pet-motion,
+  .pet[data-pet="alive"].is-press .pet-motion {
     animation: none;
     opacity: 1;
     transform: none;
