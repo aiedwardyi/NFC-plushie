@@ -85,7 +85,7 @@ test("scripted route flow: first meeting, naming, transfer, and separate plushie
   assert.match(owner.html, /data-tap-count/);
   assert.match(owner.html, /우리 2번 토닥였어요!/);
   assert.match(owner.html, /data-celebrate="claim"/);
-  assert.match(owner.setCookies.join("\n"), /celebrate=/);
+  assert.match(owner.setCookies.join("\n"), /celebrate=;|celebrate=.*Max-Age=0/);
   assert.equal(calls.at(-1)[2], token);
   const reload = await request(tapUrl(), { cookie: first.cookie });
   pages.push(reload.html);
@@ -299,7 +299,7 @@ test("claim celebrate flash is server-consumed and missing on the next tap", asy
   answers.tap = "OWNER";
   const celebrated = await request(tapUrl(), { cookie: `${first.cookie}; celebrate=claim` });
   assert.match(celebrated.html, /data-celebrate="claim"/);
-  assert.match(celebrated.setCookies.join("\n"), /celebrate=/);
+  assert.match(celebrated.setCookies.join("\n"), /celebrate=;|celebrate=.*Max-Age=0/);
   const again = await request(tapUrl(), { cookie: first.cookie });
   assert.doesNotMatch(again.html, /data-celebrate/);
 });
