@@ -315,9 +315,13 @@ test("returning milestone page marks celebrate and keeps distinct lines", async 
   assert.match(mile.html, /data-tap-count/);
   assert.match(mile.html, /우리 50번 토닥였어요!/);
   assert.match(mile.html, /오십 번이에요!/);
+  assert.doesNotMatch(mile.html, /data-celebrate="levelup"/);
+  db.prepare("UPDATE plushies SET tap_count = 50, xp = 90, last_rewarded_at = NULL WHERE uid = ?").run(A);
+  const level = await request(tapUrl(), { cookie: first.cookie });
+  assert.match(level.html, /data-celebrate="levelup"/);
+  assert.match(level.html, /Lv\. 2/);
   const next = await request(tapUrl(), { cookie: first.cookie });
-  assert.doesNotMatch(next.html, /data-celebrate/);
-  assert.match(next.html, /우리 51번 토닥였어요!/);
+  assert.match(next.html, /우리 52번 토닥였어요!/);
   assert.doesNotMatch(next.html, /오십 번이에요!/);
 });
 
@@ -357,11 +361,12 @@ test("milestone celebrate only when named pet hits a milestone count", async (t)
   const { db, answers, request } = await setup(t);
   const first = await request(tapUrl());
   await request("/name", { cookie: first.cookie, body: { uid: A, name: "Mochi" } });
-  db.prepare("UPDATE plushies SET tap_count = 9 WHERE uid = ?").run(A);
+  db.prepare("UPDATE plushies SET tap_count = 9, last_rewarded_at = NULL WHERE uid = ?").run(A);
   answers.tap = "OWNER";
   const ten = await request(tapUrl(), { cookie: first.cookie });
   assert.match(ten.html, /data-celebrate="milestone"/);
   assert.match(ten.html, /벌써 열 번이에요!/);
+  assert.doesNotMatch(ten.html, /data-celebrate="levelup"/);
   db.prepare("UPDATE plushies SET tap_count = 11 WHERE uid = ?").run(A);
   const twelve = await request(tapUrl(), { cookie: first.cookie });
   assert.doesNotMatch(twelve.html, /data-celebrate/);
@@ -387,6 +392,24 @@ test("dev preview celebration routes render and stay hidden in production", asyn
   assert.match(mile100.html, /data-tap-count="100"/);
   assert.match(mile100.html, /백 번 만났어요!/);
 
+  const levelup = await request("/dev/preview?kind=levelup&count=10");
+  assert.equal(levelup.status, 200);
+  assert.match(levelup.html, /data-celebrate="levelup"/);
+  assert.match(levelup.html, /Lv\. 2/);
+
+  const reunion = await request("/dev/preview?kind=reunion&count=10");
+  assert.equal(reunion.status, 200);
+  assert.match(reunion.html, /data-celebrate="reunion"/);
+  assert.match(reunion.html, /보고 싶었어요/);
+
+  const gift = await request("/dev/preview?kind=gift&count=10&tier=rare");
+  assert.equal(gift.status, 200);
+  assert.match(gift.html, /data-gift="rare"/);
+
+  const lonely = await request("/dev/preview?kind=lonely&count=10");
+  assert.equal(lonely.status, 200);
+  assert.match(lonely.html, /외로워요/);
+
   const bad = await request("/dev/preview?kind=nope&count=10");
   assert.equal(bad.status, 404);
 
@@ -394,10 +417,15 @@ test("dev preview celebration routes render and stay hidden in production", asyn
   assert.match(hub.html, /\/dev\/preview\?kind=claim/);
   assert.match(hub.html, /\/dev\/preview\?kind=milestone&count=10/);
   assert.match(hub.html, /\/dev\/preview\?kind=milestone&count=100/);
+  assert.match(hub.html, /\/dev\/preview\?kind=levelup/);
+  assert.match(hub.html, /\/dev\/preview\?kind=reunion/);
 
   const { request: prodRequest } = await setup(t, { production: true });
   assert.equal((await prodRequest("/dev")).status, 404);
   assert.equal((await prodRequest("/dev/preview?kind=claim&count=10")).status, 404);
   assert.equal((await prodRequest("/dev/preview?kind=milestone&count=10")).status, 404);
   assert.equal((await prodRequest("/dev/preview?kind=milestone&count=100")).status, 404);
+  assert.equal((await prodRequest("/dev/preview?kind=levelup&count=10")).status, 404);
+  assert.equal((await prodRequest("/dev/preview?kind=reunion&count=10")).status, 404);
+  assert.equal((await prodRequest("/dev/prime", { body: { uid: A } })).status, 404);
 });

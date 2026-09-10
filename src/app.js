@@ -3,13 +3,67 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import * as binding from "./binding.js";
 import { hash, ownerToken, recoveryCode } from "./secrets.js";
-import { devPage, page, petPage, previewPetPage, strangerPage } from "./pages.js";
+import { EMPTY_FOUND, EMPTY_SEEN } from "./db.js";
+import { GIFTS } from "./gifts.js";
+import { PET, applyTap, currentMood, parseTapUid, seoulDayKey, xpProgress } from "./pet.js";
+import { devPage, milestoneLine, page, petPage, previewPetPage, strangerPage } from "./pages.js";
+
+export { PET };
 
 const cookieAge = 400 * 24 * 60 * 60 * 1000;
 const cooldown = 15 * 60 * 1000;
+const skipAge = 2 * 60 * 1000;
 const validUid = (uid) => typeof uid === "string" && /^[0-9A-F]{14}$/.test(uid);
 
-export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now }) {
+const UNREWARDED_LINES = {
+  cooldown: "배불러요! 조금 있다가 다시 토닥여주세요.",
+  cap: "오늘은 실컷 놀았어요. 내일 또 만나요!",
+  stale: "인형 자체를 톡 토닥여야 돌봐줄 수 있어요.",
+};
+const LONELY_LINE = "혼자 있어서 심심했어요...";
+const REUNION_LINE = "보고 싶었어요! 진짜루요!";
+const GIFT_TOTAL = GIFTS.common.length + GIFTS.special.length + GIFTS.rare.length;
+
+function parseSeen(text) {
+  const clean = (v) => (Array.isArray(v) ? v.filter((s) => typeof s === "string") : []);
+  try {
+    const v = JSON.parse(text || "");
+    if (!v || typeof v !== "object") return { common: [], special: [], rare: [] };
+    return { common: clean(v.common), special: clean(v.special), rare: clean(v.rare) };
+  } catch {
+    return { common: [], special: [], rare: [] };
+  }
+}
+
+function parseFound(text) {
+  try {
+    const v = JSON.parse(text || "");
+    return Array.isArray(v) ? v.filter((s) => typeof s === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function petState(row, t) {
+  const seen = parseSeen(row.gift_seen);
+  return {
+    moodValue: row.mood_value ?? 70,
+    moodUpdatedAt: row.mood_updated_at ?? t,
+    xp: row.xp ?? 0,
+    lastRewardedAt: row.last_rewarded_at ?? null,
+    rewardDay: row.reward_day ?? null,
+    rewardDayCount: row.reward_day_count ?? 0,
+    lastGiftDay: row.last_gift_day ?? null,
+    lastActiveDay: row.last_active_day ?? null,
+    lastCounter: row.last_counter ?? null,
+    nextGiftTier: ["common", "special", "rare"].includes(row.next_gift_tier) ? row.next_gift_tier : null,
+    seen_common: seen.common,
+    seen_special: seen.special,
+    seen_rare: seen.rare,
+  };
+}
+
+export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now, rng = Math.random }) {
   const app = express();
   app.disable("x-powered-by");
   app.use((req, res, next) => {
@@ -46,36 +100,121 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     if (kind) clearCelebrate(res);
     return kind;
   };
+  const skipCookie = { httpOnly: true, sameSite: "lax", secure: production, path: "/", maxAge: skipAge };
+  const setSkip = (res, serial) => res.cookie("pet_skip", serial, skipCookie);
+  const clearSkip = (res) => res.clearCookie("pet_skip", {
+    httpOnly: true, sameSite: "lax", secure: production, path: "/",
+  });
   const invalidUid = (res) => res.status(400).send(page(null, "<p>링크가 잘 맞지 않아요. 인형에 있는 링크로 다시 찾아와 주세요.</p>"));
+
+  function writePetReward(serial, st, out, row, t, today) {
+    const seen = { common: [...st.seen_common], special: [...st.seen_special], rare: [...st.seen_rare] };
+    let found = parseFound(row.gift_found);
+    let giftDay = st.lastGiftDay;
+    if (out.gift) {
+      const tier = out.gift.tier;
+      const ids = GIFTS[tier].map((g) => g.id);
+      seen[tier] = ids.every((id) => st[`seen_${tier}`].includes(id)) ? [out.gift.gift.id] : [...st[`seen_${tier}`], out.gift.gift.id];
+      if (!found.includes(out.gift.gift.id)) found.push(out.gift.gift.id);
+      giftDay = out.giftDay;
+    }
+    const after = xpProgress(out.xpAfter);
+    db.prepare(`UPDATE plushies SET mood_value = ?, mood_updated_at = ?, xp = ?, last_rewarded_at = ?,
+      reward_day = ?, reward_day_count = ?, last_gift_day = ?, gift_seen = ?, gift_found = ?,
+      days_together = ?, last_active_day = ?, next_gift_tier = NULL WHERE uid = ?`).run(
+      out.moodAfter, t, out.xpAfter, t, today, out.dayCountAfter, giftDay,
+      JSON.stringify(seen), JSON.stringify(found),
+      out.newActiveDay ? (row.days_together ?? 1) + 1 : (row.days_together ?? 1),
+      out.newActiveDay ? today : st.lastActiveDay, serial,
+    );
+    return { after, foundCount: found.length };
+  }
+
+  function petView(fresh, st, out, t, extra = {}) {
+    const xpNow = xpProgress(st.xp);
+    const moodBefore = out.rewarded ? out.moodBefore : currentMood(st, t);
+    const moodAfter = out.rewarded ? out.moodAfter : moodBefore;
+    return {
+      rewarded: out.rewarded,
+      reason: out.reason || "",
+      moodBefore: Math.round(moodBefore * 10) / 10,
+      moodAfter: Math.round(moodAfter * 10) / 10,
+      lonely: moodBefore <= PET.moodLonelyAt,
+      reunion: Boolean(out.rewarded && out.reunion),
+      level: out.rewarded ? extra.after.level : xpNow.level,
+      xpInto: out.rewarded ? extra.after.into : xpNow.into,
+      xpSpan: out.rewarded ? extra.after.span : xpNow.span,
+      gift: out.gift,
+      giftFound: out.rewarded ? extra.foundCount : parseFound(fresh.gift_found).length,
+      giftTotal: GIFT_TOTAL,
+      days: fresh.days_together ?? 1,
+      unrewardedLine: out.rewarded ? "" : (UNREWARDED_LINES[out.reason] || ""),
+      lonelyLine: !out.rewarded && moodBefore <= PET.moodLonelyAt ? LONELY_LINE : "",
+      reunionLine: out.rewarded && out.reunion ? REUNION_LINE : "",
+    };
+  }
 
   app.get("/health", (req, res) => res.type("text").send("ok"));
   app.get("/t", (req, res) => {
-    const uid = req.query.uid;
-    if (!validUid(uid)) return invalidUid(res);
+    const parsed = parseTapUid(req.query.uid);
+    if (!parsed) return invalidUid(res);
+    const serial = parsed.serial;
+    const counter = parsed.counter;
     const result = db.transaction(() => {
-      const row = getRow(uid);
+      const row = getRow(serial);
       const state = decisions.resolveTap(row, req.cookies.owner_token || null, hash);
-      const stamp = new Date(now()).toISOString();
+      const t = now();
+      const today = seoulDayKey(t);
+      const stamp = new Date(t).toISOString();
       if (state === "NEW") {
         const token = ownerToken();
         const code = recoveryCode();
-        db.prepare(`INSERT INTO plushies (uid, owner_token_hash, recovery_code_hash, tap_count, created_at, last_tap_at)
-          VALUES (?, ?, ?, 1, ?, ?)`).run(uid, hash(token), hash(code), stamp, stamp);
-        return { html: petPage(getRow(uid), code), token };
+        db.prepare(`INSERT INTO plushies (uid, owner_token_hash, recovery_code_hash, tap_count, created_at, last_tap_at,
+          mood_value, mood_updated_at, xp, reward_day_count, gift_seen, gift_found, days_together, last_active_day, last_counter)
+          VALUES (?, ?, ?, 1, ?, ?, 100, ?, 0, 0, ?, ?, 1, ?, ?)`)
+          .run(serial, hash(token), hash(code), stamp, stamp, t, EMPTY_SEEN, EMPTY_FOUND, today, counter);
+        return { html: petPage(getRow(serial), code), token };
       }
       if (state === "OWNER") {
-        db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ? WHERE uid = ?").run(stamp, uid);
-        return { html: "OWNER", uid };
+        db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ? WHERE uid = ?").run(stamp, serial);
+        const afterTap = getRow(serial);
+        const raiseMirror = () => {
+          if (counter !== null && (afterTap.last_counter === null || counter > afterTap.last_counter)) {
+            db.prepare("UPDATE plushies SET last_counter = ? WHERE uid = ?").run(counter, serial);
+          }
+        };
+        const flash = takeCelebrate(req, res);
+        if (req.cookies.pet_skip === serial) {
+          clearSkip(res);
+          raiseMirror();
+          return { html: petPage(getRow(serial), null, { celebrate: flash }) };
+        }
+        if (!afterTap.pet_name) {
+          raiseMirror();
+          return { html: petPage(getRow(serial), null, { celebrate: flash }) };
+        }
+        const st = petState(afterTap, t);
+        const out = applyTap(st, t, {
+          counter: { present: counter !== null, missing: counter === null, value: counter },
+          rng,
+        });
+        raiseMirror();
+        let extra = null;
+        if (out.rewarded) extra = writePetReward(serial, st, out, getRow(serial), t, today);
+        const fresh = getRow(serial);
+        const mile = milestoneLine(fresh.tap_count);
+        let visual = flash;
+        if (!visual && out.rewarded && out.leveledUp) visual = "levelup";
+        else if (!visual && out.rewarded && out.reunion) visual = "reunion";
+        else if (!visual && mile) visual = "milestone";
+        else if (!visual && out.rewarded && out.gift && out.gift.tier === "rare") visual = "rare";
+        else if (!visual && out.rewarded && out.gift && out.gift.tier === "special") visual = "special";
+        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, extra || {}) }) };
       }
       if (state === "STRANGER") return { html: strangerPage(row) };
       throw new Error("Invalid binding result");
     })();
     if (result.token) setOwner(res, result.token);
-    if (result.html === "OWNER") {
-      const celebrate = takeCelebrate(req, res);
-      res.send(petPage(getRow(result.uid), null, { celebrate }));
-      return;
-    }
     res.send(result.html);
   });
 
@@ -93,6 +232,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     const firstName = !row.pet_name;
     db.prepare("UPDATE plushies SET pet_name = ? WHERE uid = ?").run(trimmed, uid);
     if (firstName) setCelebrate(res, "claim");
+    setSkip(res, uid);
     res.redirect(303, `/t?uid=${uid}`);
   });
 
@@ -121,6 +261,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     })();
     if (result.token) {
       setOwner(res, result.token);
+      setSkip(res, uid);
       return res.redirect(303, `/t?uid=${uid}`);
     }
     res.status(result.status).send(result.row ? strangerPage(result.row, result.message) : page(null, "<p>먼저 인형에 있는 링크로 친구를 만나보세요.</p>"));
@@ -131,16 +272,43 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     app.get("/dev/preview", (req, res) => {
       const kind = req.query.kind;
       const count = Number(req.query.count);
-      const allowedCount = count === 10 || count === 100;
-      if ((kind !== "claim" && kind !== "milestone") || !allowedCount) {
+      const tier = req.query.tier;
+      const reason = req.query.reason;
+      const ok = previewPetPage.validate({ kind, count, tier, reason });
+      if (!ok) {
         return res.status(404).send(page(null, "<p>이 친구는 인형에 있는 링크에서 기다리고 있어요.</p>"));
       }
-      res.send(previewPetPage({ kind, count }));
+      res.send(previewPetPage({ kind, count, tier, reason }));
+    });
+    app.post("/dev/prime", (req, res) => {
+      const { uid, preset, tier } = req.body || {};
+      if (!validUid(uid)) return invalidUid(res);
+      const row = getRow(uid);
+      if (!row) return res.status(404).send(page(null, "<p>먼저 인형에 있는 링크로 친구를 만나보세요.</p>"));
+      const t = now();
+      if (preset === "lonely") {
+        db.prepare("UPDATE plushies SET mood_value = 20, mood_updated_at = ?, last_rewarded_at = NULL WHERE uid = ?").run(t, uid);
+      } else if (preset === "levelup") {
+        db.prepare("UPDATE plushies SET xp = 90, last_rewarded_at = NULL WHERE uid = ?").run(uid);
+      } else if (preset === "fresh") {
+        db.prepare("UPDATE plushies SET last_rewarded_at = NULL, reward_day_count = 0 WHERE uid = ?").run(uid);
+      } else if (preset) {
+        return res.status(400).send(page(null, "<p>잘 알아듣지 못했어요. 다시 한 번 해보세요.</p>"));
+      }
+      if (tier === "none") {
+        db.prepare("UPDATE plushies SET next_gift_tier = NULL WHERE uid = ?").run(uid);
+      } else if (tier === "common" || tier === "special" || tier === "rare") {
+        db.prepare("UPDATE plushies SET next_gift_tier = ?, last_gift_day = NULL, last_rewarded_at = NULL WHERE uid = ?").run(tier, uid);
+      } else if (tier) {
+        return res.status(400).send(page(null, "<p>잘 알아듣지 못했어요. 다시 한 번 해보세요.</p>"));
+      }
+      res.redirect(303, "/dev");
     });
     app.post("/dev/reset", (req, res) => {
       db.prepare("DELETE FROM plushies").run();
       res.clearCookie("owner_token", { path: "/", httpOnly: true, sameSite: "lax" });
       clearCelebrate(res);
+      clearSkip(res);
       res.redirect(303, "/dev");
     });
   }
