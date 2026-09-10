@@ -6,6 +6,8 @@ export function escapeHtml(value) {
 
 export function page(row, content, waving = false) {
   const title = escapeHtml(row?.pet_name || "새 친구");
+  const alt = waving ? "다정한 인형 친구가 손을 흔들어요" : "다정한 인형 친구가 방긋 웃어요";
+  const enterClass = waving ? " enter" : "";
   return `<!doctype html>
 <html lang="ko">
 <head>
@@ -19,15 +21,14 @@ export function page(row, content, waving = false) {
   <main>
     <p class="eyebrow">살포시 전하는 안녕</p>
     <h1>${title}</h1>
-    <div class="pet ${waving ? "waving" : "idle"}">
-      <img
-        src="/mascot-duck-512.png"
-        srcset="/mascot-duck-512.png 512w, /mascot-duck-1024.png 1024w"
-        sizes="170px"
-        width="170"
-        height="160"
-        alt="${waving ? "다정한 인형 친구가 손을 흔들어요" : "다정한 인형 친구가 방긋 웃어요"}"
-      >
+    <div class="pet ${waving ? "waving" : "idle"}${enterClass}" data-pet>
+      <button type="button" class="pet-hit" aria-label="${alt}">
+        <span class="pet-motion">
+          <img class="pet-frame is-show" data-frame="canon" src="/mascot-duck-512.png" width="220" height="220" alt="${alt}" decoding="async">
+          <img class="pet-frame" data-frame="blink" src="/mascot-duck-blink-512.png" width="220" height="220" alt="" aria-hidden="true" decoding="async">
+          <img class="pet-frame" data-frame="react" src="/mascot-duck-react-512.png" width="220" height="220" alt="" aria-hidden="true" decoding="async">
+        </span>
+      </button>
     </div>
     ${content}
     <footer>작은 토닥임. 다정한 친구.</footer>
