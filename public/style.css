@@ -185,12 +185,168 @@ a { color: var(--cap-blue-deep); }
   .pet { width: 220px; height: 220px; margin: 18px auto 22px; }
   .code { font-size: 1.85rem; }
 }
+
+.celebrate-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  background: #fff;
+  opacity: var(--flash-opacity, 0.62);
+  animation: celebrate-flash-fade .16s ease-out forwards;
+}
+@keyframes celebrate-flash-fade {
+  from { opacity: var(--flash-opacity, 0.62); }
+  to { opacity: 0; }
+}
+body.is-shake main {
+  animation: screen-shake .28s ease-out;
+}
+@keyframes screen-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-3px, 2px); }
+  40% { transform: translate(3px, -2px); }
+  60% { transform: translate(-2px, -1px); }
+  80% { transform: translate(2px, 1px); }
+}
+body.is-evo-dim::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  background: rgba(12, 16, 24, 0.6);
+}
+.pet.is-evolving {
+  z-index: 25;
+  isolation: isolate;
+}
+.evo-overlay {
+  position: absolute;
+  inset: -18%;
+  z-index: 2;
+  pointer-events: none;
+  overflow: visible;
+}
+.evo-rays {
+  position: absolute;
+  inset: -20%;
+  background: conic-gradient(from 0deg, transparent 0 12deg, rgba(245, 215, 110, 0.35) 12deg 18deg, transparent 18deg 42deg);
+  border-radius: 50%;
+  animation: evo-spin 2.8s linear;
+  filter: blur(0.2px);
+  opacity: 0.85;
+}
+@keyframes evo-spin {
+  from { transform: rotate(0deg) scale(0.92); }
+  to { transform: rotate(120deg) scale(1.05); }
+}
+.pet.is-evolving .pet-frame.is-show {
+  opacity: 0.35;
+}
+.evo-silhouette {
+  position: absolute;
+  inset: 12%;
+  background-color: #fff;
+  -webkit-mask-image: var(--duck-src);
+  mask-image: var(--duck-src);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center bottom;
+  mask-position: center bottom;
+  opacity: 0;
+  transition: opacity .07s linear;
+}
+.evo-overlay.is-silhouette .evo-silhouette {
+  opacity: 1;
+  filter: drop-shadow(0 0 4px #fff) drop-shadow(0 0 14px #fff) drop-shadow(0 0 28px rgba(240, 200, 74, 0.95)) drop-shadow(0 0 48px rgba(240, 180, 40, 0.7));
+}
+.evo-overlay.is-silhouette ~ .pet-hit .pet-frame,
+.pet.is-evolving:has(.evo-overlay.is-silhouette) .pet-frame.is-show {
+  opacity: 0 !important;
+}
+.evo-sweep {
+  position: absolute;
+  inset: 12%;
+  -webkit-mask-image: var(--duck-src);
+  mask-image: var(--duck-src);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center bottom;
+  mask-position: center bottom;
+  background: linear-gradient(to top, transparent 0%, rgba(255, 250, 230, 0.95) 42%, rgba(255, 255, 255, 0.55) 55%, transparent 72%);
+  background-size: 100% 55%;
+  background-repeat: no-repeat;
+  background-position: center 140%;
+  opacity: 0;
+  mix-blend-mode: screen;
+}
+.evo-overlay.is-sweeping .evo-sweep {
+  opacity: 1;
+  animation: evo-sweep 1.35s ease-in-out forwards;
+}
+@keyframes evo-sweep {
+  from { background-position: center 145%; }
+  to { background-position: center -45%; }
+}
+.pet.is-evo-bounce .pet-motion {
+  animation: evo-bounce .55s ease;
+  filter: saturate(1.15) brightness(1.08);
+}
+@keyframes evo-bounce {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.08); }
+  70% { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+.count .odometer-digit {
+  display: inline-block;
+  height: 1.15em;
+  overflow: hidden;
+  vertical-align: -0.1em;
+  width: 0.7em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.count .odometer-track {
+  display: block;
+  will-change: transform;
+}
+.count .odometer-cell {
+  display: block;
+  height: 1.15em;
+  line-height: 1.15em;
+  text-align: center;
+}
+.count.is-gold-pop {
+  animation: gold-pop .65s ease;
+  color: #b8860b;
+  text-shadow: 0 0 10px rgba(240, 200, 74, 0.55);
+}
+@keyframes gold-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.14); color: #d4a017; }
+  100% { transform: scale(1); }
+}
+.dev-preview {
+  margin: 16px 0 8px;
+}
 @media (prefers-reduced-motion: reduce) {
   .pet[data-pet="alive"]:not(.is-press) .pet-motion,
   .pet[data-pet="alive"].is-night:not(.is-press) .pet-motion,
   .pet[data-pet="alive"].enter:not(.is-press) .pet-motion,
   .pet[data-pet="alive"].is-night.enter:not(.is-press) .pet-motion,
-  .pet[data-pet="alive"].is-press .pet-motion {
+  .pet[data-pet="alive"].is-press .pet-motion,
+  .pet.is-evo-bounce .pet-motion,
+  .evo-rays,
+  .evo-overlay.is-sweeping .evo-sweep,
+  body.is-shake main,
+  .celebrate-flash,
+  .count.is-gold-pop {
     animation: none;
     opacity: 1;
     transform: none;
@@ -198,5 +354,9 @@ a { color: var(--cap-blue-deep); }
   .milestone.is-glow,
   .count.is-pulse {
     animation: none;
+  }
+  body.is-evo-dim::before,
+  .evo-overlay {
+    display: none;
   }
 }
