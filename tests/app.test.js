@@ -246,6 +246,11 @@ test("local cookie works over HTTP; sensitive pages cannot be cached", async (t)
   assert.match(first.headers.get("content-security-policy"), /frame-ancestors 'none'/);
   assert.equal((await request("/app.js")).status, 200);
   assert.equal((await request("/style.css")).status, 200);
+  const duck = await request("/mascot-duck-512.png");
+  assert.equal(duck.status, 200);
+  assert.match(duck.headers.get("cache-control") || "", /max-age=31536000/);
+  assert.match(duck.headers.get("cache-control") || "", /immutable/);
+  assert.doesNotMatch(duck.headers.get("cache-control") || "", /no-store/);
 });
 
 test("database retains pet state across connections", async (t) => {
