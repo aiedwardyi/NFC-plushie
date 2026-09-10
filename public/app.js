@@ -158,7 +158,12 @@ if (pet) {
 
 const CELEBRATE_COLORS = ["#3d6f94", "#f5d76e", "#f2a6b0", "#faf8f1", "#f0c84a", "#e8a0a0"];
 const FRAME_MS = 1000 / 60;
-const EVOLUTION_MS = 2800;
+const EVOLUTION_MS = 2900;
+const FLICKER_ON_MS = 140;
+// Milestone flash timeline (ms from start), counting every silhouette/color swap and the end flash:
+// 500 silhouette on, 640 color, 1700 silhouette on, 1840 color, 2900 end flash.
+// Claim flash timeline: 0 start flash only.
+// Worst 1s window milestone: 2. Claim: 1.
 const CLAIM_PARTICLES = 360;
 const MILE_PARTICLES = 120;
 const CLAIM_DURATION = 2500;
@@ -399,20 +404,30 @@ function runEvolutionGlow({ onComplete } = {}) {
   const overlay = document.createElement("div");
   overlay.className = "evo-overlay";
   overlay.setAttribute("aria-hidden", "true");
-  overlay.innerHTML = `
-    <div class="evo-rays"></div>
-    <div class="evo-silhouette"></div>
-    <div class="evo-sweep"></div>
-  `;
-  pet.appendChild(overlay);
+  const rays = document.createElement("div");
+  rays.className = "evo-rays";
+  rays.setAttribute("aria-hidden", "true");
+  for (let i = 0; i < 10; i++) {
+    const ray = document.createElement("span");
+    ray.className = "evo-ray";
+    ray.style.setProperty("--ray-rot", i * 36 + "deg");
+    rays.appendChild(ray);
+  }
+  const silhouette = document.createElement("div");
+  silhouette.className = "evo-silhouette";
+  const sweep = document.createElement("div");
+  sweep.className = "evo-sweep";
+  overlay.append(silhouette, sweep);
+  pet.append(rays, overlay);
   pet.classList.add("is-evolving");
   document.body.classList.add("is-evo-dim");
 
   const started = performance.now();
   let finished = false;
   let frame = 0;
-  // Three silhouette pulses, accelerating, spaced so any 1s window has <=3 flashes.
-  const flickerAt = [380, 780, 1080];
+  // Two silhouette pulses (drop one) so every swap + end flash stays under 3 per 1s window.
+  // Events: 500 on, 640 off, 1700 on, 1840 off, 2900 end flash. Worst 1s window: 2.
+  const flickerAt = [500, 1700];
   let flickerIndex = 0;
 
   function endState() {
@@ -429,6 +444,7 @@ function runEvolutionGlow({ onComplete } = {}) {
     enhanceRollingCounter({ duration: 1000, goldPop: true });
     window.setTimeout(() => {
       overlay.remove();
+      rays.remove();
       pet.classList.remove("is-evolving", "is-evo-bounce");
       pet.style.removeProperty("--duck-src");
       document.body.classList.remove("is-evo-dim");
@@ -452,10 +468,9 @@ function runEvolutionGlow({ onComplete } = {}) {
     const elapsed = now - started;
     while (flickerIndex < flickerAt.length && elapsed >= flickerAt[flickerIndex]) {
       overlay.classList.add("is-silhouette");
-      const idx = flickerIndex;
       window.setTimeout(() => {
         if (!finished) overlay.classList.remove("is-silhouette");
-      }, 140);
+      }, FLICKER_ON_MS);
       flickerIndex += 1;
     }
     if (elapsed >= EVOLUTION_MS) {
