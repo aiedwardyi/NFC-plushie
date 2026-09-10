@@ -84,7 +84,7 @@ if (pet) {
   syncBand();
   setInterval(syncBand, 60 * 1000);
 
-  pet.querySelector(".pet-hit")?.addEventListener("pointerdown", () => {
+  function react() {
     try {
       navigator.vibrate?.(10);
     } catch (_) {
@@ -97,6 +97,21 @@ if (pet) {
       pet.classList.remove("is-press");
       showFrame(restingFrame());
     }, 700);
+  }
+
+  const hit = pet.querySelector(".pet-hit");
+  let skipClick = false;
+  hit?.addEventListener("pointerdown", () => {
+    skipClick = true;
+    react();
+  });
+  hit?.addEventListener("click", (event) => {
+    if (skipClick) {
+      skipClick = false;
+      event.preventDefault();
+      return;
+    }
+    react();
   });
 } else {
   applyTimeBand();
