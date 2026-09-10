@@ -154,3 +154,156 @@ if (pet) {
 } else {
   applyTimeBand();
 }
+
+
+const CELEBRATE_COLORS = ["#3d6f94", "#f5d76e", "#f2a6b0", "#faf8f1"];
+const FRAME_MS = 1000 / 60;
+
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function burstConfetti({ mode = "claim", onStop } = {}) {
+  if (prefersReducedMotion()) return;
+  document.querySelectorAll("canvas.celebrate-layer").forEach((node) => {
+    node.dispatchEvent(new Event("celebrate-stop"));
+    node.remove();
+  });
+
+  const canvas = document.createElement("canvas");
+  canvas.className = "celebrate-layer";
+  canvas.setAttribute("aria-hidden", "true");
+  document.body.appendChild(canvas);
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    canvas.remove();
+    return;
+  }
+
+  const big = mode === "claim";
+  const duration = big ? 1800 : 1000;
+  const count = big ? 120 : 48;
+  const gravity = big ? 0.14 : 0.12;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize() {
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${window.innerHeight}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize();
+
+  const originX = window.innerWidth / 2;
+  const originY = window.innerHeight * 0.28;
+  const pieces = Array.from({ length: count }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = (big ? 6 : 4) + Math.random() * (big ? 7 : 4);
+    return {
+      x: originX,
+      y: originY,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - (big ? 4 : 2.5),
+      w: 4 + Math.random() * 5,
+      h: 6 + Math.random() * 7,
+      rot: Math.random() * Math.PI,
+      vr: (Math.random() - 0.5) * 0.3,
+      color: CELEBRATE_COLORS[(Math.random() * CELEBRATE_COLORS.length) | 0],
+    };
+  });
+
+  const started = performance.now();
+  let last = started;
+  let frame = 0;
+  let stopped = false;
+  const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  function teardown() {
+    if (stopped) return;
+    stopped = true;
+    window.cancelAnimationFrame(frame);
+    frame = 0;
+    window.removeEventListener("resize", onResize);
+    canvas.removeEventListener("celebrate-stop", teardown);
+    if (typeof motionQuery.removeEventListener === "function") {
+      motionQuery.removeEventListener("change", onMotionChange);
+    } else if (typeof motionQuery.removeListener === "function") {
+      motionQuery.removeListener(onMotionChange);
+    }
+    canvas.remove();
+    onStop?.();
+  }
+
+  function onResize() {
+    resize();
+  }
+
+  function onMotionChange() {
+    if (motionQuery.matches) teardown();
+  }
+
+  function tick(now) {
+    if (stopped) return;
+    const elapsed = now - started;
+    const dt = Math.min(now - last, 50) / FRAME_MS;
+    last = now;
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    for (const p of pieces) {
+      p.vy += gravity * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.rot += p.vr * dt;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.globalAlpha = Math.max(0, 1 - elapsed / duration);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    }
+    if (elapsed < duration) {
+      frame = window.requestAnimationFrame(tick);
+    } else {
+      teardown();
+    }
+  }
+
+  window.addEventListener("resize", onResize);
+  if (typeof motionQuery.addEventListener === "function") {
+    motionQuery.addEventListener("change", onMotionChange);
+  } else if (typeof motionQuery.addListener === "function") {
+    motionQuery.addListener(onMotionChange);
+  }
+  canvas.addEventListener("celebrate-stop", teardown);
+  frame = window.requestAnimationFrame(tick);
+}
+
+function runCelebrate() {
+  const kind = document.body.dataset.celebrate;
+  if (kind !== "claim" && kind !== "milestone") return;
+  delete document.body.dataset.celebrate;
+
+  const countEl = document.querySelector("[data-tap-count]");
+  const mileEl = document.querySelector(".milestone");
+
+  function clearMotionClasses() {
+    mileEl?.classList.remove("is-glow");
+    countEl?.classList.remove("is-pulse");
+  }
+
+  if (kind === "claim") {
+    burstConfetti({ mode: "claim" });
+    return;
+  }
+
+  if (!prefersReducedMotion()) {
+    mileEl?.classList.add("is-glow");
+    countEl?.classList.add("is-pulse");
+    burstConfetti({ mode: "milestone", onStop: clearMotionClasses });
+    window.setTimeout(clearMotionClasses, 900);
+  }
+}
+
+runCelebrate();
