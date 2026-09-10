@@ -36,6 +36,16 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   const setOwner = (res, token) => res.cookie("owner_token", token, {
     httpOnly: true, sameSite: "lax", secure: production, maxAge: cookieAge, path: "/",
   });
+  const celebrateCookie = { httpOnly: true, sameSite: "lax", secure: production, path: "/", maxAge: 120 * 1000 };
+  const setCelebrate = (res, kind) => res.cookie("celebrate", kind, celebrateCookie);
+  const clearCelebrate = (res) => res.clearCookie("celebrate", {
+    httpOnly: true, sameSite: "lax", secure: production, path: "/",
+  });
+  const takeCelebrate = (req, res) => {
+    const kind = req.cookies.celebrate === "claim" ? "claim" : "";
+    if (kind) clearCelebrate(res);
+    return kind;
+  };
   const invalidUid = (res) => res.status(400).send(page(null, "<p>링크가 잘 맞지 않아요. 인형에 있는 링크로 다시 찾아와 주세요.</p>"));
 
   app.get("/health", (req, res) => res.type("text").send("ok"));
@@ -55,12 +65,17 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       }
       if (state === "OWNER") {
         db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ? WHERE uid = ?").run(stamp, uid);
-        return { html: petPage(getRow(uid)) };
+        return { html: "OWNER", uid };
       }
       if (state === "STRANGER") return { html: strangerPage(row) };
       throw new Error("Invalid binding result");
     })();
     if (result.token) setOwner(res, result.token);
+    if (result.html === "OWNER") {
+      const celebrate = takeCelebrate(req, res);
+      res.send(petPage(getRow(result.uid), null, { celebrate }));
+      return;
+    }
     res.send(result.html);
   });
 
@@ -75,7 +90,9 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     if (!trimmed || Array.from(trimmed).length > 24) {
       return res.status(400).send(page(row, `<p>이름은 1글자에서 24글자 사이로 지어주세요.</p><a class="button" href="/t?uid=${uid}">다시 지어볼래요</a>`));
     }
+    const firstName = !row.pet_name;
     db.prepare("UPDATE plushies SET pet_name = ? WHERE uid = ?").run(trimmed, uid);
+    if (firstName) setCelebrate(res, "claim");
     res.redirect(303, `/t?uid=${uid}`);
   });
 
@@ -114,6 +131,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     app.post("/dev/reset", (req, res) => {
       db.prepare("DELETE FROM plushies").run();
       res.clearCookie("owner_token", { path: "/", httpOnly: true, sameSite: "lax" });
+      clearCelebrate(res);
       res.redirect(303, "/dev");
     });
   }
