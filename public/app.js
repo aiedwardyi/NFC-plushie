@@ -157,14 +157,18 @@ if (pet) {
 
 
 const CELEBRATE_COLORS = ["#3d6f94", "#f5d76e", "#f2a6b0", "#faf8f1"];
+const FRAME_MS = 1000 / 60;
 
 function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function burstConfetti({ mode = "claim" } = {}) {
+function burstConfetti({ mode = "claim", onStop } = {}) {
   if (prefersReducedMotion()) return;
-  document.querySelectorAll("canvas.celebrate-layer").forEach((node) => node.remove());
+  document.querySelectorAll("canvas.celebrate-layer").forEach((node) => {
+    node.dispatchEvent(new Event("celebrate-stop"));
+    node.remove();
+  });
 
   const canvas = document.createElement("canvas");
   canvas.className = "celebrate-layer";
@@ -211,18 +215,46 @@ function burstConfetti({ mode = "claim" } = {}) {
   });
 
   const started = performance.now();
+  let last = started;
   let frame = 0;
-  const onResize = () => resize();
-  window.addEventListener("resize", onResize);
+  let stopped = false;
+  const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  function teardown() {
+    if (stopped) return;
+    stopped = true;
+    window.cancelAnimationFrame(frame);
+    frame = 0;
+    window.removeEventListener("resize", onResize);
+    canvas.removeEventListener("celebrate-stop", teardown);
+    if (typeof motionQuery.removeEventListener === "function") {
+      motionQuery.removeEventListener("change", onMotionChange);
+    } else if (typeof motionQuery.removeListener === "function") {
+      motionQuery.removeListener(onMotionChange);
+    }
+    canvas.remove();
+    onStop?.();
+  }
+
+  function onResize() {
+    resize();
+  }
+
+  function onMotionChange() {
+    if (motionQuery.matches) teardown();
+  }
 
   function tick(now) {
+    if (stopped) return;
     const elapsed = now - started;
+    const dt = Math.min(now - last, 50) / FRAME_MS;
+    last = now;
     ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
     for (const p of pieces) {
-      p.vy += gravity;
-      p.x += p.vx;
-      p.y += p.vy;
-      p.rot += p.vr;
+      p.vy += gravity * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.rot += p.vr * dt;
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rot);
@@ -234,11 +266,17 @@ function burstConfetti({ mode = "claim" } = {}) {
     if (elapsed < duration) {
       frame = window.requestAnimationFrame(tick);
     } else {
-      window.removeEventListener("resize", onResize);
-      window.cancelAnimationFrame(frame);
-      canvas.remove();
+      teardown();
     }
   }
+
+  window.addEventListener("resize", onResize);
+  if (typeof motionQuery.addEventListener === "function") {
+    motionQuery.addEventListener("change", onMotionChange);
+  } else if (typeof motionQuery.addListener === "function") {
+    motionQuery.addListener(onMotionChange);
+  }
+  canvas.addEventListener("celebrate-stop", teardown);
   frame = window.requestAnimationFrame(tick);
 }
 
@@ -247,32 +285,24 @@ function runCelebrate() {
   if (kind !== "claim" && kind !== "milestone") return;
   delete document.body.dataset.celebrate;
 
-  const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
   const countEl = document.querySelector("[data-tap-count]");
   const mileEl = document.querySelector(".milestone");
 
-  function play() {
-    if (kind === "claim") {
-      burstConfetti({ mode: "claim" });
-      return;
-    }
-    if (!prefersReducedMotion()) {
-      mileEl?.classList.add("is-glow");
-      countEl?.classList.add("is-pulse");
-      burstConfetti({ mode: "milestone" });
-      window.setTimeout(() => {
-        mileEl?.classList.remove("is-glow");
-        countEl?.classList.remove("is-pulse");
-      }, 900);
-    }
+  function clearMotionClasses() {
+    mileEl?.classList.remove("is-glow");
+    countEl?.classList.remove("is-pulse");
   }
 
-  play();
-  const onChange = () => {
-    /* preference flips mid-burst: future bursts respect it via prefersReducedMotion() */
-  };
-  if (typeof motionQuery.addEventListener === "function") {
-    motionQuery.addEventListener("change", onChange);
+  if (kind === "claim") {
+    burstConfetti({ mode: "claim" });
+    return;
+  }
+
+  if (!prefersReducedMotion()) {
+    mileEl?.classList.add("is-glow");
+    countEl?.classList.add("is-pulse");
+    burstConfetti({ mode: "milestone", onStop: clearMotionClasses });
+    window.setTimeout(clearMotionClasses, 900);
   }
 }
 
