@@ -26,12 +26,17 @@ export function currentMood(state, now) {
   return Math.max(PET.moodFloor, base - hours * PET.moodDecayPerHour);
 }
 
-export function levelForXp(xp) {
+function normalizeXp(xp) {
   const n = Number(xp);
-  const total = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
-  let level = 1;
-  while (xpForLevel(level + 1) <= total) level += 1;
-  return level;
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(Math.floor(n), xpForLevel(1000)));
+}
+
+export function levelForXp(xp) {
+  const total = normalizeXp(xp);
+  // Inverse of xpForLevel(L) = 25*(L-1)*(L+2)
+  const level = Math.floor((-1 + Math.sqrt(9 + (4 * total) / 25)) / 2);
+  return Math.max(1, Math.min(level, 1000));
 }
 
 export function xpForLevel(n) {
@@ -39,11 +44,10 @@ export function xpForLevel(n) {
 }
 
 export function xpProgress(xp) {
-  const level = levelForXp(xp);
+  const total = normalizeXp(xp);
+  const level = levelForXp(total);
   const base = xpForLevel(level);
   const next = xpForLevel(level + 1);
-  const n = Number(xp);
-  const total = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
   return { level, base, next, into: total - base, span: next - base };
 }
 
