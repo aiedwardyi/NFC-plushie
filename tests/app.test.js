@@ -81,7 +81,8 @@ test("scripted route flow: first meeting, naming, transfer, and separate plushie
   const claimJar = [first.cookie, "celebrate=claim"].join("; ");
   const owner = await request(tapUrl(), { cookie: claimJar });
   pages.push(owner.html);
-  assert.match(owner.html, /다시 만나서 반가워, Mochi!/);
+  assert.match(owner.html, /만나서 반가워, Mochi!/);
+  assert.doesNotMatch(owner.html, /다시 만나서 반가워/);
   assert.match(owner.html, /data-tap-count/);
   assert.match(owner.html, /우리 2번 토닥였어!/);
   assert.match(owner.html, /data-celebrate="claim"/);
@@ -392,10 +393,17 @@ test("dev preview celebration routes render and stay hidden in production", asyn
   assert.match(mile100.html, /data-tap-count="100"/);
   assert.match(mile100.html, /백 번 만났어!/);
 
+  const claimPreview = await request("/dev/preview?kind=claim&count=10");
+  assert.equal(claimPreview.status, 200);
+  assert.match(claimPreview.html, /만나서 반가워, 미리보기!/);
+  assert.doesNotMatch(claimPreview.html, /다시 만나서 반가워/);
+
   const levelup = await request("/dev/preview?kind=levelup&count=10");
   assert.equal(levelup.status, 200);
   assert.match(levelup.html, /data-celebrate="levelup"/);
   assert.match(levelup.html, /Lv\. 2/);
+  assert.match(levelup.html, /성장했어! 이제 Lv\. 2이야!/);
+  assert.match(levelup.html, /xp-fill" style="width:5%"/);
 
   const reunion = await request("/dev/preview?kind=reunion&count=10");
   assert.equal(reunion.status, 200);
@@ -405,11 +413,24 @@ test("dev preview celebration routes render and stay hidden in production", asyn
   const gift = await request("/dev/preview?kind=gift&count=10&tier=rare");
   assert.equal(gift.status, 200);
   assert.match(gift.html, /data-gift="rare"/);
+  assert.match(gift.html, /반짝 선물/);
+
+  const giftSpecial = await request("/dev/preview?kind=gift&count=10&tier=special");
+  assert.equal(giftSpecial.status, 200);
+  assert.match(giftSpecial.html, /data-gift="special"/);
+  assert.match(giftSpecial.html, /특별한 선물/);
+
+  const coolPrev = await request("/dev/preview?kind=gift&count=10&reason=cooldown");
+  assert.equal(coolPrev.status, 200);
+  assert.match(coolPrev.html, /방금 토닥여서 기분 좋아! 잠깐 있다 다시 토닥여줘\./);
+  assert.doesNotMatch(coolPrev.html, /<p class="gift /);
 
   const lonely = await request("/dev/preview?kind=lonely&count=10");
   assert.equal(lonely.status, 200);
-  assert.match(lonely.html, /외로워/);
+  assert.doesNotMatch(lonely.html, /mood-word|>외로워</);
+  assert.match(lonely.html, /혼자 있어서 심심했어/);
   assert.match(lonely.html, /is-lonely/);
+  assert.match(lonely.html, /pet-moments/);
 
   const bad = await request("/dev/preview?kind=nope&count=10");
   assert.equal(bad.status, 404);
@@ -420,6 +441,7 @@ test("dev preview celebration routes render and stay hidden in production", asyn
   assert.match(hub.html, /\/dev\/preview\?kind=milestone&count=100/);
   assert.match(hub.html, /\/dev\/preview\?kind=levelup/);
   assert.match(hub.html, /\/dev\/preview\?kind=reunion/);
+  assert.match(hub.html, /\/dev\/preview\?kind=gift&count=10&tier=special/);
 
   const { request: prodRequest } = await setup(t, { production: true });
   assert.equal((await prodRequest("/dev")).status, 404);

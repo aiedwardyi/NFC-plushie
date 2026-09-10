@@ -11,6 +11,7 @@ import {
   rollGiftTier,
   seoulDayKey,
   xpForLevel,
+  xpProgress,
 } from "../src/pet.js";
 
 const HOUR = 3600000;
@@ -159,4 +160,22 @@ test("reunion flag when decayed mood is at most 30", () => {
   assert.equal(sad.moodBefore, 25);
   const glad = applyTap(fresh(), T0, { counter: noCounter, rng: () => 0 });
   assert.equal(glad.reunion, false);
+});
+
+test("XP bar resets into the new level after level-up", () => {
+  const before = xpProgress(90);
+  assert.equal(before.level, 1);
+  assert.equal(before.into, 90);
+  const after = xpProgress(100);
+  assert.equal(after.level, 2);
+  assert.equal(after.into, 0);
+  assert.ok(after.span > 0);
+  const pct = Math.round((after.into / after.span) * 100);
+  assert.equal(pct, 0);
+  const out = applyTap(fresh({ xp: 90, lastGiftDay: seoulDayKey(T0) }), T0, { counter: noCounter, rng: () => 0 });
+  assert.equal(out.leveledUp, true);
+  assert.equal(out.levelAfter, 2);
+  const bar = xpProgress(out.xpAfter);
+  assert.equal(bar.level, 2);
+  assert.ok(bar.into < bar.span / 2);
 });

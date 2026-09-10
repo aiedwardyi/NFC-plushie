@@ -402,6 +402,18 @@ body.is-evo-dim::before {
   font-size: .85rem;
   color: var(--muted);
 }
+body[data-celebrate="levelup"] .level-line {
+  position: relative;
+  z-index: 26;
+}
+.pet-moments {
+  margin: 8px 0 0;
+}
+.pet-line.is-levelup {
+  margin: 8px 0 0;
+  font-weight: 700;
+  color: var(--cap-blue-deep);
+}
 .level-line {
   display: flex;
   align-items: center;
@@ -466,13 +478,38 @@ body.is-evo-dim::before {
   margin-bottom: 2px;
 }
 .gift.is-special {
-  border-color: #9fc3dd;
-  box-shadow: 0 0 12px rgba(61, 111, 148, 0.35);
+  border-color: #5a8fb5;
+  background: #eef5fb;
+  box-shadow: 0 0 14px rgba(61, 111, 148, 0.4);
+}
+.gift.is-special .gift-label {
+  color: #2f5a7a;
 }
 .gift.is-rare {
-  border-color: #d4a017;
-  background: #fff8e2;
-  box-shadow: 0 0 16px rgba(212, 160, 23, 0.45);
+  position: relative;
+  border: 2px solid #b8860b;
+  background: #fff4d6;
+  box-shadow: 0 0 16px rgba(184, 134, 11, 0.4);
+  overflow: hidden;
+}
+.gift.is-rare .gift-label {
+  color: #6b4e00;
+}
+.gift.is-rare::after {
+  content: "";
+  position: absolute;
+  top: -20%;
+  left: -30%;
+  width: 40%;
+  height: 140%;
+  background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.65) 50%, transparent 70%);
+  transform: translateX(0);
+  animation: gift-sparkle 2.4s linear infinite;
+  pointer-events: none;
+}
+@keyframes gift-sparkle {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(320%); }
 }
 .gift.is-glow {
   animation: gift-glow 1.1s ease;
@@ -509,6 +546,7 @@ body.is-evo-dim::before {
   .pet.is-evo-bounce .pet-motion,
   .pet.is-reunion-jump .pet-motion,
   .gift.is-glow,
+  .gift.is-rare::after,
   .evo-rays,
   .evo-overlay.is-sweeping .evo-sweep,
   body.is-shake main,

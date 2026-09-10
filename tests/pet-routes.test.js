@@ -98,8 +98,10 @@ test("the post-naming render is not a pet tap", async (t) => {
   updateJar(jar, named.setCookies);
   const skip = await request(`/t?uid=${A}`, { jar });
   assert.match(skip.html, /data-celebrate="claim"/);
+  assert.match(skip.html, /만나서 반가워, Mochi!/);
+  assert.doesNotMatch(skip.html, /다시 만나서 반가워/);
   assert.doesNotMatch(skip.html, /data-pet-state/);
-  assert.doesNotMatch(skip.html, /오늘의 선물/);
+  assert.doesNotMatch(skip.html, /오늘의 선물|특별한 선물|반짝 선물/);
   assert.doesNotMatch(skip.html, /행복이 가득|내일 또 만나자|콕 찍고/);
   assert.equal(ctx.row().tap_count, 2);
   assert.equal(ctx.row().xp, 0);
@@ -132,7 +134,9 @@ test("reload within 30 minutes is unrewarded and writes nothing but tap_count", 
   const reload = await ctx.request(`/t?uid=${A}`, { jar });
   assert.match(reload.html, /data-rewarded="0"/);
   assert.match(reload.html, /data-reason="cooldown"/);
-  assert.match(reload.html, /행복이 가득 찼어! 잠깐 있다 다시 토닥여줘\./);
+  assert.match(reload.html, /방금 토닥여서 기분 좋아! 잠깐 있다 다시 토닥여줘\./);
+  assert.doesNotMatch(reload.html, /<p class="gift /);
+  assert.doesNotMatch(reload.html, /행복이 가득/);
   const after = ctx.row();
   assert.equal(after.tap_count, before.tap_count + 1);
   assert.equal(after.xp, before.xp);
@@ -218,7 +222,7 @@ test("stranger pages leak no pet state", async (t) => {
   await meet(ctx, A, "Mochi");
   await ctx.request(`/t?uid=${A}`, { jar: {} });
   const stranger = await ctx.request(`/t?uid=${A}`);
-  for (const re of [/data-pet-state/, /pet-stats/, /data-hearts/, /Lv\./, /선물 \d/, /함께한 지/, /data-mood/, /data-gift/, /data-rewarded/, /data-reason/, /data-tap-count/, /data-celebrate/, /count-final/, /class="milestone"/, /class="gift/, /evo-overlay/, /data-evo/]) {
+  for (const re of [/data-pet-state/, /pet-stats/, /pet-moments/, /data-hearts/, /Lv\./, /선물 \d/, /함께한 지/, /data-mood/, /data-gift/, /data-rewarded/, /data-reason/, /data-tap-count/, /data-celebrate/, /count-final/, /class="milestone"/, /<p class="gift /, /evo-overlay/, /data-evo/]) {
     assert.doesNotMatch(stranger.html, re, String(re));
   }
   assert.match(stranger.html, /이미 주인이 있어요/);
@@ -378,8 +382,14 @@ test("celebration priority: levelup over milestone, reunion over milestone, rare
   ctx.db.prepare("UPDATE plushies SET tap_count = 9, xp = 90, last_rewarded_at = NULL WHERE uid = ?").run(A);
   const both = await ctx.request(`/t?uid=${A}`, { jar });
   assert.match(both.html, /data-celebrate="levelup"/);
+  assert.match(both.html, /성장했어! 이제 Lv\. 2이야!/);
   assert.match(both.html, /벌써 열 번이야!/);
   assert.match(both.html, /Lv\. 2/);
+  assert.match(both.html, /pet-moments[\s\S]*성장했어![\s\S]*벌써 열 번이야![\s\S]*pet-stats/);
+  assert.match(both.html, /xp-fill" style="width:(\d+)%"/);
+  const xpPct = Number(both.html.match(/xp-fill" style="width:(\d+)%"/)[1]);
+  assert.ok(xpPct < 50, `expected near-empty XP after level-up, got ${xpPct}%`);
+  assert.notEqual(xpPct, 100);
 
   const ctx2 = await setup(t);
   const { jar: jar2 } = await meet(ctx2, A, "Mochi");
@@ -396,6 +406,7 @@ test("celebration priority: levelup over milestone, reunion over milestone, rare
   const rare = await ctx3.request(`/t?uid=${A}`, { jar: jar3 });
   assert.match(rare.html, /data-celebrate="rare"/);
   assert.match(rare.html, /data-gift="rare"/);
+  assert.match(rare.html, /반짝 선물/);
 
   const ctx4 = await setup(t);
   const { jar: jar4 } = await meet(ctx4, A, "Mochi");
@@ -403,6 +414,7 @@ test("celebration priority: levelup over milestone, reunion over milestone, rare
   const special = await ctx4.request(`/t?uid=${A}`, { jar: jar4 });
   assert.match(special.html, /data-celebrate="special"/);
   assert.match(special.html, /data-gift="special"/);
+  assert.match(special.html, /특별한 선물/);
 });
 
 test("days_together counts distinct Seoul days with rewarded taps", async (t) => {
@@ -438,4 +450,36 @@ test("claim render carries the claim marker and the client claim path is not emp
   assert.match(block[0], /burstConfetti/);
   assert.match(block[0], /mode: "claim"/);
   assert.match(block[0], /enhanceRollingCounter/);
+});
+
+test("gift card absent on unrewarded taps", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await ctx.request(`/t?uid=${A}`, { jar });
+  const cool = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.match(cool.html, /data-reason="cooldown"/);
+  assert.doesNotMatch(cool.html, /<p class="gift /);
+  assert.match(cool.html, /선물 \d+\/30/);
+
+  for (let i = 0; i < 5; i++) {
+    ctx.advance(31 * MIN);
+    await ctx.request(`/t?uid=${A}`, { jar });
+  }
+  ctx.advance(31 * MIN);
+  const cap = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.match(cap.html, /data-reason="cap"/);
+  assert.doesNotMatch(cap.html, /<p class="gift /);
+});
+
+test("first-claim greeting uses first-meeting copy", async (t) => {
+  const ctx = await setup(t);
+  const { request } = ctx;
+  const jar = {};
+  const first = await request(`/t?uid=${A}`, { jar });
+  updateJar(jar, first.setCookies);
+  const named = await request("/name", { jar, body: { uid: A, name: "Mochi" } });
+  updateJar(jar, named.setCookies);
+  const skip = await request(`/t?uid=${A}`, { jar });
+  assert.match(skip.html, /만나서 반가워, Mochi!/);
+  assert.doesNotMatch(skip.html, /다시 만나서 반가워/);
 });

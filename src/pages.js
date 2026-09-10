@@ -53,26 +53,49 @@ export function heartRow(mood, { animate = false, before = null } = {}) {
   return `<div class="hearts" role="img" aria-label="기분 ${halves}단계" data-hearts="${start}"${anim}>${hearts}</div>`;
 }
 
+function giftLabel(tier) {
+  if (tier === "rare") return "반짝 선물";
+  if (tier === "special") return "특별한 선물";
+  return "오늘의 선물";
+}
+
+function giftCardHtml(pet) {
+  if (!pet?.gift) return "";
+  const tier = pet.gift.tier;
+  const tierClass = tier === "rare" ? "is-rare" : tier === "special" ? "is-special" : "is-common";
+  return `<p class="gift ${tierClass}" data-gift="${tier}"><span class="gift-label">${giftLabel(tier)}</span> ${escapeHtml(pet.gift.gift.line)}</p>`;
+}
+
+function petMoments({ pet = null, milestone = "" } = {}) {
+  const items = [];
+  if (pet?.leveledUp && pet.levelUpLine) {
+    items.push(`<p class="pet-line is-levelup">${escapeHtml(pet.levelUpLine)}</p>`);
+  }
+  if (pet?.reunionLine) {
+    items.push(`<p class="pet-line is-reunion">${escapeHtml(pet.reunionLine)}</p>`);
+  }
+  if (milestone) {
+    items.push(`<p class="milestone">${escapeHtml(milestone)}</p>`);
+  }
+  if (pet?.lonelyLine) {
+    items.push(`<p class="pet-line is-lonely-line">${escapeHtml(pet.lonelyLine)}</p>`);
+  }
+  if (pet?.unrewardedLine) {
+    items.push(`<p class="pet-line is-soft">${escapeHtml(pet.unrewardedLine)}</p>`);
+  }
+  if (!items.length) return "";
+  return `<section class="pet-moments" aria-label="오늘의 순간">${items.join("")}</section>`;
+}
+
 function petStats(pet) {
   if (!pet) return "";
   const pct = pet.xpSpan > 0 ? Math.max(0, Math.min(100, Math.round((pet.xpInto / pet.xpSpan) * 100))) : 100;
-  const lines = [];
-  if (pet.reunionLine) lines.push(`<p class="pet-line is-reunion">${escapeHtml(pet.reunionLine)}</p>`);
-  if (pet.lonelyLine) lines.push(`<p class="pet-line is-lonely-line">${escapeHtml(pet.lonelyLine)}</p>`);
-  if (pet.unrewardedLine) lines.push(`<p class="pet-line is-soft">${escapeHtml(pet.unrewardedLine)}</p>`);
-  let giftHtml = "";
-  if (pet.gift) {
-    const tierClass = pet.gift.tier === "rare" ? "is-rare" : pet.gift.tier === "special" ? "is-special" : "is-common";
-    giftHtml = `<p class="gift ${tierClass}" data-gift="${pet.gift.tier}"><span class="gift-label">오늘의 선물</span> ${escapeHtml(pet.gift.gift.line)}</p>`;
-  }
   return `<section class="pet-stats" aria-label="돌봄 상태">
     ${heartRow(pet.moodAfter, { animate: pet.rewarded, before: pet.moodBefore })}
-    ${pet.lonely ? `<p class="mood-word">외로워</p>` : ""}
     <p class="level-line"><span class="level-badge">Lv. ${pet.level}</span>
       <span class="xp-bar" role="img" aria-label="다음 단계까지 ${pet.xpSpan - pet.xpInto}"><span class="xp-fill" style="width:${pct}%"></span></span></p>
     <p class="days-line">함께한 지 ${pet.days}일</p>
     <p class="gift-count">선물 ${pet.giftFound}/${pet.giftTotal}</p>
-    ${lines.join("")}${giftHtml}
   </section>`;
 }
 
@@ -106,7 +129,12 @@ export function page(row, content, { waving = false, away = false, lonely = fals
 }
 
 export function petPage(row, code = null, { celebrate = "", pet = null } = {}) {
-  const greeting = row.pet_name ? `다시 만나서 반가워, ${escapeHtml(row.pet_name)}!` : "안녕! 나를 찾아줘서 정말 기뻐.";
+  const firstMeet = celebrate === "claim";
+  const greeting = row.pet_name
+    ? (firstMeet
+      ? `만나서 반가워, ${escapeHtml(row.pet_name)}!`
+      : `다시 만나서 반가워, ${escapeHtml(row.pet_name)}!`)
+    : "안녕! 나를 찾아줘서 정말 기뻐.";
   const recovery = code ? `<aside class="recovery"><h2>우리 안심 코드</h2>
     <p>꼭 적어두세요. 새 폰으로 나를 데려갈 때 꼭 필요해요.</p>
     <strong class="code">${escapeHtml(code)}</strong><p>지금만 볼 수 있어요. 이름을 짓거나 창을 닫기 전에 꼭 챙겨두세요.</p></aside>` : "";
@@ -118,17 +146,18 @@ export function petPage(row, code = null, { celebrate = "", pet = null } = {}) {
   </form>`;
   const returning = Boolean(row.pet_name) && !code;
   const mile = returning ? milestoneLine(row.tap_count) : "";
-  const mileHtml = mile ? `<p class="milestone">${escapeHtml(mile)}</p>` : "";
   const countHtml = returning
     ? `<p class="count" data-tap-count="${row.tap_count}"><span class="count-final">우리 ${row.tap_count}번 토닥였어!</span></p>`
     : "";
   const petAttr = pet
     ? ` data-pet-state="1" data-rewarded="${pet.rewarded ? 1 : 0}" data-reason="${escapeHtml(pet.reason)}" data-mood-before="${pet.moodBefore}" data-mood-after="${pet.moodAfter}" data-lonely="${pet.lonely ? 1 : 0}" data-reunion="${pet.reunion ? 1 : 0}" data-gift="${pet.gift ? escapeHtml(pet.gift.tier) : ""}"`
     : "";
+  const moments = returning ? petMoments({ pet, milestone: mile }) : "";
+  const giftHtml = returning && pet ? giftCardHtml(pet) : "";
   const stats = returning && pet ? petStats(pet) : "";
   let kind = celebrate;
   if (!kind && mile) kind = "milestone";
-  const body = `<p class="intro"${pet ? petAttr : ""}>${greeting}</p>${recovery}${prompt}${mileHtml}${stats}`;
+  const body = `<p class="intro"${pet ? petAttr : ""}>${greeting}</p>${recovery}${prompt}${moments}${giftHtml}${stats}`;
   return page(
     row,
     body,
@@ -163,29 +192,40 @@ export function previewPetPage({ kind, count, tier = "common", reason = "" }) {
     tap_count: n,
   };
   const mile = kind === "milestone" ? milestoneLine(n) : "";
-  const mileHtml = mile ? `<p class="milestone">${escapeHtml(mile)}</p>` : "";
   const countHtml = `<p class="count" data-tap-count="${n}"><span class="count-final">우리 ${n}번 토닥였어!</span></p>`;
   const giftLine = tier === "rare" ? "별들이 속삭였어. 우린 짝꿍이래!"
     : tier === "special" ? "고마움이 가득가득 넘쳐!"
     : "오늘도 와줘서 고마워!";
   const tierClass = tier === "rare" ? "is-rare" : tier === "special" ? "is-special" : "is-common";
   const unrewarded = {
-    cooldown: "행복이 가득 찼어! 잠깐 있다 다시 토닥여줘.",
+    cooldown: "방금 토닥여서 기분 좋아! 잠깐 있다 다시 토닥여줘.",
     cap: "오늘은 실컷 놀았어! 내일 또 만나자!",
     stale: "폰으로 진짜 나를 톡 해줘!",
   };
+  const moments = [];
+  if (kind === "levelup") moments.push(`<p class="pet-line is-levelup">성장했어! 이제 Lv. 2이야!</p>`);
+  if (kind === "reunion") moments.push(`<p class="pet-line is-reunion">보고 싶었어! 진짜로!</p>`);
+  if (mile) moments.push(`<p class="milestone">${escapeHtml(mile)}</p>`);
+  if (kind === "lonely") moments.push(`<p class="pet-line is-lonely-line">혼자 있어서 심심했어...</p>`);
+  if (reason) moments.push(`<p class="pet-line is-soft">${escapeHtml(unrewarded[reason] || "")}</p>`);
+  const momentsHtml = moments.length
+    ? `<section class="pet-moments" aria-label="오늘의 순간">${moments.join("")}</section>`
+    : "";
+  const showGift = kind === "gift" && !reason;
+  const giftHtml = showGift
+    ? `<p class="gift ${tierClass}" data-gift="${tier}"><span class="gift-label">${giftLabel(tier)}</span> ${escapeHtml(giftLine)}</p>`
+    : "";
   const stats = heartRow(kind === "lonely" ? 20 : kind === "reunion" ? 70 : 80, { animate: kind === "reunion", before: kind === "reunion" ? 20 : null })
     + `<p class="level-line"><span class="level-badge">Lv. ${kind === "levelup" ? 2 : 1}</span>`
     + `<span class="xp-bar"><span class="xp-fill" style="width:${kind === "levelup" ? 5 : 40}%"></span></span></p>`
-    + `<p class="days-line">함께한 지 12일</p><p class="gift-count">선물 7/30</p>`
-    + (kind === "reunion" ? `<p class="pet-line is-reunion">보고 싶었어! 진짜로!</p>` : "")
-    + (kind === "lonely" ? `<p class="pet-line is-lonely-line">혼자 있어서 심심했어...</p><p class="mood-word">외로워</p>` : "")
-    + (kind === "gift" ? `<p class="gift ${tierClass}" data-gift="${tier}"><span class="gift-label">오늘의 선물</span> ${escapeHtml(giftLine)}</p>` : "")
-    + (reason ? `<p class="pet-line is-soft">${escapeHtml(unrewarded[reason] || "")}</p>` : "");
+    + `<p class="days-line">함께한 지 12일</p><p class="gift-count">선물 7/30</p>`;
   const visual = kind === "gift" ? (tier === "rare" ? "rare" : tier === "special" ? "special" : "") : kind === "lonely" ? "" : kind;
+  const greeting = kind === "claim"
+    ? `만나서 반가워, ${escapeHtml(row.pet_name)}!`
+    : `다시 만나서 반가워, ${escapeHtml(row.pet_name)}!`;
   return page(
     row,
-    `<p class="intro">다시 만나서 반가워, ${escapeHtml(row.pet_name)}!</p>${mileHtml}<section class="pet-stats" aria-label="돌봄 상태">${stats}</section>`,
+    `<p class="intro">${greeting}</p>${momentsHtml}${giftHtml}<section class="pet-stats" aria-label="돌봄 상태">${stats}</section>`,
     { timeLine: true, celebrate: visual, countHtml, lonely: kind === "lonely" },
   );
 }
@@ -210,6 +250,7 @@ export function devPage(uids = fakeUids) {
       <a class="button secondary" href="/dev/preview?kind=milestone&count=10">10번 이정표 미리보기</a>
       <a class="button secondary" href="/dev/preview?kind=milestone&count=100">100번 이정표 미리보기</a>
       <a class="button secondary" href="/dev/preview?kind=gift&count=10&tier=common">선물 미리보기</a>
+      <a class="button secondary" href="/dev/preview?kind=gift&count=10&tier=special">특별한 선물 미리보기</a>
       <a class="button secondary" href="/dev/preview?kind=gift&count=10&tier=rare">진귀한 선물 미리보기</a>
       <a class="button secondary" href="/dev/preview?kind=lonely&count=10">외로움 미리보기</a>
       <a class="button secondary" href="/dev/preview?kind=gift&count=10&reason=cooldown">쿨다운 미리보기</a>
