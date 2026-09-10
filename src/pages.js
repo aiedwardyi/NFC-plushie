@@ -19,8 +19,15 @@ export function page(row, content, waving = false) {
   <main>
     <p class="eyebrow">살포시 전하는 안녕</p>
     <h1>${title}</h1>
-    <div class="pet ${waving ? "waving" : "idle"}" role="img" aria-label="${waving ? "다정한 인형 친구가 손을 흔들어요" : "다정한 인형 친구가 방긋 웃어요"}">
-      <div class="arm"></div><div class="blob"><span class="eyes"></span><span class="smile"></span></div>
+    <div class="pet ${waving ? "waving" : "idle"}">
+      <img
+        src="/mascot-duck-512.png"
+        srcset="/mascot-duck-512.png 512w, /mascot-duck-1024.png 1024w"
+        sizes="170px"
+        width="170"
+        height="160"
+        alt="${waving ? "다정한 인형 친구가 손을 흔들어요" : "다정한 인형 친구가 방긋 웃어요"}"
+      >
     </div>
     ${content}
     <footer>작은 토닥임. 다정한 친구.</footer>
