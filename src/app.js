@@ -170,7 +170,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const today = seoulDayKey(t);
       const stamp = new Date(t).toISOString();
       if (state === "NEW") {
-        const token = ownerToken();
+        const existing = req.cookies.owner_token;
+        const token = typeof existing === "string" && existing ? existing : ownerToken();
         const code = recoveryCode();
         db.prepare(`INSERT INTO plushies (uid, owner_token_hash, recovery_code_hash, tap_count, created_at, last_tap_at,
           mood_value, mood_updated_at, xp, reward_day_count, gift_seen, gift_found, days_together, last_active_day, last_counter)
@@ -249,7 +250,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const active = attempt && time - attempt.window_start < cooldown;
       if (active && attempt.attempts >= 5) return { status: 429, row, message: "너무 여러 번 시도했어요. 처음 시도한 때로부터 15분이 지나면 다시 해볼 수 있어요." };
       if (decisions.verifyClaim(row, code, hash)) {
-        const token = ownerToken();
+        const existing = req.cookies.owner_token;
+        const token = typeof existing === "string" && existing ? existing : ownerToken();
         db.prepare("UPDATE plushies SET owner_token_hash = ? WHERE uid = ?").run(hash(token), uid);
         db.prepare("DELETE FROM claim_attempts WHERE uid = ?").run(uid);
         return { token };
