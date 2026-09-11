@@ -170,11 +170,32 @@ const CLAIM_DURATION = 2500;
 const MILE_DURATION = 1100;
 const FLASH_OPACITY = 0.62;
 
+const stillCelebrateTimers = [];
+
 function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+function clearStillCelebrate() {
+  for (const id of stillCelebrateTimers) window.clearTimeout(id);
+  stillCelebrateTimers.length = 0;
+  document.querySelectorAll(".still-wash, .still-sparkles, .still-claim-card, .still-named-card").forEach((node) => {
+    node.remove();
+  });
+  document.body.classList.remove(
+    "is-still-celebrate",
+    "is-still-fade",
+    "is-still-claim",
+    "is-still-milestone",
+    "is-still-levelup",
+  );
+  document.querySelectorAll(".is-still-gold, .is-still-card").forEach((el) => {
+    el.classList.remove("is-still-gold", "is-still-card");
+  });
+}
+
 function showStillCelebrate(kind) {
+  clearStillCelebrate();
   const holdMs = kind === "claim" ? 2200 : 2000;
   const visual = kind === "named" ? "milestone" : kind;
   document.body.classList.add("is-still-celebrate", `is-still-${visual}`);
@@ -207,24 +228,44 @@ function showStillCelebrate(kind) {
   document.body.insertBefore(sparks, wash.nextSibling);
 
   let claimCard = null;
+  let namedCard = null;
   let mileCard = null;
-  if (visual === "claim") {
-    claimCard = document.createElement("p");
-    claimCard.className = "still-claim-card";
-    claimCard.textContent = "오늘부터 우리 친구예요!";
-    const main = document.querySelector("main");
-    const intro = main?.querySelector(".intro");
-    if (intro) intro.insertAdjacentElement("afterend", claimCard);
-    else main?.insertAdjacentElement("afterbegin", claimCard);
-  } else if (visual === "milestone") {
-    mileCard = document.querySelector(".milestone");
-    mileCard?.classList.add("is-still-card");
-  } else if (visual === "levelup") {
-    const level = document.querySelector(".level-line") || document.querySelector(".level-badge");
-    if (level) {
-      mileCard = level;
-      level.classList.add("is-still-card", "is-still-gold");
+  switch (kind) {
+    case "claim": {
+      claimCard = document.createElement("p");
+      claimCard.className = "still-claim-card";
+      claimCard.textContent = "오늘부터 우리 친구예요!";
+      const main = document.querySelector("main");
+      const intro = main?.querySelector(".intro");
+      if (intro) intro.insertAdjacentElement("afterend", claimCard);
+      else main?.insertAdjacentElement("afterbegin", claimCard);
+      break;
     }
+    case "named": {
+      namedCard = document.createElement("p");
+      namedCard.className = "still-named-card";
+      namedCard.textContent = "이름을 지어 줘서 정말 기뻐요!";
+      const main = document.querySelector("main");
+      const intro = main?.querySelector(".intro");
+      if (intro) intro.insertAdjacentElement("afterend", namedCard);
+      else main?.insertAdjacentElement("afterbegin", namedCard);
+      break;
+    }
+    case "milestone": {
+      mileCard = document.querySelector(".milestone");
+      mileCard?.classList.add("is-still-card");
+      break;
+    }
+    case "levelup": {
+      const level = document.querySelector(".level-line") || document.querySelector(".level-badge");
+      if (level) {
+        mileCard = level;
+        level.classList.add("is-still-card", "is-still-gold");
+      }
+      break;
+    }
+    default:
+      break;
   }
 
   const goldTargets = [
@@ -235,17 +276,12 @@ function showStillCelebrate(kind) {
   ].filter(Boolean);
   for (const el of goldTargets) el.classList.add("is-still-gold");
 
-  window.setTimeout(() => {
+  stillCelebrateTimers.push(window.setTimeout(() => {
     document.body.classList.add("is-still-fade");
-    window.setTimeout(() => {
-      document.body.classList.remove("is-still-celebrate", "is-still-fade", `is-still-${visual}`);
-      wash.remove();
-      sparks.remove();
-      claimCard?.remove();
-      for (const el of goldTargets) el.classList.remove("is-still-gold");
-      mileCard?.classList.remove("is-still-card", "is-still-gold");
-    }, 450);
-  }, holdMs);
+    stillCelebrateTimers.push(window.setTimeout(() => {
+      clearStillCelebrate();
+    }, 450));
+  }, holdMs));
 }
 
 
@@ -750,7 +786,7 @@ function runCelebrate() {
 
   if (kind === "named") {
     if (prefersReducedMotion()) {
-      showStillCelebrate("milestone");
+      showStillCelebrate("named");
       enhanceRollingCounter({ duration: 0, goldPop: false });
       return;
     }
