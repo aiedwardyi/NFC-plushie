@@ -244,7 +244,7 @@ function showStillCelebrate(kind) {
     case "named": {
       namedCard = document.createElement("p");
       namedCard.className = "still-named-card";
-      namedCard.textContent = "이름을 지어 줘서 정말 기뻐요!";
+      namedCard.textContent = "예쁜 이름 고마워요!";
       const main = document.querySelector("main");
       const intro = main?.querySelector(".intro");
       if (intro) intro.insertAdjacentElement("afterend", namedCard);

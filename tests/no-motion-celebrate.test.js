@@ -59,12 +59,12 @@ test("reduced-motion named still frame mounts a named card smaller than the clai
   assert.match(named[0], /showStillCelebrate\(\s*["']named["']\s*\)/);
   assert.doesNotMatch(named[0], /showStillCelebrate\(\s*["']milestone["']\s*\)/);
   assert.match(src, /still-named-card/);
-  assert.match(src, /이름을 지어 줘서 정말 기뻐요!/);
+  assert.match(src, /예쁜 이름 고마워요!/);
   assert.match(styles, /\.still-named-card/);
   const stillFn = src.match(/function showStillCelebrate\(kind\) \{[\s\S]*?\n\}/);
   assert.ok(stillFn);
   assert.match(stillFn[0], /case "named":[\s\S]*still-named-card/);
-  assert.match(stillFn[0], /case "named":[\s\S]*이름을 지어 줘서 정말 기뻐요!/);
+  assert.match(stillFn[0], /case "named":[\s\S]*예쁜 이름 고마워요!/);
   const namedCase = stillFn[0].match(/case "named":[\s\S]*?break;/);
   assert.ok(namedCase);
   assert.doesNotMatch(namedCase[0], /still-claim-card/);
@@ -74,9 +74,17 @@ test("reduced-motion named still frame mounts a named card smaller than the clai
   assert.equal(smallCount, 6, "named/milestone-size has 6 star slots");
   assert.match(stillFn[0], /slots = visual === "claim" \? claimSlots : smallSlots/);
   assert.match(stillFn[0], /kind === "named" \? "milestone"/);
-  const claimFont = styles.match(/\.still-claim-card\s*\{[^}]*font-size:\s*([\d.]+)rem/);
-  const namedFont = styles.match(/\.still-named-card\s*\{[^}]*font-size:\s*([\d.]+)rem/);
-  assert.ok(claimFont && namedFont, "both card font sizes set");
+  // Standalone card rule (not nested under .is-still-fade) must carry visible chrome
+  const namedRule = styles.match(/(?:^|\n)\.still-named-card\s*\{([^}]+)\}/);
+  assert.ok(namedRule, "standalone .still-named-card rule exists");
+  assert.match(namedRule[1], /border\s*:|outline\s*:/);
+  assert.match(namedRule[1], /background\s*:/);
+  assert.match(namedRule[1], /padding\s*:/);
+  // Must not be only opacity:0
+  assert.doesNotMatch(namedRule[1].replace(/\s+/g, ""), /^opacity:0;?$/);
+  const claimFont = styles.match(/(?:^|\n)\.still-claim-card\s*\{[^}]*font-size:\s*([\d.]+)rem/);
+  const namedFont = styles.match(/(?:^|\n)\.still-named-card\s*\{[^}]*font-size:\s*([\d.]+)rem/);
+  assert.ok(claimFont && namedFont, "both card font sizes set on standalone rules");
   assert.ok(Number(namedFont[1]) < Number(claimFont[1]), "named card font smaller than claim");
 });
 

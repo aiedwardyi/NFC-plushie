@@ -572,27 +572,8 @@ body.is-still-celebrate main {
 }
 .is-still-celebrate.is-still-fade .still-wash,
 .is-still-celebrate.is-still-fade .still-sparkles,
+.is-still-celebrate.is-still-fade .still-claim-card,
 .is-still-celebrate.is-still-fade .still-named-card {
-  margin: 12px 0 6px;
-  padding: 10px 14px;
-  border-radius: 14px;
-  border: 2px solid rgba(240, 200, 74, 0.75);
-  background: #fff8dc;
-  color: var(--cap-blue-deep);
-  font-weight: 700;
-  font-size: 1.02rem;
-  line-height: 1.4;
-  word-break: keep-all;
-  overflow-wrap: break-word;
-  opacity: 1;
-  transition: opacity 0.45s ease;
-  position: relative;
-  z-index: 2;
-}
-.is-still-celebrate.is-still-fade .still-named-card {
-  opacity: 0;
-}
-.still-claim-card {
   opacity: 0;
 }
 .is-still-claim .still-wash {
@@ -636,6 +617,23 @@ body.is-still-celebrate main {
   font-weight: 700;
   font-size: 1.22rem;
   line-height: 1.45;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  opacity: 1;
+  transition: opacity 0.45s ease;
+  position: relative;
+  z-index: 2;
+}
+.still-named-card {
+  margin: 12px 0 6px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  outline: 2px solid rgba(245, 215, 110, 0.85);
+  background: rgba(255, 248, 220, 0.92);
+  color: var(--cap-blue-deep);
+  font-weight: 700;
+  font-size: 1.02rem;
+  line-height: 1.4;
   word-break: keep-all;
   overflow-wrap: break-word;
   opacity: 1;
