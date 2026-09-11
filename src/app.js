@@ -95,7 +95,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     httpOnly: true, sameSite: "lax", secure: production, path: "/",
   });
   const takeCelebrate = (req, res) => {
-    const kind = req.cookies.celebrate === "claim" ? "claim" : "";
+    const raw = req.cookies.celebrate;
+    const kind = raw === "claim" || raw === "named" ? raw : "";
     if (kind) clearCelebrate(res);
     return kind;
   };
@@ -177,7 +178,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           mood_value, mood_updated_at, xp, reward_day_count, gift_seen, gift_found, days_together, last_active_day, last_counter)
           VALUES (?, ?, ?, 1, ?, ?, 100, ?, 0, 0, ?, ?, 1, ?, ?)`)
           .run(serial, hash(token), hash(code), stamp, stamp, t, EMPTY_SEEN, EMPTY_FOUND, today, counter);
-        return { html: petPage(getRow(serial), code), token };
+        return { html: petPage(getRow(serial), code, { celebrate: "claim" }), token };
       }
       if (state === "OWNER") {
         db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ? WHERE uid = ?").run(stamp, serial);
@@ -235,7 +236,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     }
     const firstName = !row.pet_name;
     db.prepare("UPDATE plushies SET pet_name = ? WHERE uid = ?").run(trimmed, uid);
-    if (firstName) setCelebrate(res, "claim");
+    if (firstName) setCelebrate(res, "named");
     setSkip(res, uid);
     res.redirect(303, `/t?uid=${uid}`);
   });

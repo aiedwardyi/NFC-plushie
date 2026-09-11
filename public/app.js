@@ -174,6 +174,34 @@ function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+function claimSeenKey(uid) {
+  return `nfc-claim-seen:${uid}`;
+}
+
+function hasClaimSeen(uid) {
+  if (!uid) return false;
+  try {
+    return sessionStorage.getItem(claimSeenKey(uid)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markClaimSeen(uid) {
+  if (!uid) return;
+  try {
+    sessionStorage.setItem(claimSeenKey(uid), "1");
+  } catch {
+    /* private mode */
+  }
+}
+
+function pageUid() {
+  return document.querySelector('input[name="uid"]')?.value
+    || document.body.dataset.uid
+    || "";
+}
+
 function ensureCelebrateCanvas() {
   document.querySelectorAll("canvas.celebrate-layer").forEach((node) => {
     node.dispatchEvent(new Event("celebrate-stop"));
@@ -620,7 +648,7 @@ function glowGift() {
 function runCelebrate() {
   animateHearts();
   const kind = document.body.dataset.celebrate;
-  if (kind !== "claim" && kind !== "levelup" && kind !== "reunion" && kind !== "milestone" && kind !== "rare" && kind !== "special") {
+  if (kind !== "claim" && kind !== "named" && kind !== "levelup" && kind !== "reunion" && kind !== "milestone" && kind !== "rare" && kind !== "special") {
     if (document.querySelector("[data-tap-count]")) {
       enhanceRollingCounter({ duration: 400, goldPop: false });
     }
@@ -629,11 +657,27 @@ function runCelebrate() {
   delete document.body.dataset.celebrate;
 
   if (kind === "claim") {
+    const uid = pageUid();
+    if (hasClaimSeen(uid)) return;
+    markClaimSeen(uid);
     pulseFlash(FLASH_OPACITY, 150);
     shakeScreen(300);
     tryVibrate([30, 40, 30, 40, 80]);
     burstConfetti({ mode: "claim" });
     enhanceRollingCounter({ duration: 400, goldPop: false });
+    return;
+  }
+
+  if (kind === "named") {
+    if (prefersReducedMotion()) {
+      enhanceRollingCounter({ duration: 0, goldPop: false });
+      return;
+    }
+    const mileEl = document.querySelector(".milestone");
+    mileEl?.classList.add("is-glow");
+    window.setTimeout(() => mileEl?.classList.remove("is-glow"), 1200);
+    burstConfetti({ mode: "milestone" });
+    enhanceRollingCounter({ duration: 1000, goldPop: true });
     return;
   }
 

@@ -102,7 +102,7 @@ function petStats(pet) {
 export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null } = {}) {
   const title = escapeHtml(row?.pet_name || "새 친구");
   const timeEl = timeLine ? `<p class="time-line" data-time-line></p>` : "";
-  const celebrateAttr = celebrate === "claim" || celebrate === "milestone" || celebrate === "levelup" || celebrate === "reunion" || celebrate === "rare" || celebrate === "special"
+  const celebrateAttr = celebrate === "claim" || celebrate === "named" || celebrate === "milestone" || celebrate === "levelup" || celebrate === "reunion" || celebrate === "rare" || celebrate === "special"
     ? ` data-celebrate="${celebrate}"`
     : "";
   return `<!doctype html>
@@ -129,7 +129,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
 }
 
 export function petPage(row, code = null, { celebrate = "", pet = null } = {}) {
-  const firstMeet = celebrate === "claim";
+  const firstMeet = celebrate === "claim" || celebrate === "named";
   const greeting = row.pet_name
     ? (firstMeet
       ? `만나서 반가워요, ${escapeHtml(row.pet_name)}!`
