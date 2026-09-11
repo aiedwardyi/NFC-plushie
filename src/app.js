@@ -95,7 +95,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     httpOnly: true, sameSite: "lax", secure: production, path: "/",
   });
   const takeCelebrate = (req, res) => {
-    const kind = req.cookies.celebrate === "claim" ? "claim" : "";
+    const raw = req.cookies.celebrate;
+    const kind = raw === "claim" || raw === "named" ? raw : "";
     if (kind) clearCelebrate(res);
     return kind;
   };
@@ -170,13 +171,14 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const today = seoulDayKey(t);
       const stamp = new Date(t).toISOString();
       if (state === "NEW") {
-        const token = ownerToken();
+        const existing = req.cookies.owner_token;
+        const token = typeof existing === "string" && existing ? existing : ownerToken();
         const code = recoveryCode();
         db.prepare(`INSERT INTO plushies (uid, owner_token_hash, recovery_code_hash, tap_count, created_at, last_tap_at,
           mood_value, mood_updated_at, xp, reward_day_count, gift_seen, gift_found, days_together, last_active_day, last_counter)
           VALUES (?, ?, ?, 1, ?, ?, 100, ?, 0, 0, ?, ?, 1, ?, ?)`)
           .run(serial, hash(token), hash(code), stamp, stamp, t, EMPTY_SEEN, EMPTY_FOUND, today, counter);
-        return { html: petPage(getRow(serial), code), token };
+        return { html: petPage(getRow(serial), code, { celebrate: "claim" }), token };
       }
       if (state === "OWNER") {
         db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ? WHERE uid = ?").run(stamp, serial);
@@ -234,7 +236,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     }
     const firstName = !row.pet_name;
     db.prepare("UPDATE plushies SET pet_name = ? WHERE uid = ?").run(trimmed, uid);
-    if (firstName) setCelebrate(res, "claim");
+    if (firstName) setCelebrate(res, "named");
     setSkip(res, uid);
     res.redirect(303, `/t?uid=${uid}`);
   });
@@ -249,7 +251,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const active = attempt && time - attempt.window_start < cooldown;
       if (active && attempt.attempts >= 5) return { status: 429, row, message: "너무 여러 번 시도했어요. 처음 시도한 때로부터 15분이 지나면 다시 해볼 수 있어요." };
       if (decisions.verifyClaim(row, code, hash)) {
-        const token = ownerToken();
+        const existing = req.cookies.owner_token;
+        const token = typeof existing === "string" && existing ? existing : ownerToken();
         db.prepare("UPDATE plushies SET owner_token_hash = ? WHERE uid = ?").run(hash(token), uid);
         db.prepare("DELETE FROM claim_attempts WHERE uid = ?").run(uid);
         return { token };

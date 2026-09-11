@@ -134,7 +134,7 @@ p { line-height: 1.6; }
   55% { transform: scale(0.95, 1.05); }
   100% { transform: scale(1, 1); }
 }
-.recovery { background: #fff0d7; padding: 20px; border-radius: 18px; margin: 24px 0; border: 1px solid #ead6b2; }
+.recovery { position: relative; z-index: 60; background: #fff0d7; padding: 20px; border-radius: 18px; margin: 24px 0; border: 1px solid #ead6b2; }
 .recovery p, #claim-help { font-size: .88rem; }
 .code { display: block; font-family: ui-monospace, monospace; font-size: 2rem; letter-spacing: .18em; user-select: all; }
 form { text-align: left; margin: 24px 0; }
@@ -555,6 +555,108 @@ body.is-evo-dim.is-levelup-glow .xp-bar {
   75% { transform: translateY(-8px) scale(1.01); }
   100% { transform: translateY(0) scale(1); }
 }
+
+/* Still-frame celebration for prefers-reduced-motion (opacity fades only) */
+body.is-still-celebrate main {
+  position: relative;
+  z-index: 2;
+}
+.still-wash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(ellipse at center, rgba(245, 215, 110, 0.28), rgba(250, 248, 241, 0.06) 55%, transparent 78%);
+  opacity: 1;
+  transition: opacity 0.45s ease;
+}
+.is-still-celebrate.is-still-fade .still-wash,
+.is-still-celebrate.is-still-fade .still-sparkles,
+.is-still-celebrate.is-still-fade .still-claim-card,
+.is-still-celebrate.is-still-fade .still-named-card {
+  opacity: 0;
+}
+.is-still-claim .still-wash {
+  background: radial-gradient(ellipse at center, rgba(245, 215, 110, 0.48), rgba(255, 250, 230, 0.14) 52%, transparent 80%);
+}
+.is-still-milestone .still-wash,
+.is-still-levelup .still-wash {
+  background: radial-gradient(ellipse at center, rgba(245, 215, 110, 0.26), rgba(61, 111, 148, 0.08) 50%, transparent 78%);
+}
+.still-sparkles {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 1;
+  transition: opacity 0.45s ease;
+}
+.still-sparkle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  background: #f0c84a;
+  clip-path: polygon(50% 0%, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0% 50%, 38% 38%);
+  opacity: 0.92;
+}
+.still-sparkle.is-claim-sparkle {
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  background: #f5d76e;
+  box-shadow: 0 0 0 1px rgba(240, 200, 74, 0.25);
+}
+.still-claim-card {
+  margin: 18px 0 8px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 2px solid #f0c84a;
+  background: #fff8dc;
+  color: var(--cap-blue-deep);
+  font-weight: 700;
+  font-size: 1.22rem;
+  line-height: 1.45;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  opacity: 1;
+  transition: opacity 0.45s ease;
+  position: relative;
+  z-index: 2;
+}
+.still-named-card {
+  margin: 12px 0 6px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  outline: 2px solid rgba(245, 215, 110, 0.85);
+  background: rgba(255, 248, 220, 0.92);
+  color: var(--cap-blue-deep);
+  font-weight: 700;
+  font-size: 1.02rem;
+  line-height: 1.4;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  opacity: 1;
+  transition: opacity 0.45s ease;
+  position: relative;
+  z-index: 2;
+}
+.count.is-still-gold,
+.level-line.is-still-gold,
+.level-badge.is-still-gold,
+.milestone.is-still-gold {
+  color: #b8860b;
+  text-shadow: 0 0 8px rgba(245, 215, 110, 0.4);
+}
+.milestone.is-still-card,
+.level-line.is-still-card,
+.level-badge.is-still-card {
+  outline: 2px solid rgba(245, 215, 110, 0.85);
+  background: rgba(255, 248, 220, 0.92);
+  border-radius: 12px;
+  padding: 6px 10px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pet[data-pet="alive"]:not(.is-press) .pet-motion,
   .pet[data-pet="alive"].is-night:not(.is-press) .pet-motion,

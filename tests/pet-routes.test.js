@@ -97,7 +97,7 @@ test("the post-naming render is not a pet tap", async (t) => {
   const named = await request("/name", { jar, body: { uid: A, name: "Mochi" } });
   updateJar(jar, named.setCookies);
   const skip = await request(`/t?uid=${A}`, { jar });
-  assert.match(skip.html, /data-celebrate="claim"/);
+  assert.match(skip.html, /data-celebrate="named"/);
   assert.match(skip.html, /만나서 반가워요, Mochi!/);
   assert.doesNotMatch(skip.html, /다시 만나서 반가워요/);
   assert.doesNotMatch(skip.html, /data-pet-state/);
@@ -439,9 +439,10 @@ test("claim render carries the claim marker and the client claim path is not emp
   const jar = {};
   const first = await request(`/t?uid=${A}`, { jar });
   updateJar(jar, first.setCookies);
+  assert.match(first.html, /data-celebrate="claim"/);
   await request("/name", { jar, body: { uid: A, name: "Mochi" } }).then((r) => updateJar(jar, r.setCookies));
   const skip = await request(`/t?uid=${A}`, { jar });
-  assert.match(skip.html, /data-celebrate="claim"/);
+  assert.match(skip.html, /data-celebrate="named"/);
   const client = readFileSync(new URL("../public/app.js", import.meta.url), "utf-8");
   const block = client.match(/if \(kind === "claim"\) \{[\s\S]*?\n  \}/);
   assert.ok(block, "claim handler exists in client");

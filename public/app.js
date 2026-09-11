@@ -170,8 +170,147 @@ const CLAIM_DURATION = 2500;
 const MILE_DURATION = 1100;
 const FLASH_OPACITY = 0.62;
 
+const stillCelebrateTimers = [];
+
 function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function clearStillCelebrate() {
+  for (const id of stillCelebrateTimers) window.clearTimeout(id);
+  stillCelebrateTimers.length = 0;
+  document.querySelectorAll(".still-wash, .still-sparkles, .still-claim-card, .still-named-card").forEach((node) => {
+    node.remove();
+  });
+  document.body.classList.remove(
+    "is-still-celebrate",
+    "is-still-fade",
+    "is-still-claim",
+    "is-still-milestone",
+    "is-still-levelup",
+  );
+  document.querySelectorAll(".is-still-gold, .is-still-card").forEach((el) => {
+    el.classList.remove("is-still-gold", "is-still-card");
+  });
+}
+
+function showStillCelebrate(kind) {
+  clearStillCelebrate();
+  const holdMs = kind === "claim" ? 2200 : 2000;
+  const visual = kind === "named" ? "milestone" : kind;
+  document.body.classList.add("is-still-celebrate", `is-still-${visual}`);
+
+  const wash = document.createElement("div");
+  wash.className = "still-wash";
+  wash.setAttribute("aria-hidden", "true");
+  document.body.insertBefore(wash, document.body.firstChild);
+
+  const sparks = document.createElement("div");
+  sparks.className = "still-sparkles";
+  sparks.setAttribute("aria-hidden", "true");
+  // Fixed margin slots only (corners / side gutters). Never over the centered duck or copy.
+  const claimSlots = [
+    [5, 8], [95, 7], [4, 22], [96, 24], [3, 48], [97, 50],
+    [5, 72], [95, 74], [8, 90], [92, 92], [2, 35], [98, 62],
+  ];
+  const smallSlots = [
+    [5, 10], [95, 12], [4, 78], [96, 80], [3, 45], [97, 48],
+  ];
+  const slots = visual === "claim" ? claimSlots : smallSlots;
+  for (const [left, top] of slots) {
+    const star = document.createElement("span");
+    star.className = "still-sparkle";
+    if (visual === "claim") star.classList.add("is-claim-sparkle");
+    star.style.left = `${left}%`;
+    star.style.top = `${top}%`;
+    sparks.appendChild(star);
+  }
+  document.body.insertBefore(sparks, wash.nextSibling);
+
+  let claimCard = null;
+  let namedCard = null;
+  let mileCard = null;
+  switch (kind) {
+    case "claim": {
+      claimCard = document.createElement("p");
+      claimCard.className = "still-claim-card";
+      claimCard.textContent = "오늘부터 우리 친구예요!";
+      const main = document.querySelector("main");
+      const intro = main?.querySelector(".intro");
+      if (intro) intro.insertAdjacentElement("afterend", claimCard);
+      else main?.insertAdjacentElement("afterbegin", claimCard);
+      break;
+    }
+    case "named": {
+      namedCard = document.createElement("p");
+      namedCard.className = "still-named-card";
+      namedCard.textContent = "예쁜 이름 고마워요!";
+      const main = document.querySelector("main");
+      const intro = main?.querySelector(".intro");
+      if (intro) intro.insertAdjacentElement("afterend", namedCard);
+      else main?.insertAdjacentElement("afterbegin", namedCard);
+      break;
+    }
+    case "milestone": {
+      mileCard = document.querySelector(".milestone");
+      mileCard?.classList.add("is-still-card");
+      break;
+    }
+    case "levelup": {
+      const level = document.querySelector(".level-line") || document.querySelector(".level-badge");
+      if (level) {
+        mileCard = level;
+        level.classList.add("is-still-card", "is-still-gold");
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
+  const goldTargets = [
+    document.querySelector("[data-tap-count]"),
+    document.querySelector(".level-line"),
+    document.querySelector(".level-badge"),
+    document.querySelector(".milestone"),
+  ].filter(Boolean);
+  for (const el of goldTargets) el.classList.add("is-still-gold");
+
+  stillCelebrateTimers.push(window.setTimeout(() => {
+    document.body.classList.add("is-still-fade");
+    stillCelebrateTimers.push(window.setTimeout(() => {
+      clearStillCelebrate();
+    }, 450));
+  }, holdMs));
+}
+
+
+function claimSeenKey(uid) {
+  return `nfc-claim-seen:${uid}`;
+}
+
+function hasClaimSeen(uid) {
+  if (!uid) return false;
+  try {
+    return sessionStorage.getItem(claimSeenKey(uid)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markClaimSeen(uid) {
+  if (!uid) return;
+  try {
+    sessionStorage.setItem(claimSeenKey(uid), "1");
+  } catch {
+    /* private mode */
+  }
+}
+
+function pageUid() {
+  return document.querySelector('input[name="uid"]')?.value
+    || document.body.dataset.uid
+    || "";
 }
 
 function ensureCelebrateCanvas() {
@@ -620,7 +759,7 @@ function glowGift() {
 function runCelebrate() {
   animateHearts();
   const kind = document.body.dataset.celebrate;
-  if (kind !== "claim" && kind !== "levelup" && kind !== "reunion" && kind !== "milestone" && kind !== "rare" && kind !== "special") {
+  if (kind !== "claim" && kind !== "named" && kind !== "levelup" && kind !== "reunion" && kind !== "milestone" && kind !== "rare" && kind !== "special") {
     if (document.querySelector("[data-tap-count]")) {
       enhanceRollingCounter({ duration: 400, goldPop: false });
     }
@@ -629,6 +768,14 @@ function runCelebrate() {
   delete document.body.dataset.celebrate;
 
   if (kind === "claim") {
+    const uid = pageUid();
+    if (hasClaimSeen(uid)) return;
+    markClaimSeen(uid);
+    if (prefersReducedMotion()) {
+      showStillCelebrate("claim");
+      enhanceRollingCounter({ duration: 0, goldPop: false });
+      return;
+    }
     pulseFlash(FLASH_OPACITY, 150);
     shakeScreen(300);
     tryVibrate([30, 40, 30, 40, 80]);
@@ -637,8 +784,23 @@ function runCelebrate() {
     return;
   }
 
+  if (kind === "named") {
+    if (prefersReducedMotion()) {
+      showStillCelebrate("named");
+      enhanceRollingCounter({ duration: 0, goldPop: false });
+      return;
+    }
+    const mileEl = document.querySelector(".milestone");
+    mileEl?.classList.add("is-glow");
+    window.setTimeout(() => mileEl?.classList.remove("is-glow"), 1200);
+    burstConfetti({ mode: "milestone" });
+    enhanceRollingCounter({ duration: 1000, goldPop: true });
+    return;
+  }
+
   if (kind === "levelup") {
     if (prefersReducedMotion()) {
+      showStillCelebrate("levelup");
       enhanceRollingCounter({ duration: 0, goldPop: false });
       return;
     }
@@ -658,10 +820,8 @@ function runCelebrate() {
 
   if (kind === "milestone") {
     if (prefersReducedMotion()) {
+      showStillCelebrate("milestone");
       enhanceRollingCounter({ duration: 0, goldPop: false });
-      const mileEl = document.querySelector(".milestone");
-      mileEl?.classList.add("is-glow");
-      window.setTimeout(() => mileEl?.classList.remove("is-glow"), 400);
       return;
     }
     const mileEl = document.querySelector(".milestone");
