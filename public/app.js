@@ -174,6 +174,81 @@ function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+function showStillCelebrate(kind) {
+  const holdMs = kind === "claim" ? 2200 : 2000;
+  const visual = kind === "named" ? "milestone" : kind;
+  document.body.classList.add("is-still-celebrate", `is-still-${visual}`);
+
+  const wash = document.createElement("div");
+  wash.className = "still-wash";
+  wash.setAttribute("aria-hidden", "true");
+  document.body.insertBefore(wash, document.body.firstChild);
+
+  const sparks = document.createElement("div");
+  sparks.className = "still-sparkles";
+  sparks.setAttribute("aria-hidden", "true");
+  // Fixed margin slots only (corners / side gutters). Never over the centered duck or copy.
+  const claimSlots = [
+    [5, 8], [95, 7], [4, 22], [96, 24], [3, 48], [97, 50],
+    [5, 72], [95, 74], [8, 90], [92, 92], [2, 35], [98, 62],
+  ];
+  const smallSlots = [
+    [5, 10], [95, 12], [4, 78], [96, 80], [3, 45], [97, 48],
+  ];
+  const slots = visual === "claim" ? claimSlots : smallSlots;
+  for (const [left, top] of slots) {
+    const star = document.createElement("span");
+    star.className = "still-sparkle";
+    if (visual === "claim") star.classList.add("is-claim-sparkle");
+    star.style.left = `${left}%`;
+    star.style.top = `${top}%`;
+    sparks.appendChild(star);
+  }
+  document.body.insertBefore(sparks, wash.nextSibling);
+
+  let claimCard = null;
+  let mileCard = null;
+  if (visual === "claim") {
+    claimCard = document.createElement("p");
+    claimCard.className = "still-claim-card";
+    claimCard.textContent = "오늘부터 우리 친구예요!";
+    const main = document.querySelector("main");
+    const intro = main?.querySelector(".intro");
+    if (intro) intro.insertAdjacentElement("afterend", claimCard);
+    else main?.insertAdjacentElement("afterbegin", claimCard);
+  } else if (visual === "milestone") {
+    mileCard = document.querySelector(".milestone");
+    mileCard?.classList.add("is-still-card");
+  } else if (visual === "levelup") {
+    const level = document.querySelector(".level-line") || document.querySelector(".level-badge");
+    if (level) {
+      mileCard = level;
+      level.classList.add("is-still-card", "is-still-gold");
+    }
+  }
+
+  const goldTargets = [
+    document.querySelector("[data-tap-count]"),
+    document.querySelector(".level-line"),
+    document.querySelector(".level-badge"),
+    document.querySelector(".milestone"),
+  ].filter(Boolean);
+  for (const el of goldTargets) el.classList.add("is-still-gold");
+
+  window.setTimeout(() => {
+    document.body.classList.add("is-still-fade");
+    window.setTimeout(() => {
+      document.body.classList.remove("is-still-celebrate", "is-still-fade", `is-still-${visual}`);
+      wash.remove();
+      sparks.remove();
+      claimCard?.remove();
+      for (const el of goldTargets) el.classList.remove("is-still-gold");
+      mileCard?.classList.remove("is-still-card", "is-still-gold");
+    }, 450);
+  }, holdMs);
+}
+
+
 function claimSeenKey(uid) {
   return `nfc-claim-seen:${uid}`;
 }
@@ -660,6 +735,11 @@ function runCelebrate() {
     const uid = pageUid();
     if (hasClaimSeen(uid)) return;
     markClaimSeen(uid);
+    if (prefersReducedMotion()) {
+      showStillCelebrate("claim");
+      enhanceRollingCounter({ duration: 0, goldPop: false });
+      return;
+    }
     pulseFlash(FLASH_OPACITY, 150);
     shakeScreen(300);
     tryVibrate([30, 40, 30, 40, 80]);
@@ -670,6 +750,7 @@ function runCelebrate() {
 
   if (kind === "named") {
     if (prefersReducedMotion()) {
+      showStillCelebrate("milestone");
       enhanceRollingCounter({ duration: 0, goldPop: false });
       return;
     }
@@ -683,6 +764,7 @@ function runCelebrate() {
 
   if (kind === "levelup") {
     if (prefersReducedMotion()) {
+      showStillCelebrate("levelup");
       enhanceRollingCounter({ duration: 0, goldPop: false });
       return;
     }
@@ -702,10 +784,8 @@ function runCelebrate() {
 
   if (kind === "milestone") {
     if (prefersReducedMotion()) {
+      showStillCelebrate("milestone");
       enhanceRollingCounter({ duration: 0, goldPop: false });
-      const mileEl = document.querySelector(".milestone");
-      mileEl?.classList.add("is-glow");
-      window.setTimeout(() => mileEl?.classList.remove("is-glow"), 400);
       return;
     }
     const mileEl = document.querySelector(".milestone");
