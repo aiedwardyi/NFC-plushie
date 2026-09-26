@@ -19,7 +19,7 @@ function petMarkup({ waving = false, away = false, lonely = false } = {}) {
     const awayAlt = "다정한 친구가 등을 보이고 있어요";
     return `<div class="pet pet-away" data-pet="away" role="img" aria-label="${awayAlt}">
       <span class="pet-motion">
-        <img class="pet-frame is-show" src="/mascot-horse-away-512.png" width="220" height="220" alt="" decoding="async" draggable="false">
+        <img class="pet-frame is-show" src="/mascot-horse-away-512-v2.png" width="220" height="220" alt="" decoding="async" draggable="false">
       </span>
     </div>`;
   }
@@ -29,10 +29,10 @@ function petMarkup({ waving = false, away = false, lonely = false } = {}) {
   return `<div class="pet${enterClass}${lonelyClass}" data-pet="alive">
       <button type="button" class="pet-hit" aria-label="${alt}">
         <span class="pet-motion">
-          <img class="pet-frame is-show" data-frame="canon" src="/mascot-horse-512.png" width="220" height="220" alt="${alt}" decoding="async" draggable="false">
-          <img class="pet-frame" data-frame="blink" src="/mascot-horse-512.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
-          <img class="pet-frame" data-frame="react" src="/mascot-horse-512.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
-          <img class="pet-frame" data-frame="sleepy" src="/mascot-horse-512.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
+          <img class="pet-frame is-show" data-frame="canon" src="/mascot-horse-512-v2.png" width="220" height="220" alt="${alt}" decoding="async" draggable="false">
+          <img class="pet-frame" data-frame="blink" src="/mascot-horse-512-v2.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
+          <img class="pet-frame" data-frame="react" src="/mascot-horse-512-v2.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
+          <img class="pet-frame" data-frame="sleepy" src="/mascot-horse-512-v2.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
         </span>
       </button>
     </div>`;
