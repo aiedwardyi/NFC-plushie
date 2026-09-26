@@ -21,8 +21,8 @@ function mascotKind(mascot) {
 
 function petMarkup({ waving = false, away = false, lonely = false, mascot = "horse" } = {}) {
   const kind = mascotKind(mascot);
-  const front = `/mascot-${kind}-512-v2.png`;
-  const awaySrc = `/mascot-${kind}-away-512-v2.png`;
+  const front = `/mascot-${kind}-512-v3.png`;
+  const awaySrc = `/mascot-${kind}-away-512-v3.png`;
   if (away) {
     const awayAlt = "다정한 친구가 등을 보이고 있어요";
     return `<div class="pet pet-away" data-pet="away" role="img" aria-label="${awayAlt}">
@@ -120,10 +120,10 @@ export function page(row, content, { waving = false, away = false, lonely = fals
   const sheepActive = kind === "sheep" ? " is-active" : "";
   const toggle = `<aside class="mascot-toggle" data-mascot-toggle role="group" aria-label="친구 바꾸기">
     <button type="button" class="mascot-tog${horseActive}" data-mascot="horse" aria-label="말 친구" aria-pressed="${horsePressed}">
-      <img src="/mascot-horse-512-v2.png" width="32" height="32" alt="" decoding="async" draggable="false">
+      <img src="/mascot-horse-512-v3.png" width="32" height="32" alt="" decoding="async" draggable="false">
     </button>
     <button type="button" class="mascot-tog${sheepActive}" data-mascot="sheep" aria-label="양 친구" aria-pressed="${sheepPressed}">
-      <img src="/mascot-sheep-512-v2.png" width="32" height="32" alt="" decoding="async" draggable="false">
+      <img src="/mascot-sheep-512-v3.png" width="32" height="32" alt="" decoding="async" draggable="false">
     </button>
   </aside>`;
   return `<!doctype html>
