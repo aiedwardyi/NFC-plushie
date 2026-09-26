@@ -77,7 +77,7 @@ index f22c634..8dd5cd2 100644
    <script src="/app.js" defer></script>
  </head>
  <body${celebrateAttr}>
-@@ -119,16 +142,17 @@ export function page(row, content, { waving = false, away = false, lonely = false
+@@ -119,16 +142,17 @@ export function page(row, content, { waving = false, away = false, lonely = fals
      <p class="eyebrow">살짝 건네는 인사</p>
      <h1>${title}</h1>
      ${timeEl}
@@ -146,6 +146,3 @@ index f22c634..8dd5cd2 100644
        <a class="button secondary" href="/dev/preview?kind=levelup&count=10">레벨업 미리보기</a>
        <a class="button secondary" href="/dev/preview?kind=reunion&count=10">재회 미리보기</a>
        <a class="button secondary" href="/dev/preview?kind=milestone&count=10">10번 이정표 미리보기</a>
-@@ -284,7 +307,7 @@ export function strangerPage(row, message = "") {
-@@ -284,7 +307,7 @@ export function strangerPage(row, message = "") {
-@@ -284,7 +307,7 @@ export function strangerPage(row, message = "") {
