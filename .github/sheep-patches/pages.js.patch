@@ -77,7 +77,7 @@ index f22c634..8dd5cd2 100644
    <script src="/app.js" defer></script>
  </head>
  <body${celebrateAttr}>
-@@ -119,16 +142,17 @@ export function page(row, content, { waving = false, away = false, lonely = fals
+@@ -119,16 +142,17 @@ function petMarkup({ waving = false, away = false, lonely = false } = {}) {
      <p class="eyebrow">살짝 건네는 인사</p>
      <h1>${title}</h1>
      ${timeEl}
@@ -97,7 +97,7 @@ index f22c634..8dd5cd2 100644
    const firstMeet = celebrate === "claim" || celebrate === "named";
    const greeting = row.pet_name
      ? (firstMeet
-@@ -161,11 +185,11 @@ export function petPage(row, code = null, { celebrate = "", pet = null } = {}) {
+@@ -161,11 +185,11 @@ function petMarkup({ waving, away, lonely }) {
    return page(
      row,
      body,
@@ -111,7 +111,7 @@ index f22c634..8dd5cd2 100644
    return page(row, `<p class="intro">이 작은 친구는 이미 주인이 있어요.</p>
      ${message ? `<p class="notice" role="alert">${escapeHtml(message)}</p>` : ""}
      <button type="button" id="claim-toggle" aria-expanded="${Boolean(message)}" aria-controls="claim-form">제가 주인이에요</button>
-@@ -175,7 +199,7 @@ export function strangerPage(row, message = "") {
+@@ -175,7 +199,7 @@ function petMarkup({ waving, away, lonely }) {
        <input id="code" name="code" required autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="claim-help">
        <p id="claim-help">처음 만났을 때 적어둔 안심 코드를 넣어주세요.</p>
        <button type="submit">내 친구를 데려올래요!</button>
@@ -129,7 +129,7 @@ index f22c634..8dd5cd2 100644
    const n = Number(count);
    const row = {
      uid: "04PREVIEW00001",
-@@ -226,7 +250,7 @@ export function previewPetPage({ kind, count, tier = "common", reason = "" }) {
+@@ -226,7 +250,7 @@ function petMarkup({ waving, away, lonely }) {
    return page(
      row,
      `<p class="intro">${greeting}</p>${momentsHtml}${giftHtml}<section class="pet-stats" aria-label="돌봄 상태">${stats}</section>`,
@@ -138,7 +138,7 @@ index f22c634..8dd5cd2 100644
    );
  }
  
-@@ -245,6 +269,7 @@ export function devPage(uids = fakeUids) {
+@@ -245,7 +269,7 @@ function petMarkup({ waving, away, lonely }) {
      <nav aria-label="연습용 친구들">${uids.map((uid, i) => `<a class="button" href="/t?uid=${uid}">인형 친구 ${String.fromCharCode(65 + i)} <small>${uid}</small></a>`).join("")}</nav>
      <nav aria-label="축하 미리보기" class="dev-preview">
        <a class="button secondary" href="/dev/preview?kind=claim&count=10">이름 짓기 축하 미리보기</a>
