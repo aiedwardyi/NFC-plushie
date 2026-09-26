@@ -30,9 +30,9 @@ function petMarkup({ waving = false, away = false, lonely = false } = {}) {
       <button type="button" class="pet-hit" aria-label="${alt}">
         <span class="pet-motion">
           <img class="pet-frame is-show" data-frame="canon" src="/mascot-horse-512.png" width="220" height="220" alt="${alt}" decoding="async" draggable="false">
-          <img class="pet-frame" data-frame="blink" src="/mascot-horse-blink-512.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
-          <img class="pet-frame" data-frame="react" src="/mascot-horse-react-512.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
-          <img class="pet-frame" data-frame="sleepy" src="/mascot-horse-sleepy-512.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
+          <img class="pet-frame" data-frame="blink" src="/mascot-horse-512.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
+          <img class="pet-frame" data-frame="react" src="/mascot-horse-512.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
+          <img class="pet-frame" data-frame="sleepy" src="/mascot-horse-512.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
         </span>
       </button>
     </div>`;
