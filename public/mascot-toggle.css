@@ -1,0 +1,54 @@
+/* Dad demo: horse↔sheep corner toggle + squash on away pets */
+.pet.is-press .pet-motion { animation: squash .7s ease; }
+.mascot-toggle {
+  position: fixed;
+  right: max(10px, env(safe-area-inset-right));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 90;
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 999px;
+  background: rgba(255, 252, 246, 0.92);
+  border: 1px solid rgba(90, 70, 40, 0.12);
+  box-shadow: 0 6px 18px rgba(40, 30, 10, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.mascot-tog {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  min-width: 40px;
+  margin: 0;
+  padding: 3px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  cursor: pointer;
+  line-height: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.mascot-tog.is-active {
+  border-color: var(--cap-blue);
+  background: #e8f1ff;
+}
+.mascot-tog:focus-visible {
+  outline: 2px solid var(--cap-blue);
+  outline-offset: 2px;
+}
+.mascot-tog img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mascot-tog { transition: none; }
+}
