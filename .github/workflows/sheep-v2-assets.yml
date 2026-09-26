@@ -1,0 +1,37 @@
+name: sheep-v2-assets-once
+on:
+  workflow_dispatch:
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/sheep-mascot-demo
+      - name: Pull sheep PNGs from assets branch
+        run: |
+          git fetch origin feat/sheep-mascot-assets
+          git checkout origin/feat/sheep-mascot-assets -- \
+            public/mascot-sheep-512.png \
+            public/mascot-sheep-away-512.png \
+            public/mascot-sheep-blink-512.png \
+            public/mascot-sheep-react-512.png \
+            public/mascot-sheep-sleepy-512.png
+          cp public/mascot-sheep-512.png public/mascot-sheep-512-v2.png
+          cp public/mascot-sheep-away-512.png public/mascot-sheep-away-512-v2.png
+          cp public/mascot-sheep-blink-512.png public/mascot-sheep-blink-512-v2.png
+          cp public/mascot-sheep-react-512.png public/mascot-sheep-react-512-v2.png
+          cp public/mascot-sheep-sleepy-512.png public/mascot-sheep-sleepy-512-v2.png
+          rm -f public/mascot-sheep-512.png public/mascot-sheep-away-512.png \
+            public/mascot-sheep-blink-512.png public/mascot-sheep-react-512.png \
+            public/mascot-sheep-sleepy-512.png
+      - name: Commit if needed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/mascot-sheep-*-v2.png
+          git diff --cached --quiet && echo "nothing" && exit 0
+          git commit -m "feat(sheep): add transparent -v2 PNG pack"
+          git push origin feat/sheep-mascot-demo

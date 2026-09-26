@@ -1,0 +1,105 @@
+diff --git a/public/app.js b/public/app.js
+index 74d66fa..47f8c85 100644
+--- a/public/app.js
++++ b/public/app.js
+@@ -1,3 +1,100 @@
++/* Dad demo: horse↔sheep corner toggle. Persist localStorage+cookie. binding.js untouched. */
++(function mascotDemoToggle() {
++  const KEY = "pokkey-mascot";
++  const MAX_AGE = String(400 * 24 * 60 * 60);
++
++  function readKind() {
++    try {
++      const params = new URLSearchParams(window.location.search);
++      const q = params.get("mascot");
++      if (q === "sheep" || q === "horse") return q;
++    } catch (_) { /* ignore */ }
++    try {
++      const ls = localStorage.getItem(KEY);
++      if (ls === "sheep" || ls === "horse") return ls;
++    } catch (_) { /* ignore */ }
++    try {
++      const m = document.cookie.match(/(?:^|; )mascot=(sheep|horse)(?:;|$)/);
++      if (m) return m[1];
++    } catch (_) { /* ignore */ }
++    const htmlKind = document.documentElement.getAttribute("data-mascot");
++    return htmlKind === "sheep" ? "sheep" : "horse";
++  }
++
++  function persist(kind) {
++    try { localStorage.setItem(KEY, kind); } catch (_) { /* ignore */ }
++    try {
++      document.cookie = "mascot=" + kind + ";path=/;max-age=" + MAX_AGE + ";samesite=lax";
++    } catch (_) { /* ignore */ }
++  }
++
++  function rewriteSrc(src, kind) {
++    if (!src || src.indexOf("mascot-") === -1) return src;
++    if (kind === "sheep") return src.split("mascot-horse").join("mascot-sheep");
++    return src.split("mascot-sheep").join("mascot-horse");
++  }
++
++  function applyArt(kind) {
++    document.documentElement.setAttribute("data-mascot", kind);
++    document.querySelectorAll("img.pet-frame").forEach((img) => {
++      const next = rewriteSrc(img.getAttribute("src") || "", kind);
++      if (next) img.setAttribute("src", next);
++    });
++    document.querySelectorAll(".mascot-tog").forEach((btn) => {
++      const on = btn.getAttribute("data-mascot") === kind;
++      btn.classList.toggle("is-active", on);
++      btn.setAttribute("aria-pressed", on ? "true" : "false");
++    });
++  }
++
++  function bouncePet() {
++    const pet = document.querySelector(".pet");
++    if (!pet) return;
++    try { navigator.vibrate?.(10); } catch (_) { /* ignore */ }
++    pet.classList.remove("is-press");
++    void pet.offsetWidth;
++    const motion = pet.querySelector(".pet-motion");
++    if (motion) {
++      motion.style.animation = "none";
++      void motion.offsetWidth;
++      motion.style.animation = "";
++    }
++    pet.classList.add("is-press");
++    window.setTimeout(() => pet.classList.remove("is-press"), 700);
++  }
++
++  let kind = readKind();
++  persist(kind);
++  applyArt(kind);
++
++  // One motion, one go: swap art + squash in the SAME tick (not bounce-then-swap).
++  const SQUASH_MS = 700;
++  let toggling = false;
++
++  function onToggleClick(event) {
++    const btn = event.currentTarget;
++    const next = btn.getAttribute("data-mascot");
++    if (next !== "horse" && next !== "sheep") return;
++    if (next === kind) {
++      bouncePet();
++      return;
++    }
++    if (toggling) return;
++    toggling = true;
++    kind = next;
++    persist(kind);
++    applyArt(kind); // swap FIRST so the squash is of the new pet
++    bouncePet();    // same tick - one continuous motion
++    window.setTimeout(() => {
++      toggling = false;
++    }, SQUASH_MS);
++  }
++
++  document.querySelectorAll(".mascot-tog").forEach((btn) => {
++    btn.addEventListener("click", onToggleClick);
++  });
++})();
++
+ const toggle = document.querySelector("#claim-toggle");
+ const form = document.querySelector("#claim-form");
+ 
