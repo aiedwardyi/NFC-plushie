@@ -16,6 +16,7 @@
   -webkit-backdrop-filter: blur(8px);
 }
 .mascot-tog {
+  touch-action: manipulation;
   box-sizing: border-box;
   width: 40px;
   height: 40px;
@@ -50,5 +51,17 @@
   -webkit-user-drag: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .mascot-tog { transition: none; }
+  .mascot-tog {
+  touch-action: manipulation; transition: none; }
+}
+
+.mascot-tog:hover,
+.mascot-tog:focus {
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+}
+.mascot-tog.is-active:hover,
+.mascot-tog.is-active:focus {
+  background: #e8f1ff;
 }
