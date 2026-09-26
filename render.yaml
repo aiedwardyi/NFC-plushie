@@ -3,7 +3,7 @@ services:
     name: nfc-plushie
     runtime: node
     plan: starter
-    buildCommand: npm ci
+    buildCommand: npm ci && cp public/mascot-horse-512.png public/mascot-horse-512-v2.png && cp public/mascot-horse-away-512.png public/mascot-horse-away-512-v2.png && cp public/mascot-horse-blink-512.png public/mascot-horse-blink-512-v2.png && cp public/mascot-horse-react-512.png public/mascot-horse-react-512-v2.png && cp public/mascot-horse-sleepy-512.png public/mascot-horse-sleepy-512-v2.png
     startCommand: npm start
     healthCheckPath: /health
     disk:
