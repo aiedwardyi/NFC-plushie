@@ -26,19 +26,27 @@
     try {
       document.cookie = "mascot=" + kind + ";path=/;max-age=" + MAX_AGE + ";samesite=lax";
     } catch (_) { /* ignore */ }
+    // Drop sticky ?mascot= so it can't fight the toggle on the next read/navigation.
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("mascot")) {
+        url.searchParams.delete("mascot");
+        const next = url.pathname + (url.search ? url.search : "") + url.hash;
+        window.history.replaceState(null, "", next);
+      }
+    } catch (_) { /* ignore */ }
   }
 
-  function rewriteSrc(src, kind) {
-    if (!src || src.indexOf("mascot-") === -1) return src;
-    if (kind === "sheep") return src.split("mascot-horse").join("mascot-sheep");
-    return src.split("mascot-sheep").join("mascot-horse");
+  function frameSrc(img, kind) {
+    const src = img.getAttribute("src") || "";
+    const away = src.includes("-away-") || img.closest(".pet-away");
+    return away ? `/mascot-${kind}-away-512-v2.png` : `/mascot-${kind}-512-v2.png`;
   }
 
   function applyArt(kind) {
     document.documentElement.setAttribute("data-mascot", kind);
     document.querySelectorAll("img.pet-frame").forEach((img) => {
-      const next = rewriteSrc(img.getAttribute("src") || "", kind);
-      if (next) img.setAttribute("src", next);
+      img.setAttribute("src", frameSrc(img, kind));
     });
     document.querySelectorAll(".mascot-tog").forEach((btn) => {
       const on = btn.getAttribute("data-mascot") === kind;
@@ -67,31 +75,46 @@
   persist(kind);
   applyArt(kind);
 
-  // One motion, one go: swap art + squash in the SAME tick (not bounce-then-swap).
-  const SQUASH_MS = 700;
-  let toggling = false;
+  let lastPointerId = null;
 
-  function onToggleClick(event) {
-    const btn = event.currentTarget;
-    const next = btn.getAttribute("data-mascot");
+  function swapTo(next) {
     if (next !== "horse" && next !== "sheep") return;
     if (next === kind) {
       bouncePet();
       return;
     }
-    if (toggling) return;
-    toggling = true;
     kind = next;
     persist(kind);
     applyArt(kind); // swap FIRST so the squash is of the new pet
-    bouncePet();    // same tick - one continuous motion
-    window.setTimeout(() => {
-      toggling = false;
-    }, SQUASH_MS);
+    bouncePet(); // same tick — one continuous motion
+  }
+
+  function onTogglePointer(event) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    // Prefer pointerup so one finger tap always commits; ignore following click.
+    if (event.type === "click") {
+      event.preventDefault();
+      return;
+    }
+    if (event.type === "pointerup") {
+      if (lastPointerId !== null && event.pointerId !== lastPointerId) return;
+      lastPointerId = null;
+      const btn = event.currentTarget;
+      swapTo(btn.getAttribute("data-mascot"));
+      event.preventDefault();
+    }
+  }
+
+  function onTogglePointerDown(event) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    lastPointerId = event.pointerId;
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch (_) { /* ignore */ }
   }
 
   document.querySelectorAll(".mascot-tog").forEach((btn) => {
-    btn.addEventListener("click", onToggleClick);
+    btn.addEventListener("pointerdown", onTogglePointerDown);
+    btn.addEventListener("pointerup", onTogglePointer);
+    btn.addEventListener("click", onTogglePointer);
   });
 })();
 
