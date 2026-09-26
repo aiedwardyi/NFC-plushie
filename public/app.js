@@ -116,6 +116,15 @@ if (pet) {
       /* ignore */
     }
     clearTimeout(pressTimer);
+    // Restart squash even mid-animation (class reflow + iOS animation reset).
+    pet.classList.remove("is-press");
+    void pet.offsetWidth;
+    const motion = pet.querySelector(".pet-motion");
+    if (motion) {
+      motion.style.animation = "none";
+      void motion.offsetWidth;
+      motion.style.animation = "";
+    }
     pet.classList.add("is-press");
     showFrame("react");
     pressTimer = window.setTimeout(() => {
