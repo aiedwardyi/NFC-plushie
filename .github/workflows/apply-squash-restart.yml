@@ -2,8 +2,10 @@ name: apply-squash-restart
 on:
   workflow_dispatch:
   push:
-    branches: [fix/multi-tap-squash-restart]
-    paths: [.github/workflows/apply-squash-restart.yml]
+    branches:
+      - fix/multi-tap-squash-restart
+    paths:
+      - .github/workflows/apply-squash-restart.yml
 permissions:
   contents: write
 jobs:
@@ -11,53 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: fix/multi-tap-squash-restart
-      - name: Patch public/app.js react()
-        run: |
-          python3 <<'EOF'
-          from pathlib import Path
-          path = Path("public/app.js")
-          text = path.read_text()
-          if "void pet.offsetWidth" in text and 'motion.style.animation = "none"' in text:
-              print("already patched")
-              raise SystemExit(0)
-          old = """    clearTimeout(pressTimer);
-    pet.classList.add("is-press");
-    showFrame("react");
-    pressTimer = window.setTimeout(() => {
-      pet.classList.remove("is-press");
-      showFrame(restingFrame());
-    }, 700);"""
-          new = """    clearTimeout(pressTimer);
-    // Restart squash even mid-animation (class reflow + iOS animation reset).
-    pet.classList.remove("is-press");
-    void pet.offsetWidth;
-    const motion = pet.querySelector(".pet-motion");
-    if (motion) {
-      motion.style.animation = "none";
-      void motion.offsetWidth;
-      motion.style.animation = "";
-    }
-    pet.classList.add("is-press");
-    showFrame("react");
-    pressTimer = window.setTimeout(() => {
-      pet.classList.remove("is-press");
-      showFrame(restingFrame());
-    }, 700);"""
-          if old not in text:
-              raise SystemExit("OLD react block not found")
-          path.write_text(text.replace(old, new, 1))
-          print("patched ok")
-          EOF
+      - name: Apply restart pattern with Python
+        run: python3 .github/scripts/patch_squash_restart.py
       - name: Commit and push
         run: |
           git config user.name "Edward Yi"
           git config user.email "41576951+aiedwardyi@users.noreply.github.com"
           git add public/app.js
-          if git diff --cached --quiet; then
-            echo "no changes to commit"
-            exit 0
-          fi
+          git diff --cached --quiet && echo nochange && exit 0
           git commit -m "fix: restart squash animation on every multi-tap"
           git push
