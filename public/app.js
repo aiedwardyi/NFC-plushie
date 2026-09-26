@@ -208,7 +208,7 @@ function showStillCelebrate(kind) {
   const sparks = document.createElement("div");
   sparks.className = "still-sparkles";
   sparks.setAttribute("aria-hidden", "true");
-  // Fixed margin slots only (corners / side gutters). Never over the centered duck or copy.
+  // Fixed margin slots only (corners / side gutters). Never over the centered pet or copy.
   const claimSlots = [
     [5, 8], [95, 7], [4, 22], [96, 24], [3, 48], [97, 50],
     [5, 72], [95, 74], [8, 90], [92, 92], [2, 35], [98, 62],
@@ -524,9 +524,9 @@ function enhanceRollingCounter({ duration = 400, goldPop = false } = {}) {
   }, duration);
 }
 
-function currentDuckSrc(pet) {
+function currentPetSrc(pet) {
   const shown = pet?.querySelector(".pet-frame.is-show");
-  return shown?.getAttribute("src") || "/mascot-duck-512.png";
+  return shown?.getAttribute("src") || "/mascot-horse-512.png";
 }
 
 function runEvolutionGlow({ onComplete } = {}) {
@@ -537,8 +537,8 @@ function runEvolutionGlow({ onComplete } = {}) {
     return;
   }
 
-  const duckSrc = currentDuckSrc(pet);
-  pet.style.setProperty("--duck-src", `url("${duckSrc.replace(/["()]/g, encodeURIComponent)}")`);
+  const petSrc = currentPetSrc(pet);
+  pet.style.setProperty("--pet-src", `url("${petSrc.replace(/["()]/g, encodeURIComponent)}")`);
 
   const overlay = document.createElement("div");
   overlay.className = "evo-overlay";
@@ -585,7 +585,7 @@ function runEvolutionGlow({ onComplete } = {}) {
       overlay.remove();
       rays.remove();
       pet.classList.remove("is-evolving", "is-evo-bounce");
-      pet.style.removeProperty("--duck-src");
+      pet.style.removeProperty("--pet-src");
       document.body.classList.remove("is-evo-dim");
       mileEl?.classList.remove("is-glow");
       onComplete?.();
