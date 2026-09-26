@@ -526,7 +526,7 @@ function enhanceRollingCounter({ duration = 400, goldPop = false } = {}) {
 
 function currentPetSrc(pet) {
   const shown = pet?.querySelector(".pet-frame.is-show");
-  return shown?.getAttribute("src") || "/mascot-horse-512.png";
+  return shown?.getAttribute("src") || "/mascot-horse-512-v2.png";
 }
 
 function runEvolutionGlow({ onComplete } = {}) {

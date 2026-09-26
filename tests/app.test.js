@@ -266,7 +266,7 @@ test("local cookie works over HTTP; sensitive pages cannot be cached", async (t)
   assert.match(first.headers.get("content-security-policy"), /frame-ancestors 'none'/);
   assert.equal((await request("/app.js")).status, 200);
   assert.equal((await request("/style.css")).status, 200);
-  const duck = await request("/mascot-horse-512.png");
+  const duck = await request("/mascot-horse-512-v2.png");
   assert.equal(duck.status, 200);
   assert.match(duck.headers.get("cache-control") || "", /max-age=86400/);
   assert.doesNotMatch(duck.headers.get("cache-control") || "", /immutable/);
