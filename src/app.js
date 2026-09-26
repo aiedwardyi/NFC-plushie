@@ -101,7 +101,15 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     const send = res.send.bind(res);
     res.send = (body) => {
       if (typeof body === "string" && body.includes("mascot-horse")) {
-        body = body.split("mascot-horse").join("mascot-sheep");
+        // Keep toggle icons as horse|sheep; only rewrite pet frames outside the toggle.
+        const parts = body.split(/(<aside class="mascot-toggle"[\s\S]*?<\/aside>)/);
+        body = parts
+          .map((part) =>
+            part.startsWith('<aside class="mascot-toggle"')
+              ? part
+              : part.split("mascot-horse").join("mascot-sheep"),
+          )
+          .join("");
       }
       return send(body);
     };
