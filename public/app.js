@@ -1,72 +1,74 @@
-/* Dad demo: horse\leftrightarrow sheep corner toggle. Persist localStorage+cookie. binding.js untouched. */
+/* Dad demo: horse↔sheep corner toggle. Persist localStorage+cookie. binding.js untouched. */
 (function mascotDemoToggle() {
-  const KEY = \"pokkey-mascot\";
+  const KEY = "pokkey-mascot";
   const MAX_AGE = String(400 * 24 * 60 * 60);
 
   function readKind() {
     try {
       const params = new URLSearchParams(window.location.search);
-      const q = params.get(\"mascot\");
-      if (q === \"sheep\" || q === \"horse\") return q;
+      const q = params.get("mascot");
+      if (q === "sheep" || q === "horse") return q;
     } catch (_) { /* ignore */ }
     try {
       const ls = localStorage.getItem(KEY);
-      if (ls === \"sheep\" || ls === \"horse\") return ls;
+      if (ls === "sheep" || ls === "horse") return ls;
     } catch (_) { /* ignore */ }
     try {
       const m = document.cookie.match(/(?:^|; )mascot=(sheep|horse)(?:;|$)/);
       if (m) return m[1];
     } catch (_) { /* ignore */ }
-    const htmlKind = document.documentElement.getAttribute(\"data-mascot\");
-    return htmlKind === \"sheep\" ? \"sheep\" : \"horse\";
+    const htmlKind = document.documentElement.getAttribute("data-mascot");
+    return htmlKind === "sheep" ? "sheep" : "horse";
   }
 
   function persist(kind) {
     try { localStorage.setItem(KEY, kind); } catch (_) { /* ignore */ }
     try {
-      document.cookie = \"mascot=\" + kind + \";path=/;max-age=\" + MAX_AGE + \";samesite=lax\";
+      document.cookie = "mascot=" + kind + ";path=/;max-age=" + MAX_AGE + ";samesite=lax";
     } catch (_) { /* ignore */ }
+    // Drop sticky ?mascot= so it can't fight the toggle on the next read/navigation.
     try {
       const url = new URL(window.location.href);
-      if (url.searchParams.has(\"mascot\")) {
-        url.searchParams.delete(\"mascot\");
-        window.history.replaceState(null, \"\", url.pathname + (url.search || \"\") + url.hash);
+      if (url.searchParams.has("mascot")) {
+        url.searchParams.delete("mascot");
+        const next = url.pathname + (url.search ? url.search : "") + url.hash;
+        window.history.replaceState(null, "", next);
       }
     } catch (_) { /* ignore */ }
   }
 
   function frameSrc(img, kind) {
-    const src = img.getAttribute(\"src\") || \"\";
-    const away = src.includes(\"-away-\") || Boolean(img.closest(\".pet-away\"));
+    const src = img.getAttribute("src") || "";
+    const away = src.includes("-away-") || Boolean(img.closest(".pet-away"));
     return away ? `/mascot-${kind}-away-512-v3.png` : `/mascot-${kind}-512-v3.png`;
   }
 
   function applyArt(kind) {
-    document.documentElement.setAttribute(\"data-mascot\", kind);
-    document.querySelectorAll(\"img.pet-frame\").forEach((img) => {
-      img.setAttribute(\"src\", frameSrc(img, kind));
+    document.documentElement.setAttribute("data-mascot", kind);
+    document.querySelectorAll("img.pet-frame").forEach((img) => {
+      img.setAttribute("src", frameSrc(img, kind));
     });
-    document.querySelectorAll(\".mascot-tog\").forEach((btn) => {
-      const on = btn.getAttribute(\"data-mascot\") === kind;
-      btn.classList.toggle(\"is-active\", on);
-      btn.setAttribute(\"aria-pressed\", on ? \"true\" : \"false\");
+    document.querySelectorAll(".mascot-tog").forEach((btn) => {
+      const on = btn.getAttribute("data-mascot") === kind;
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
     });
   }
 
   function bouncePet() {
-    const pet = document.querySelector(\".pet\");
+    const pet = document.querySelector(".pet");
     if (!pet) return;
     try { navigator.vibrate?.(10); } catch (_) { /* ignore */ }
-    pet.classList.remove(\"is-press\");
+    pet.classList.remove("is-press");
     void pet.offsetWidth;
-    const motion = pet.querySelector(\".pet-motion\");
+    const motion = pet.querySelector(".pet-motion");
     if (motion) {
-      motion.style.animation = \"none\";
+      motion.style.animation = "none";
       void motion.offsetWidth;
-      motion.style.animation = \"\";
+      motion.style.animation = "";
     }
-    pet.classList.add(\"is-press\");
-    window.setTimeout(() => pet.classList.remove(\"is-press\"), 700);
+    pet.classList.add("is-press");
+    window.setTimeout(() => pet.classList.remove("is-press"), 700);
   }
 
   let kind = readKind();
@@ -76,22 +78,22 @@
   let skipClick = false;
 
   function swapTo(next) {
-    if (next !== \"horse\" && next !== \"sheep\") return;
+    if (next !== "horse" && next !== "sheep") return;
     if (next === kind) {
       bouncePet();
       return;
     }
     kind = next;
     persist(kind);
-    applyArt(kind);
-    bouncePet();
+    applyArt(kind); // swap FIRST so the squash is of the new pet
+    bouncePet(); // same tick — one continuous motion
   }
 
   function onPointerDown(event) {
-    if (event.pointerType === \"mouse\" && event.button !== 0) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     skipClick = true;
     try { event.currentTarget.setPointerCapture(event.pointerId); } catch (_) { /* ignore */ }
-    swapTo(event.currentTarget.getAttribute(\"data-mascot\"));
+    swapTo(event.currentTarget.getAttribute("data-mascot"));
   }
 
   function onClick(event) {
@@ -100,12 +102,12 @@
       event.preventDefault();
       return;
     }
-    swapTo(event.currentTarget.getAttribute(\"data-mascot\"));
+    swapTo(event.currentTarget.getAttribute("data-mascot"));
   }
 
-  document.querySelectorAll(\".mascot-tog\").forEach((btn) => {
-    btn.addEventListener(\"pointerdown\", onPointerDown);
-    btn.addEventListener(\"click\", onClick);
+  document.querySelectorAll(".mascot-tog").forEach((btn) => {
+    btn.addEventListener("pointerdown", onPointerDown);
+    btn.addEventListener("click", onClick);
   });
 })();
 
