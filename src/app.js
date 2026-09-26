@@ -85,6 +85,29 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     },
   }));
 
+  // Dad demo: ?mascot=sheep|horse (cookie). Default horse. Does not touch binding.js.
+  const resolveDemoMascot = (req, res) => {
+    const q = typeof req.query?.mascot === "string" ? req.query.mascot : "";
+    if (q === "sheep" || q === "horse") {
+      res.cookie("mascot", q, { httpOnly: false, sameSite: "lax", secure: production, maxAge: cookieAge, path: "/" });
+      return q;
+    }
+    return req.cookies?.mascot === "sheep" ? "sheep" : "horse";
+  };
+  app.use((req, res, next) => {
+    const mascot = resolveDemoMascot(req, res);
+    req.demoMascot = mascot;
+    if (mascot !== "sheep") return next();
+    const send = res.send.bind(res);
+    res.send = (body) => {
+      if (typeof body === "string" && body.includes("mascot-horse")) {
+        body = body.split("mascot-horse").join("mascot-sheep");
+      }
+      return send(body);
+    };
+    next();
+  });
+
   const getRow = (uid) => db.prepare("SELECT * FROM plushies WHERE uid = ?").get(uid) || null;
   const setOwner = (res, token) => res.cookie("owner_token", token, {
     httpOnly: true, sameSite: "lax", secure: production, maxAge: cookieAge, path: "/",
@@ -284,7 +307,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       if (!ok) {
         return res.status(404).send(page(null, "<p>이 친구는 인형에 있는 링크에서 기다리고 있어요.</p>"));
       }
-      res.send(previewPetPage({ kind, count, tier, reason }));
+      res.send(previewPetPage({ kind, count, tier, reason, mascot: req.demoMascot || "horse" }));
     });
     app.post("/dev/prime", (req, res) => {
       const { uid, preset, tier } = req.body || {};

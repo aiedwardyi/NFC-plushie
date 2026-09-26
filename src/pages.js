@@ -14,12 +14,20 @@ export function milestoneLine(count) {
   return "";
 }
 
-function petMarkup({ waving = false, away = false, lonely = false } = {}) {
+// Demo mascot: default horse. Pass mascot:"sheep" (or use ?mascot=sheep / cookie via public/app.js).
+function mascotKind(mascot) {
+  return mascot === "sheep" ? "sheep" : "horse";
+}
+
+function petMarkup({ waving = false, away = false, lonely = false, mascot = "horse" } = {}) {
+  const kind = mascotKind(mascot);
+  const front = `/mascot-${kind}-512-v2.png`;
+  const awaySrc = `/mascot-${kind}-away-512-v2.png`;
   if (away) {
     const awayAlt = "다정한 친구가 등을 보이고 있어요";
     return `<div class="pet pet-away" data-pet="away" role="img" aria-label="${awayAlt}">
       <span class="pet-motion">
-        <img class="pet-frame is-show" src="/mascot-horse-away-512-v2.png" width="220" height="220" alt="" decoding="async" draggable="false">
+        <img class="pet-frame is-show" src="${awaySrc}" width="220" height="220" alt="" decoding="async" draggable="false">
       </span>
     </div>`;
   }
@@ -29,10 +37,10 @@ function petMarkup({ waving = false, away = false, lonely = false } = {}) {
   return `<div class="pet${enterClass}${lonelyClass}" data-pet="alive">
       <button type="button" class="pet-hit" aria-label="${alt}">
         <span class="pet-motion">
-          <img class="pet-frame is-show" data-frame="canon" src="/mascot-horse-512-v2.png" width="220" height="220" alt="${alt}" decoding="async" draggable="false">
-          <img class="pet-frame" data-frame="blink" src="/mascot-horse-512-v2.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
-          <img class="pet-frame" data-frame="react" src="/mascot-horse-512-v2.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
-          <img class="pet-frame" data-frame="sleepy" src="/mascot-horse-512-v2.png" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
+          <img class="pet-frame is-show" data-frame="canon" src="${front}" width="220" height="220" alt="${alt}" decoding="async" draggable="false">
+          <img class="pet-frame" data-frame="blink" src="${front}" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
+          <img class="pet-frame" data-frame="react" src="${front}" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
+          <img class="pet-frame" data-frame="sleepy" src="${front}" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
         </span>
       </button>
     </div>`;
@@ -99,19 +107,34 @@ function petStats(pet) {
   </section>`;
 }
 
-export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null } = {}) {
+export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = "horse" } = {}) {
   const title = escapeHtml(row?.pet_name || "새 친구");
   const timeEl = timeLine ? `<p class="time-line" data-time-line></p>` : "";
   const celebrateAttr = celebrate === "claim" || celebrate === "named" || celebrate === "milestone" || celebrate === "levelup" || celebrate === "reunion" || celebrate === "rare" || celebrate === "special"
     ? ` data-celebrate="${celebrate}"`
     : "";
+  const kind = mascot === "sheep" ? "sheep" : "horse";
+  const horsePressed = kind === "horse" ? "true" : "false";
+  const sheepPressed = kind === "sheep" ? "true" : "false";
+  const horseActive = kind === "horse" ? " is-active" : "";
+  const sheepActive = kind === "sheep" ? " is-active" : "";
+  const toggle = `<aside class="mascot-toggle" data-mascot-toggle role="group" aria-label="친구 바꾸기">
+    <button type="button" class="mascot-tog${horseActive}" data-mascot="horse" aria-label="말 친구" aria-pressed="${horsePressed}">
+      <img src="/mascot-horse-512-v2.png" width="32" height="32" alt="" decoding="async" draggable="false">
+    </button>
+    <button type="button" class="mascot-tog${sheepActive}" data-mascot="sheep" aria-label="양 친구" aria-pressed="${sheepPressed}">
+      <img src="/mascot-sheep-512-v2.png" width="32" height="32" alt="" decoding="async" draggable="false">
+    </button>
+  </aside>`;
   return `<!doctype html>
-<html lang="ko">
+<html lang="ko" data-mascot="${kind}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${title} | 인형 친구</title>
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/mascot-toggle.css">
+  <script src="/mascot-boot.js"></script>
   <script src="/app.js" defer></script>
 </head>
 <body${celebrateAttr}>
@@ -119,16 +142,17 @@ export function page(row, content, { waving = false, away = false, lonely = fals
     <p class="eyebrow">살짝 건네는 인사</p>
     <h1>${title}</h1>
     ${timeEl}
-    ${petMarkup({ waving, away, lonely })}
+    ${petMarkup({ waving, away, lonely, mascot: kind })}
     ${countHtml}
     ${content}
     <footer>토닥이면 깨어나는 작은 친구</footer>
   </main>
+  ${toggle}
 </body>
 </html>`;
 }
 
-export function petPage(row, code = null, { celebrate = "", pet = null } = {}) {
+export function petPage(row, code = null, { celebrate = "", pet = null, mascot = "horse" } = {}) {
   const firstMeet = celebrate === "claim" || celebrate === "named";
   const greeting = row.pet_name
     ? (firstMeet
@@ -161,11 +185,11 @@ export function petPage(row, code = null, { celebrate = "", pet = null } = {}) {
   return page(
     row,
     body,
-    { waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet },
+    { waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet, mascot },
   );
 }
 
-export function strangerPage(row, message = "") {
+export function strangerPage(row, message = "", { mascot = "horse" } = {}) {
   return page(row, `<p class="intro">이 작은 친구는 이미 주인이 있어요.</p>
     ${message ? `<p class="notice" role="alert">${escapeHtml(message)}</p>` : ""}
     <button type="button" id="claim-toggle" aria-expanded="${Boolean(message)}" aria-controls="claim-form">제가 주인이에요</button>
@@ -175,7 +199,7 @@ export function strangerPage(row, message = "") {
       <input id="code" name="code" required autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="claim-help">
       <p id="claim-help">처음 만났을 때 적어둔 안심 코드를 넣어주세요.</p>
       <button type="submit">내 친구를 데려올래요!</button>
-    </form>`, { away: true });
+    </form>`, { away: true, mascot });
 }
 
 export const fakeUids = ["04AAAAAAAAAAA1", "04BBBBBBBBBBB2", "04CCCCCCCCCCC3"];
@@ -184,7 +208,7 @@ const PREVIEW_KINDS = new Set(["claim", "levelup", "reunion", "milestone", "gift
 const PREVIEW_TIERS = new Set(["common", "special", "rare"]);
 const PREVIEW_REASONS = new Set(["cooldown", "cap", "stale"]);
 
-export function previewPetPage({ kind, count, tier = "common", reason = "" }) {
+export function previewPetPage({ kind, count, tier = "common", reason = "", mascot = "horse" } = {}) {
   const n = Number(count);
   const row = {
     uid: "04PREVIEW00001",
@@ -226,7 +250,7 @@ export function previewPetPage({ kind, count, tier = "common", reason = "" }) {
   return page(
     row,
     `<p class="intro">${greeting}</p>${momentsHtml}${giftHtml}<section class="pet-stats" aria-label="돌봄 상태">${stats}</section>`,
-    { timeLine: true, celebrate: visual, countHtml, lonely: kind === "lonely" },
+    { timeLine: true, celebrate: visual, countHtml, lonely: kind === "lonely", mascot },
   );
 }
 
@@ -245,6 +269,7 @@ export function devPage(uids = fakeUids) {
     <nav aria-label="연습용 친구들">${uids.map((uid, i) => `<a class="button" href="/t?uid=${uid}">인형 친구 ${String.fromCharCode(65 + i)} <small>${uid}</small></a>`).join("")}</nav>
     <nav aria-label="축하 미리보기" class="dev-preview">
       <a class="button secondary" href="/dev/preview?kind=claim&count=10">이름 짓기 축하 미리보기</a>
+      <a class="button secondary" href="/dev/preview?kind=claim&count=10&mascot=sheep">양(sheep) 데모 미리보기</a>
       <a class="button secondary" href="/dev/preview?kind=levelup&count=10">레벨업 미리보기</a>
       <a class="button secondary" href="/dev/preview?kind=reunion&count=10">재회 미리보기</a>
       <a class="button secondary" href="/dev/preview?kind=milestone&count=10">10번 이정표 미리보기</a>
