@@ -1,1 +1,10 @@
-.pet[data-pet="alive"].is-press .pet-motion { animation: squash .6s ease; }
+@import url("https://raw.githubusercontent.com/aiedwardyi/NFC-plushie/402a1d78f0f64932db9c43f3d5a8f9218919c7cf/public/style.css");
+
+/* squash restart overrides */
+.pet[data-pet="alive"].is-press .pet-motion { animation: squash .6s ease !important; }
+@keyframes squash {
+  0% { transform: scale(1, 1); }
+  22% { transform: scale(1.09, 0.86); }
+  48% { transform: scale(0.96, 1.05); }
+  100% { transform: scale(1, 1); }
+}
