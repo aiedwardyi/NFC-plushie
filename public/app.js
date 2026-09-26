@@ -38,7 +38,7 @@
   function frameSrc(img, kind) {
     const src = img.getAttribute(\"src\") || \"\";
     const away = src.includes(\"-away-\") || Boolean(img.closest(\".pet-away\"));
-    return away ? /mascot--away-512-v2.png : /mascot--512-v2.png;
+    return away ? `/mascot-${kind}-away-512-v3.png` : `/mascot-${kind}-512-v3.png`;
   }
 
   function applyArt(kind) {
@@ -646,7 +646,7 @@ function enhanceRollingCounter({ duration = 400, goldPop = false } = {}) {
 
 function currentPetSrc(pet) {
   const shown = pet?.querySelector(".pet-frame.is-show");
-  return shown?.getAttribute("src") || "/mascot-horse-512-v2.png";
+  return shown?.getAttribute("src") || "/mascot-horse-512-v3.png";
 }
 
 function runEvolutionGlow({ onComplete } = {}) {
