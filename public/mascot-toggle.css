@@ -16,7 +16,6 @@
   -webkit-backdrop-filter: blur(8px);
 }
 .mascot-tog {
-  touch-action: manipulation;
   box-sizing: border-box;
   width: 40px;
   height: 40px;
@@ -31,10 +30,21 @@
   box-shadow: none;
   cursor: pointer;
   line-height: 0;
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 .mascot-tog.is-active {
   border-color: var(--cap-blue);
+  background: #e8f1ff;
+}
+.mascot-tog:hover,
+.mascot-tog:focus {
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+}
+.mascot-tog.is-active:hover,
+.mascot-tog.is-active:focus {
   background: #e8f1ff;
 }
 .mascot-tog:focus-visible {
@@ -51,17 +61,5 @@
   -webkit-user-drag: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .mascot-tog {
-  touch-action: manipulation; transition: none; }
-}
-
-.mascot-tog:hover,
-.mascot-tog:focus {
-  background: transparent;
-  color: inherit;
-  box-shadow: none;
-}
-.mascot-tog.is-active:hover,
-.mascot-tog.is-active:focus {
-  background: #e8f1ff;
+  .mascot-tog { transition: none; }
 }
