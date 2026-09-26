@@ -1,7 +1,8 @@
 diff --git a/src/pages.js b/src/pages.js
+index f22c634..8dd5cd2 100644
 --- a/src/pages.js
 +++ b/src/pages.js
-@@ -14,12 +14,20 @@
+@@ -14,12 +14,20 @@ export function milestoneLine(count) {
    return "";
  }
  
@@ -24,7 +25,7 @@ diff --git a/src/pages.js b/src/pages.js
        </span>
      </div>`;
    }
-@@ -29,10 +37,10 @@
+@@ -29,10 +37,10 @@ function petMarkup({ waving = false, away = false, lonely = false } = {}) {
    return `<div class="pet${enterClass}${lonelyClass}" data-pet="alive">
        <button type="button" class="pet-hit" aria-label="${alt}">
          <span class="pet-motion">
@@ -39,7 +40,7 @@ diff --git a/src/pages.js b/src/pages.js
          </span>
        </button>
      </div>`;
-@@ -99,19 +107,34 @@
+@@ -99,19 +107,34 @@ function petStats(pet) {
    </section>`;
  }
  
@@ -76,7 +77,7 @@ diff --git a/src/pages.js b/src/pages.js
    <script src="/app.js" defer></script>
  </head>
  <body${celebrateAttr}>
-@@
+@@ -119,16 +142,17 @@ export function page(row, content, { waving = false, away = false, lonely = false
      <p class="eyebrow">살짝 건네는 인사</p>
      <h1>${title}</h1>
      ${timeEl}
@@ -96,7 +97,7 @@ diff --git a/src/pages.js b/src/pages.js
    const firstMeet = celebrate === "claim" || celebrate === "named";
    const greeting = row.pet_name
      ? (firstMeet
-@@ -161,11 +185,11 @@
+@@ -161,11 +185,11 @@ export function petPage(row, code = null, { celebrate = "", pet = null } = {}) {
    return page(
      row,
      body,
@@ -110,7 +111,7 @@ diff --git a/src/pages.js b/src/pages.js
    return page(row, `<p class="intro">이 작은 친구는 이미 주인이 있어요.</p>
      ${message ? `<p class="notice" role="alert">${escapeHtml(message)}</p>` : ""}
      <button type="button" id="claim-toggle" aria-expanded="${Boolean(message)}" aria-controls="claim-form">제가 주인이에요</button>
-@@
+@@ -175,7 +199,7 @@ export function strangerPage(row, message = "") {
        <input id="code" name="code" required autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="claim-help">
        <p id="claim-help">처음 만났을 때 적어둔 안심 코드를 넣어주세요.</p>
        <button type="submit">내 친구를 데려올래요!</button>
@@ -119,12 +120,16 @@ diff --git a/src/pages.js b/src/pages.js
  }
  
  export const fakeUids = ["04AAAAAAAAAAA1", "04BBBBBBBBBBB2", "04CCCCCCCCCCC3"];
-@@
+@@ -184,7 +208,7 @@ const PREVIEW_KINDS = new Set(["claim", "levelup", "reunion", "milestone", "gift
+ const PREVIEW_TIERS = new Set(["common", "special", "rare"]);
+ const PREVIEW_REASONS = new Set(["cooldown", "cap", "stale"]);
+ 
 -export function previewPetPage({ kind, count, tier = "common", reason = "" }) {
 +export function previewPetPage({ kind, count, tier = "common", reason = "", mascot = "horse" } = {}) {
    const n = Number(count);
    const row = {
-@@
+     uid: "04PREVIEW00001",
+@@ -226,7 +250,7 @@ export function previewPetPage({ kind, count, tier = "common", reason = "" }) {
    return page(
      row,
      `<p class="intro">${greeting}</p>${momentsHtml}${giftHtml}<section class="pet-stats" aria-label="돌봄 상태">${stats}</section>`,
@@ -132,7 +137,8 @@ diff --git a/src/pages.js b/src/pages.js
 +    { timeLine: true, celebrate: visual, countHtml, lonely: kind === "lonely", mascot },
    );
  }
-@@
+ 
+@@ -245,6 +269,7 @@ export function devPage(uids = fakeUids) {
      <nav aria-label="연습용 친구들">${uids.map((uid, i) => `<a class="button" href="/t?uid=${uid}">인형 친구 ${String.fromCharCode(65 + i)} <small>${uid}</small></a>`).join("")}</nav>
      <nav aria-label="축하 미리보기" class="dev-preview">
        <a class="button secondary" href="/dev/preview?kind=claim&count=10">이름 짓기 축하 미리보기</a>
@@ -140,3 +146,6 @@ diff --git a/src/pages.js b/src/pages.js
        <a class="button secondary" href="/dev/preview?kind=levelup&count=10">레벨업 미리보기</a>
        <a class="button secondary" href="/dev/preview?kind=reunion&count=10">재회 미리보기</a>
        <a class="button secondary" href="/dev/preview?kind=milestone&count=10">10번 이정표 미리보기</a>
+@@ -284,7 +307,7 @@ export function strangerPage(row, message = "") {
+@@ -284,7 +307,7 @@ export function strangerPage(row, message = "") {
+@@ -284,7 +307,7 @@ export function strangerPage(row, message = "") {
