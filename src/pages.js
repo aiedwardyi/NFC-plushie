@@ -1,3 +1,6 @@
+import { GIFTS, GIFT_COUNT, GIFT_TIERS } from "./gifts.js";
+import { seoulDayKey } from "./pet.js";
+
 export function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -13,6 +16,17 @@ export function milestoneLine(count) {
   if (n > 100 && n % 100 === 0) return `${n}번이에요!`;
   return "";
 }
+
+const ICONS = {
+  pat: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10A4 4 0 0 1 12 8.2a4 4 0 0 1 7.5 2.3c0 5.4-7.5 10-7.5 10z"/><path d="M7.6 3.2l.9 1.9M12 2.2v2.1M16.4 3.2l-.9 1.9"/></svg>`,
+  gift: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="9.5" rx="1.6"/><rect x="3.2" y="7" width="17.6" height="3.5" rx="1.2"/><path d="M12 7v13M12 7C10.6 4 7 3.6 7 5.8 7 7 9.6 7 12 7zm0 0c1.4-3 5-3.4 5-1.2C17 7 14.4 7 12 7z"/></svg>`,
+  record: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h10.5A1.5 1.5 0 0 1 18 5v15.5H7.5A1.5 1.5 0 0 1 6 19V3.5z"/><path d="M6 17.5A1.5 1.5 0 0 1 7.5 16H18M9.5 7.5h5M9.5 11h5"/></svg>`,
+  heart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7.5-4.6-7.5-10A4 4 0 0 1 12 7.7a4 4 0 0 1 7.5 2.3c0 5.4-7.5 10-7.5 10z"/></svg>`,
+  star: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6-4.4-4.2 6-.8z"/></svg>`,
+  keyhole: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9.6" r="3.4"/><path d="M10.4 11.8 9.2 18.4h5.6l-1.2-6.6z"/></svg>`,
+  close: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>`,
+  copy: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="2.2"/><path d="M15.5 8.5V6.7a2.2 2.2 0 0 0-2.2-2.2H6.7a2.2 2.2 0 0 0-2.2 2.2v6.6a2.2 2.2 0 0 0 2.2 2.2h1.8"/></svg>`,
+};
 
 // Demo mascot: default horse. Pass mascot:"sheep" (or use ?mascot=sheep / cookie via public/app.js).
 function mascotKind(mascot) {
@@ -46,6 +60,14 @@ function petMarkup({ waving = false, away = false, lonely = false, mascot = "hor
     </div>`;
 }
 
+const SKY = `<div class="sky" aria-hidden="true">
+        <span class="stars">${"<i></i>".repeat(9)}</span>
+        <span class="motes">${"<i></i>".repeat(6)}</span>
+        <span class="floor"></span>
+      </div>`;
+
+const HEART_PATH = "M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z";
+
 export function heartRow(mood, { animate = false, before = null } = {}) {
   const halves = Math.max(1, Math.min(10, Math.ceil(Number(mood) / 10) || 1));
   const start = animate && before !== null
@@ -55,7 +77,7 @@ export function heartRow(mood, { animate = false, before = null } = {}) {
   for (let i = 1; i <= 5; i++) {
     const fill = Math.max(0, Math.min(2, start - (i - 1) * 2));
     const cls = fill === 2 ? "is-full" : fill === 1 ? "is-half" : "is-empty";
-    hearts += `<span class="heart ${cls}" data-heart="${i}" data-fill="${fill}" aria-hidden="true"><svg viewBox="0 0 24 22"><path class="heart-bg" d="M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z"/><path class="heart-fill" d="M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z"/></svg></span>`;
+    hearts += `<span class="heart ${cls}" data-heart="${i}" data-fill="${fill}" aria-hidden="true"><svg viewBox="0 0 24 22"><path class="heart-bg" d="${HEART_PATH}"/><path class="heart-fill" d="${HEART_PATH}"/><ellipse class="heart-shine" cx="7.6" cy="8.6" rx="2.1" ry="1.4" transform="rotate(-32 7.6 8.6)"/></svg></span>`;
   }
   const anim = animate ? ` data-hearts-animate="1" data-mood-before="${start}" data-mood-after="${halves}"` : "";
   return `<div class="hearts" role="img" aria-label="기분 ${halves}단계" data-hearts="${start}"${anim}>${hearts}</div>`;
@@ -67,11 +89,17 @@ function giftLabel(tier) {
   return "오늘의 선물";
 }
 
+function tierClass(tier) {
+  return tier === "rare" ? "is-rare" : tier === "special" ? "is-special" : "is-common";
+}
+
+function giftLineHtml(tier, line) {
+  return `<p class="gift ${tierClass(tier)}" data-gift="${tier}"><span class="gift-label">${giftLabel(tier)}</span> <span class="gift-text">${escapeHtml(line)}</span></p>`;
+}
+
 function giftCardHtml(pet) {
   if (!pet?.gift) return "";
-  const tier = pet.gift.tier;
-  const tierClass = tier === "rare" ? "is-rare" : tier === "special" ? "is-special" : "is-common";
-  return `<p class="gift ${tierClass}" data-gift="${tier}"><span class="gift-label">${giftLabel(tier)}</span> ${escapeHtml(pet.gift.gift.line)}</p>`;
+  return giftLineHtml(pet.gift.tier, pet.gift.gift.line);
 }
 
 function petMoments({ pet = null, milestone = "" } = {}) {
@@ -95,19 +123,127 @@ function petMoments({ pet = null, milestone = "" } = {}) {
   return `<section class="pet-moments" aria-label="오늘의 순간">${items.join("")}</section>`;
 }
 
+function xpPercent(pet) {
+  return pet.xpSpan > 0 ? Math.max(0, Math.min(100, Math.round((pet.xpInto / pet.xpSpan) * 100))) : 100;
+}
+
+function keyBar({ level, pct, left }) {
+  return `<p class="level-line"><span class="level-badge" aria-label="Lv. ${level}">${level}</span>
+      <span class="xp-bar" role="img" aria-label="다음 단계까지 ${left}"><span class="xp-fill" data-xp="${pct}"></span></span></p>`;
+}
+
 function petStats(pet) {
   if (!pet) return "";
-  const pct = pet.xpSpan > 0 ? Math.max(0, Math.min(100, Math.round((pet.xpInto / pet.xpSpan) * 100))) : 100;
   return `<section class="pet-stats" aria-label="돌봄 상태">
     ${heartRow(pet.moodAfter, { animate: pet.rewarded, before: pet.moodBefore })}
-    <p class="level-line"><span class="level-badge">Lv. ${pet.level}</span>
-      <span class="xp-bar" role="img" aria-label="다음 단계까지 ${pet.xpSpan - pet.xpInto}"><span class="xp-fill" style="width:${pct}%"></span></span></p>
-    <p class="days-line">함께한 지 ${pet.days}일</p>
-    <p class="gift-count">선물 ${pet.giftFound}/${pet.giftTotal}</p>
+    ${keyBar({ level: pet.level, pct: xpPercent(pet), left: pet.xpSpan - pet.xpInto })}
   </section>`;
 }
 
-export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = "horse" } = {}) {
+function dockHtml({ gift = false } = {}) {
+  return `<nav class="dock" aria-label="메뉴">
+      <button type="button" class="dock-btn" data-dock-pat><span class="dock-cap">${ICONS.pat}</span><span class="dock-label">토닥</span></button>
+      <button type="button" class="dock-btn${gift ? " has-new" : ""}" data-open="gifts" aria-haspopup="dialog"><span class="dock-cap">${ICONS.gift}</span><span class="dock-label">선물함</span></button>
+      <button type="button" class="dock-btn" data-open="record" aria-haspopup="dialog"><span class="dock-cap">${ICONS.record}</span><span class="dock-label">우리 기록</span></button>
+    </nav>`;
+}
+
+function sheetHtml(id, title, body) {
+  return `<div class="sheet" data-sheet="${id}" role="dialog" aria-modal="true" aria-labelledby="sheet-${id}-title" hidden>
+    <section class="sheet-card">
+      <header class="sheet-head">
+        <h2 id="sheet-${id}-title">${title}</h2>
+        <button type="button" class="sheet-close" data-sheet-close aria-label="닫기">${ICONS.close}</button>
+      </header>
+      ${body}
+    </section>
+  </div>`;
+}
+
+const TILE_ICON = { common: ICONS.gift, special: ICONS.heart, rare: ICONS.star };
+
+export function giftCollection(found = [], today = null) {
+  const have = new Set(found);
+  let tiles = "";
+  for (const tier of GIFT_TIERS) {
+    for (const gift of GIFTS[tier]) {
+      if (have.has(gift.id)) {
+        const isNew = today?.gift?.id === gift.id ? " is-new" : "";
+        tiles += `<li><button type="button" class="tile ${tierClass(tier)}${isNew}" data-tile="${gift.id}" data-tier="${tier}" data-line="${escapeHtml(gift.line)}" aria-label="${escapeHtml(gift.line)}">${TILE_ICON[tier]}</button></li>`;
+      } else {
+        tiles += `<li><span class="tile is-locked" data-tile="${gift.id}" role="img" aria-label="아직 못 찾은 선물">${ICONS.keyhole}</span></li>`;
+      }
+    }
+  }
+  const count = GIFTS.common.concat(GIFTS.special, GIFTS.rare).filter((g) => have.has(g.id)).length;
+  const reader = today
+    ? `<p class="gift-reader ${tierClass(today.tier)}" data-gift-reader><span class="reader-label">${giftLabel(today.tier)}</span><span class="reader-text">${escapeHtml(today.gift.line)}</span></p>`
+    : `<p class="gift-reader" data-gift-reader><span class="reader-text">${count ? "찾은 선물을 누르면 다시 읽을 수 있어요." : "아직 찾은 선물이 없어요."}</span></p>`;
+  return `<p class="gift-tally">선물 ${count}/${GIFT_COUNT}</p>
+      ${reader}
+      <ul class="gift-grid" data-gift-grid>${tiles}</ul>`;
+}
+
+function miniHearts(mood) {
+  const halves = Math.max(1, Math.min(10, Math.ceil(Number(mood) / 10) || 1));
+  let out = "";
+  for (let i = 0; i < 5; i++) {
+    const fill = Math.max(0, Math.min(2, halves - i * 2));
+    out += `<span class="mini-heart${fill === 2 ? " is-full" : fill === 1 ? " is-half" : ""}" aria-hidden="true">${ICONS.heart}</span>`;
+  }
+  return `<span class="mini-hearts" role="img" aria-label="기분 ${halves}단계">${out}</span>`;
+}
+
+export function recordSheet(row, pet = null) {
+  const rows = [`<div><dt>토닥인 횟수</dt><dd>${Number(row.tap_count) || 0}번</dd></div>`];
+  if (pet) {
+    rows.push(`<div><dt>레벨</dt><dd>Lv. ${pet.level}</dd></div>`);
+    rows.push(`<div><dt>다음 레벨까지</dt><dd>${pet.xpSpan - pet.xpInto} XP</dd></div>`);
+    rows.push(`<div><dt>기분</dt><dd>${miniHearts(pet.moodAfter)}</dd></div>`);
+  }
+  const days = pet ? pet.days : (row.days_together ?? 1);
+  return `<p class="record-hero">함께한 지 ${days}일</p>
+      <dl class="record-list">${rows.join("")}</dl>`;
+}
+
+function metDay(row) {
+  const t = Date.parse(row?.created_at || "");
+  return Number.isFinite(t) ? seoulDayKey(t) : "";
+}
+
+function demoPanel(uid, row) {
+  const reveal = row?.pet_name
+    ? `<button type="button" data-reveal-replay data-met="${metDay(row)}">영상 다시 보기</button>`
+    : "";
+  return `<div class="demo-sheet" data-demo-panel role="dialog" aria-modal="true" aria-label="데모" hidden>
+    <div class="demo-card">
+      <aside class="mascot-toggle" data-demo-switch role="group" aria-label="친구 바꾸기">
+        <button type="button" class="mascot-tog" data-mascot="horse" aria-label="말 친구" aria-pressed="false">
+          <img src="/mascot-horse-512-v3.png" width="56" height="56" alt="" decoding="async" draggable="false">
+        </button>
+        <button type="button" class="mascot-tog" data-mascot="sheep" aria-label="양 친구" aria-pressed="false">
+          <img src="/mascot-sheep-512-v3.png" width="56" height="56" alt="" decoding="async" draggable="false">
+        </button>
+      </aside>
+      <button type="button" data-demo-replay>처음 인사 다시 보기</button>
+      ${reveal}
+      <form action="/demo/fresh-start" method="post" data-demo-fresh>
+        <input type="hidden" name="uid" value="${escapeHtml(uid)}">
+        <button type="submit" class="secondary">처음 만나는 날로 돌아가기</button>
+      </form>
+      <button type="button" class="demo-close" data-demo-close>닫기</button>
+    </div>
+  </div>`;
+}
+
+function nameSize(name) {
+  const n = Array.from(String(name || "")).length;
+  if (n > 14) return " is-longer";
+  if (n > 7) return " is-long";
+  return "";
+}
+
+export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = "horse", wake = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, meet = false } = {}) {
   const title = escapeHtml(row?.pet_name || "새 친구");
   const timeEl = timeLine ? `<p class="time-line" data-time-line></p>` : "";
   const celebrateAttr = celebrate === "claim" || celebrate === "named" || celebrate === "milestone" || celebrate === "levelup" || celebrate === "reunion" || celebrate === "rare" || celebrate === "special"
@@ -126,52 +262,93 @@ export function page(row, content, { waving = false, away = false, lonely = fals
       <img src="/mascot-sheep-512-v3.png" width="32" height="32" alt="" decoding="async" draggable="false">
     </button>
   </aside>`;
+  const pin = level ? `<span class="level-pin">Lv. ${level}</span>` : "";
+  const unnamed = meet && !row?.pet_name;
+  const nameplate = unnamed
+    ? `<h1 class="nameplate is-placeholder" data-nameplate data-placeholder="${title}">${title}</h1>`
+    : `<h1 class="nameplate${nameSize(row?.pet_name)}" data-nameplate>${title}</h1>`;
+  const dialogBox = dialog
+    ? `<section class="dialog" data-dialog aria-live="polite">${speaker ? `<span class="dialog-name">${escapeHtml(speaker)}</span>` : ""}${dialog}</section>`
+    : "";
+  const bodyClass = dock ? "is-home" : meet ? "is-meet" : away ? "is-stranger" : "";
   return `<!doctype html>
 <html lang="ko" data-mascot="${kind}">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141B2B">
+  <meta name="color-scheme" content="light dark">
   <title>${title} | 인형 친구</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"></noscript>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/mascot-toggle.css">
   <script src="/mascot-boot.js"></script>
   <script src="/app.js" defer></script>
 </head>
-<body${celebrateAttr}>
+<body${bodyClass ? ` class="${bodyClass}"` : ""}${celebrateAttr}${wake ? " data-wake" : ""}>
   <main>
-    <p class="eyebrow">살짝 건네는 인사</p>
-    <h1>${title}</h1>
-    ${timeEl}
-    ${petMarkup({ waving, away, lonely, mascot: kind })}
-    ${countHtml}
+    <header class="topbar">
+      <span class="wordmark">POKKEY</span>
+      ${toggle}
+      ${pin}
+    </header>
+    <section class="plate">
+      ${timeEl}
+      ${nameplate}
+      ${countHtml}
+    </section>
+    <div class="window${away ? " is-away" : ""}" data-window>
+      ${SKY}
+      ${petMarkup({ waving, away, lonely, mascot: kind })}
+    </div>
+    ${dialogBox}
+    ${stats}
     ${content}
-    <footer>토닥이면 깨어나는 작은 친구</footer>
+    ${dock}
+    <footer${demo ? " data-demo-hold" : ""}>토닥이면 깨어나는 작은 친구</footer>
   </main>
-  ${toggle}
+  ${sheets}
+  ${demo ? demoPanel(demo, row) : ""}
 </body>
 </html>`;
 }
 
-export function petPage(row, code = null, { celebrate = "", pet = null, mascot = "horse" } = {}) {
+function keyCard(code) {
+  return `<aside class="recovery">
+    <h2>우리 안심 코드</h2>
+    <p>꼭 적어두세요. 새 폰으로 저를 데려갈 때 꼭 필요해요.</p>
+    <div class="code-row"><strong class="code">${escapeHtml(code)}</strong><button type="button" class="copy" data-copy>${ICONS.copy}<span data-copy-label>복사</span></button></div>
+    <p>지금만 볼 수 있어요. 이름을 짓거나 창을 닫기 전에 꼭 챙겨두세요.</p>
+  </aside>`;
+}
+
+function homeExtras(row, pet, found) {
+  return {
+    dock: dockHtml({ gift: Boolean(pet?.gift) }),
+    sheets: sheetHtml("gifts", "선물함", giftCollection(found, pet?.gift || null))
+      + sheetHtml("record", "우리 기록", recordSheet(row, pet)),
+  };
+}
+
+export function petPage(row, code = null, { celebrate = "", pet = null, mascot = "horse", demo = "", found = [] } = {}) {
   const firstMeet = celebrate === "claim" || celebrate === "named";
   const greeting = row.pet_name
     ? (firstMeet
       ? `만나서 반가워요, ${escapeHtml(row.pet_name)}!`
       : `다시 만나서 반가워요, ${escapeHtml(row.pet_name)}!`)
     : "안녕하세요! 찾아와 줘서 정말 기뻐요.";
-  const recovery = code ? `<aside class="recovery"><h2>우리 안심 코드</h2>
-    <p>꼭 적어두세요. 새 폰으로 저를 데려갈 때 꼭 필요해요.</p>
-    <strong class="code">${escapeHtml(code)}</strong><p>지금만 볼 수 있어요. 이름을 짓거나 창을 닫기 전에 꼭 챙겨두세요.</p></aside>` : "";
-  const prompt = row.pet_name ? "" : `<form action="/name" method="post">
+  const recovery = code ? keyCard(code) : "";
+  const prompt = row.pet_name ? "" : `<form action="/name" method="post" class="name-form" data-met="${metDay(row)}">
     <input type="hidden" name="uid" value="${escapeHtml(row.uid)}">
     <label for="name">제 이름을 뭐라고 지어 줄래요?</label>
-    <input id="name" name="name" required maxlength="24" autocomplete="off" placeholder="친구 이름">
-    <button type="submit">이 이름으로 지어줄게요!</button>
+    <input id="name" name="name" required maxlength="24" autocomplete="off" placeholder="친구 이름" data-name-input>
+    <button type="submit" class="primary">이 이름으로 지어줄게요!</button>
   </form>`;
   const returning = Boolean(row.pet_name) && !code;
   const mile = returning ? milestoneLine(row.tap_count) : "";
   const countHtml = returning
-    ? `<p class="count" data-tap-count="${row.tap_count}"><span class="count-final">우리 ${row.tap_count}번 토닥였어요!</span></p>`
+    ? `<p class="count" data-tap-count="${row.tap_count}"><span class="count-final">${row.tap_count}번 토닥여 줬어요!</span></p>`
     : "";
   const petAttr = pet
     ? ` data-pet-state="1" data-rewarded="${pet.rewarded ? 1 : 0}" data-reason="${escapeHtml(pet.reason)}" data-mood-before="${pet.moodBefore}" data-mood-after="${pet.moodAfter}" data-lonely="${pet.lonely ? 1 : 0}" data-reunion="${pet.reunion ? 1 : 0}" data-gift="${pet.gift ? escapeHtml(pet.gift.tier) : ""}"`
@@ -181,25 +358,28 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
   const stats = returning && pet ? petStats(pet) : "";
   let kind = celebrate;
   if (!kind && mile) kind = "milestone";
-  const body = `<p class="intro"${pet ? petAttr : ""}>${greeting}</p>${recovery}${prompt}${moments}${giftHtml}${stats}`;
+  const dialog = `<p class="intro"${pet ? petAttr : ""}>${greeting}</p>${moments}${giftHtml}`;
+  const extras = row.pet_name ? homeExtras(row, pet, found) : { dock: "", sheets: "" };
   return page(
     row,
-    body,
-    { waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet, mascot },
+    `${recovery}${prompt}`,
+    {
+      waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet, mascot, wake: Boolean(code), demo,
+      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, meet: !row.pet_name, ...extras,
+    },
   );
 }
 
-export function strangerPage(row, message = "", { mascot = "horse" } = {}) {
-  return page(row, `<p class="intro">이 작은 친구는 이미 주인이 있어요.</p>
-    ${message ? `<p class="notice" role="alert">${escapeHtml(message)}</p>` : ""}
-    <button type="button" id="claim-toggle" aria-expanded="${Boolean(message)}" aria-controls="claim-form">제가 주인이에요</button>
+export function strangerPage(row, message = "", { mascot = "horse", demo = "" } = {}) {
+  return page(row, `${message ? `<p class="notice" role="alert">${escapeHtml(message)}</p>` : ""}
+    <button type="button" id="claim-toggle" class="ghost" aria-expanded="${Boolean(message)}" aria-controls="claim-form">제가 주인이에요</button>
     <form action="/claim" method="post" id="claim-form" ${message ? "" : "hidden"}>
       <input type="hidden" name="uid" value="${escapeHtml(row.uid)}">
       <label for="code">안심 코드</label>
       <input id="code" name="code" required autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="claim-help">
       <p id="claim-help">처음 만났을 때 적어둔 안심 코드를 넣어주세요.</p>
-      <button type="submit">내 친구를 데려올래요!</button>
-    </form>`, { away: true, mascot });
+      <button type="submit" class="primary">내 친구를 데려올래요!</button>
+    </form>`, { away: true, mascot, demo, dialog: `<p class="intro">이 작은 친구는 이미 주인이 있어요.</p>` });
 }
 
 export const fakeUids = ["04AAAAAAAAAAA1", "04BBBBBBBBBBB2", "04CCCCCCCCCCC3"];
@@ -216,11 +396,10 @@ export function previewPetPage({ kind, count, tier = "common", reason = "", masc
     tap_count: n,
   };
   const mile = kind === "milestone" ? milestoneLine(n) : "";
-  const countHtml = `<p class="count" data-tap-count="${n}"><span class="count-final">우리 ${n}번 토닥였어요!</span></p>`;
+  const countHtml = `<p class="count" data-tap-count="${n}"><span class="count-final">${n}번 토닥여 줬어요!</span></p>`;
   const giftLine = tier === "rare" ? "별똥별을 주웠어요! 소원 하나 빌어요!"
     : tier === "special" ? "고마움이 가득가득 넘쳐요!"
     : "오늘도 와줘서 고마워요!";
-  const tierClass = tier === "rare" ? "is-rare" : tier === "special" ? "is-special" : "is-common";
   const unrewarded = {
     cooldown: "방금 토닥여 줘서 기분 좋아요! 조금 있다가 또 토닥여 주세요.",
     cap: "오늘은 실컷 놀았어요! 내일 또 만나요!",
@@ -236,21 +415,27 @@ export function previewPetPage({ kind, count, tier = "common", reason = "", masc
     ? `<section class="pet-moments" aria-label="오늘의 순간">${moments.join("")}</section>`
     : "";
   const showGift = kind === "gift" && !reason;
-  const giftHtml = showGift
-    ? `<p class="gift ${tierClass}" data-gift="${tier}"><span class="gift-label">${giftLabel(tier)}</span> ${escapeHtml(giftLine)}</p>`
-    : "";
+  const giftHtml = showGift ? giftLineHtml(tier, giftLine) : "";
+  const level = kind === "levelup" ? 2 : 1;
   const stats = heartRow(kind === "lonely" ? 20 : kind === "reunion" ? 70 : 80, { animate: kind === "reunion", before: kind === "reunion" ? 20 : null })
-    + `<p class="level-line"><span class="level-badge">Lv. ${kind === "levelup" ? 2 : 1}</span>`
-    + `<span class="xp-bar"><span class="xp-fill" style="width:${kind === "levelup" ? 0 : 40}%"></span></span></p>`
-    + `<p class="days-line">함께한 지 12일</p><p class="gift-count">선물 7/30</p>`;
+    + keyBar({ level, pct: kind === "levelup" ? 0 : 40, left: kind === "levelup" ? 100 : 30 });
   const visual = kind === "gift" ? (tier === "rare" ? "rare" : tier === "special" ? "special" : "") : kind === "lonely" ? "" : kind;
   const greeting = kind === "claim"
     ? `만나서 반가워요, ${escapeHtml(row.pet_name)}!`
     : `다시 만나서 반가워요, ${escapeHtml(row.pet_name)}!`;
+  const previewGift = showGift ? { tier, gift: { id: "", line: giftLine } } : null;
+  const previewPet = { level, xpInto: kind === "levelup" ? 0 : 20, xpSpan: kind === "levelup" ? 100 : 50, moodAfter: kind === "lonely" ? 20 : 80, days: 12 };
   return page(
     row,
-    `<p class="intro">${greeting}</p>${momentsHtml}${giftHtml}<section class="pet-stats" aria-label="돌봄 상태">${stats}</section>`,
-    { timeLine: true, celebrate: visual, countHtml, lonely: kind === "lonely", mascot },
+    "",
+    {
+      timeLine: true, celebrate: visual, countHtml, lonely: kind === "lonely", mascot,
+      dialog: `<p class="intro">${greeting}</p>${momentsHtml}${giftHtml}`, speaker: row.pet_name,
+      stats: `<section class="pet-stats" aria-label="돌봄 상태">${stats}</section>`, level,
+      dock: dockHtml({ gift: showGift }),
+      sheets: sheetHtml("gifts", "선물함", giftCollection(["c01", "c02", "c05", "c09", "c14", "s05", "r01"], previewGift))
+        + sheetHtml("record", "우리 기록", recordSheet(row, previewPet)),
+    },
   );
 }
 

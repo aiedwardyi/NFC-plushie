@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { milestoneLine } from "../src/pages.js";
+import { milestoneLine, page } from "../src/pages.js";
 
 for (const [count, expected] of [
   [0, ""],
@@ -28,4 +28,8 @@ test("stylesheet keeps Korean words intact", () => {
   const css = readFileSync(new URL("../public/style.css", import.meta.url), "utf8");
   assert.match(css, /word-break:\s*keep-all/);
   assert.match(css, /overflow-wrap:\s*break-word/);
+});
+
+test("pages declare light and dark so forced dark leaves them alone", () => {
+  assert.match(page(null, ""), /<meta name="color-scheme" content="light dark">/);
 });

@@ -1,54 +1,41 @@
-/* Dad demo: horse↔sheep corner toggle + squash on away pets */
-.pet.is-press .pet-motion { animation: squash .7s ease; }
+/* Dad demo: horse/sheep switch, a compact pill in the top bar */
 .mascot-toggle {
-  position: fixed;
-  right: max(10px, env(safe-area-inset-right));
-  bottom: max(10px, env(safe-area-inset-bottom));
-  z-index: 90;
   display: flex;
-  gap: 4px;
-  padding: 5px;
+  gap: 2px;
+  padding: 2px;
   border-radius: 999px;
-  background: rgba(255, 252, 246, 0.92);
-  border: 1px solid rgba(90, 70, 40, 0.12);
-  box-shadow: 0 6px 18px rgba(40, 30, 10, 0.12);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(8, 11, 19, 0.55);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(241, 214, 140, 0.16);
 }
 .mascot-tog {
   box-sizing: border-box;
-  width: 40px;
-  height: 40px;
-  min-height: 40px;
-  min-width: 40px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  min-width: 44px;
   margin: 0;
-  padding: 3px;
+  padding: 5px;
   border-radius: 50%;
-  border: 2px solid transparent;
+  border: 0;
   background: transparent;
   color: inherit;
   box-shadow: none;
   cursor: pointer;
   line-height: 0;
+  opacity: .5;
+  filter: saturate(.6);
+  transition: opacity .2s ease, filter .2s ease, box-shadow .2s ease;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 .mascot-tog.is-active {
-  border-color: var(--cap-blue);
-  background: #e8f1ff;
-}
-.mascot-tog:hover,
-.mascot-tog:focus {
-  background: transparent;
-  color: inherit;
-  box-shadow: none;
-}
-.mascot-tog.is-active:hover,
-.mascot-tog.is-active:focus {
-  background: #e8f1ff;
+  opacity: 1;
+  filter: none;
+  background: radial-gradient(circle at 50% 32%, #2c3858, var(--midnight, #1c2538));
+  box-shadow: inset 0 0 0 1.5px var(--gold, #d6a546), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 .mascot-tog:focus-visible {
-  outline: 2px solid var(--cap-blue);
+  outline: 2px solid var(--gold-light, #f1d68c);
   outline-offset: 2px;
 }
 .mascot-tog img {

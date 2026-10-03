@@ -149,6 +149,7 @@ function applyTimeBand() {
   return band;
 }
 
+let reactPet = () => {};
 const pet = document.querySelector('[data-pet="alive"]');
 if (pet) {
   const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -246,6 +247,7 @@ if (pet) {
     }, 700);
   }
 
+  reactPet = react;
   const hit = pet.querySelector(".pet-hit");
   let skipClick = false;
   hit?.addEventListener("pointerdown", (event) => {
@@ -256,6 +258,7 @@ if (pet) {
       /* ignore */
     }
     react();
+    touchFx(event.clientX, event.clientY);
   });
   hit?.addEventListener("pointerup", () => {
     setTimeout(() => {
@@ -272,13 +275,93 @@ if (pet) {
       return;
     }
     react();
+    touchFx();
   });
 } else {
   applyTimeBand();
 }
 
+// Inline style attributes are blocked by the CSP, so the key bar width is applied here.
+document.querySelectorAll(".xp-fill[data-xp]").forEach((fill) => {
+  fill.style.width = `${Number(fill.dataset.xp) || 0}%`;
+});
 
-const CELEBRATE_COLORS = ["#3d6f94", "#f5d76e", "#f2a6b0", "#faf8f1", "#f0c84a", "#e8a0a0"];
+const nameplate = document.querySelector("[data-nameplate]");
+
+function fitName() {
+  if (!nameplate) return;
+  nameplate.style.fontSize = "";
+  const base = parseFloat(getComputedStyle(nameplate).fontSize);
+  nameplate.style.whiteSpace = "nowrap";
+  const need = nameplate.scrollWidth;
+  const room = nameplate.clientWidth;
+  nameplate.style.whiteSpace = "";
+  if (need <= room || room <= 0) return;
+  let size = (base * room) / need;
+  // Too small on one line: two balanced lines read better.
+  if (size < 22) size = Math.min(base, ((base * room * 2) / need) * 0.9);
+  nameplate.style.fontSize = `${Math.max(16, Math.floor(size))}px`;
+}
+
+fitName();
+document.fonts?.ready.then(fitName);
+window.addEventListener("resize", fitName);
+
+const nameInput = document.querySelector("[data-name-input]");
+if (nameplate && nameInput) {
+  const placeholder = nameplate.dataset.placeholder || nameplate.textContent;
+  const syncName = () => {
+    const value = nameInput.value.trim();
+    nameplate.textContent = value || placeholder;
+    nameplate.classList.toggle("is-placeholder", !value);
+    nameplate.classList.toggle("is-typing", Boolean(value) && document.activeElement === nameInput);
+    fitName();
+  };
+  const frameNaming = () => {
+    const view = window.visualViewport?.height || window.innerHeight;
+    const top = nameplate.getBoundingClientRect().top + window.scrollY;
+    const bottom = nameInput.getBoundingClientRect().bottom + window.scrollY;
+    if (bottom - top + 24 <= view) window.scrollTo({ top: Math.max(0, top - 12), behavior: prefersReducedMotion() ? "auto" : "smooth" });
+    else nameInput.scrollIntoView({ block: "center" });
+  };
+  nameInput.addEventListener("input", syncName);
+  nameInput.addEventListener("focus", () => {
+    document.body.classList.add("is-naming");
+    syncName();
+    window.setTimeout(frameNaming, prefersReducedMotion() ? 0 : 380);
+  });
+  nameInput.addEventListener("blur", () => {
+    syncName();
+    // Late, so a tap on the submit button lands before the stage grows back.
+    window.setTimeout(() => {
+      if (document.activeElement !== nameInput) document.body.classList.remove("is-naming");
+    }, 250);
+  });
+  window.visualViewport?.addEventListener("resize", () => {
+    if (document.activeElement === nameInput) frameNaming();
+  });
+}
+
+const copyButton = document.querySelector("[data-copy]");
+copyButton?.addEventListener("click", async () => {
+  const code = document.querySelector(".recovery .code");
+  const label = copyButton.querySelector("[data-copy-label]");
+  if (!code) return;
+  try {
+    await navigator.clipboard.writeText(code.textContent.trim());
+    copyButton.classList.add("is-done");
+    if (label) label.textContent = "복사했어요";
+  } catch (_) {
+    const range = document.createRange();
+    range.selectNodeContents(code);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
+});
+
+
+const CELEBRATE_COLORS = ["#d6a546", "#f1d68c", "#e8806b", "#f8f0e3", "#f4ded5", "#fff9f0"];
 const FRAME_MS = 1000 / 60;
 const EVOLUTION_MS = 2900;
 const FLICKER_ON_MS = 140;
@@ -358,7 +441,7 @@ function showStillCelebrate(kind) {
       claimCard.className = "still-claim-card";
       claimCard.textContent = "오늘부터 우리 친구예요!";
       const main = document.querySelector("main");
-      const intro = main?.querySelector(".intro");
+      const intro = main?.querySelector("[data-dialog]") || main?.querySelector(".intro");
       if (intro) intro.insertAdjacentElement("afterend", claimCard);
       else main?.insertAdjacentElement("afterbegin", claimCard);
       break;
@@ -368,7 +451,7 @@ function showStillCelebrate(kind) {
       namedCard.className = "still-named-card";
       namedCard.textContent = "예쁜 이름 고마워요!";
       const main = document.querySelector("main");
-      const intro = main?.querySelector(".intro");
+      const intro = main?.querySelector("[data-dialog]") || main?.querySelector(".intro");
       if (intro) intro.insertAdjacentElement("afterend", namedCard);
       else main?.insertAdjacentElement("afterbegin", namedCard);
       break;
@@ -606,10 +689,10 @@ function enhanceRollingCounter({ duration = 400, goldPop = false } = {}) {
   const finalValue = Number(countEl.getAttribute("data-tap-count"));
   if (!Number.isFinite(finalValue)) return;
   const finalNode = countEl.querySelector(".count-final") || countEl;
-  countEl.setAttribute("aria-label", `우리 ${finalValue}번 토닥였어요!`);
+  countEl.setAttribute("aria-label", `${finalValue}번 토닥여 줬어요!`);
 
   if (prefersReducedMotion()) {
-    finalNode.textContent = `우리 ${finalValue}번 토닥였어요!`;
+    finalNode.textContent = `${finalValue}번 토닥여 줬어요!`;
     return;
   }
 
@@ -636,7 +719,7 @@ function enhanceRollingCounter({ duration = 400, goldPop = false } = {}) {
   });
 
   finalNode.replaceChildren();
-  finalNode.append("우리 ", ...strips, "번 토닥였어요!");
+  finalNode.append(...strips, "번 토닥여 줬어요!");
 
   window.setTimeout(() => {
     if (goldPop) {
@@ -794,7 +877,7 @@ function heartBurst() {
   const ox = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
   const oy = rect ? rect.top + rect.height * 0.3 : window.innerHeight * 0.3;
   const pieces = [];
-  const colors = ["#e86a8a", "#f2a6b0", "#d94f70", "#f5d76e"];
+  const colors = ["#e8806b", "#f4ded5", "#d9604b", "#f1d68c"];
   for (let i = 0; i < 26; i++) {
     const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.2;
     const speed = 4 + Math.random() * 6;
@@ -872,7 +955,7 @@ function reunionJump() {
 }
 
 function glowGift() {
-  const gift = document.querySelector("[data-gift]");
+  const gift = document.querySelector(".gift[data-gift]");
   if (!gift || prefersReducedMotion()) return;
   gift.classList.add("is-glow");
   window.setTimeout(() => gift.classList.remove("is-glow"), 1200);
@@ -967,4 +1050,786 @@ function runCelebrate() {
   }
 }
 
-runCelebrate();
+const TYPE_MS = 55;
+const PAUSE_MS = { "!": 260, ".": 260, "?": 260, ",": 140 };
+let audio = null;
+let introLine = null;
+let waking = false;
+
+function wakeAudio() {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    audio.resume?.();
+  } catch (_) {
+    audio = null;
+  }
+}
+
+function blip() {
+  if (!audio || audio.state !== "running") return;
+  const t = audio.currentTime;
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(820 + Math.random() * 90, t);
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.14, t + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
+  osc.connect(gain).connect(audio.destination);
+  osc.start(t);
+  osc.stop(t + 0.06);
+}
+
+function boop() {
+  if (!audio || audio.state !== "running") return;
+  const t = audio.currentTime;
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(620 + Math.random() * 60, t);
+  osc.frequency.exponentialRampToValueAtTime(330, t + 0.14);
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.2, t + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+  osc.connect(gain).connect(audio.destination);
+  osc.start(t);
+  osc.stop(t + 0.22);
+}
+
+function ensureAudio(then) {
+  wakeAudio();
+  if (!audio) return;
+  if (audio.state === "running") then?.();
+  else audio.resume?.().then(() => then?.(), () => {});
+}
+
+const HEART_SVG = '<svg viewBox="0 0 24 22" aria-hidden="true"><path d="M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z"/></svg>';
+
+function touchFx(clientX, clientY) {
+  ensureAudio(boop);
+  const win = document.querySelector("[data-window]");
+  if (!win || prefersReducedMotion()) return;
+  const box = win.getBoundingClientRect();
+  let x = clientX;
+  let y = clientY;
+  if (x === undefined) {
+    const spot = document.querySelector('[data-pet="alive"]')?.getBoundingClientRect() || box;
+    x = spot.left + spot.width / 2;
+    y = spot.top + spot.height * 0.35;
+  }
+  const old = win.querySelectorAll(".touch-heart");
+  for (let i = 0; i < old.length - 12; i++) old[i].remove();
+  for (let i = 0; i < 3; i++) {
+    const heart = document.createElement("span");
+    heart.className = "touch-heart";
+    heart.setAttribute("aria-hidden", "true");
+    heart.innerHTML = HEART_SVG;
+    heart.style.setProperty("--x", `${x - box.left}px`);
+    heart.style.setProperty("--y", `${y - box.top}px`);
+    heart.style.setProperty("--dx", `${(i - 1) * 22 + (Math.random() - 0.5) * 14}px`);
+    heart.style.setProperty("--r", `${(i - 1) * 14}deg`);
+    heart.style.setProperty("--d", `${i * 70}ms`);
+    win.appendChild(heart);
+    window.setTimeout(() => heart.remove(), 1300);
+  }
+}
+
+function typeLine(intro, line, onDone, delay = 520) {
+  const chars = Array.from(line);
+  const text = document.createElement("span");
+  const cursor = document.createElement("span");
+  const spoken = document.createElement("span");
+  text.setAttribute("aria-hidden", "true");
+  cursor.className = "dialog-cursor";
+  cursor.setAttribute("aria-hidden", "true");
+  spoken.className = "visually-hidden";
+  spoken.textContent = line;
+  intro.replaceChildren(text, cursor, spoken);
+  intro.classList.add("is-dialog");
+  let i = 0;
+  let timer = 0;
+  let done = false;
+  function finish() {
+    if (done) return;
+    done = true;
+    window.clearTimeout(timer);
+    document.removeEventListener("pointerdown", finish, true);
+    text.textContent = line;
+    cursor.classList.add("is-done");
+    onDone(cursor);
+  }
+  function step() {
+    const ch = chars[i++];
+    text.textContent += ch;
+    cursor.style.animation = "none";
+    void cursor.offsetWidth;
+    cursor.style.animation = "";
+    if (ch.trim()) blip();
+    if (i >= chars.length) {
+      finish();
+      return;
+    }
+    timer = window.setTimeout(step, PAUSE_MS[ch] || TYPE_MS);
+  }
+  document.addEventListener("pointerdown", finish, true);
+  timer = window.setTimeout(step, delay);
+}
+
+function startWake(onDone) {
+  const intro = document.querySelector("[data-dialog] .intro");
+  if (!intro || waking || prefersReducedMotion()) {
+    onDone?.();
+    return;
+  }
+  waking = true;
+  introLine = introLine ?? lineText(intro);
+  sayToken += 1;
+  window.clearTimeout(lineTimer);
+  lineReady = false;
+  showLine(0);
+  const body = document.body;
+  body.classList.remove("is-awake", "is-revealed");
+  body.dataset.wake = "";
+  intro.classList.remove("is-dialog");
+  intro.textContent = introLine;
+  const call = document.createElement("p");
+  call.className = "wake-call";
+  call.textContent = "저를 토닥여 주세요";
+  document.querySelector("[data-window]")?.appendChild(call);
+
+  function wake(event) {
+    if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+    document.removeEventListener("pointerdown", wake, true);
+    document.removeEventListener("keydown", wake, true);
+    wakeAudio();
+    reactPet();
+    tryVibrate(12);
+    call.classList.add("is-gone");
+    window.setTimeout(() => call.remove(), 400);
+    body.classList.add("is-awake");
+    typeLine(intro, introLine, (cursor) => {
+      window.setTimeout(() => {
+        cursor.remove();
+        body.classList.add("is-revealed");
+        window.setTimeout(() => {
+          delete body.dataset.wake;
+          body.classList.remove("is-awake", "is-revealed");
+          waking = false;
+        }, 700);
+        if (dialogBox?.classList.contains("is-seq")) settleLine(0);
+        onDone?.();
+      }, 650);
+    });
+  }
+  // Deferred so the tap that opened a replay can't also wake it.
+  window.setTimeout(() => {
+    document.addEventListener("pointerdown", wake, true);
+    document.addEventListener("keydown", wake, true);
+  }, 0);
+}
+
+const AUTO_MS = 2200;
+const dialogBox = document.querySelector("[data-dialog]");
+const dialogLines = dialogBox
+  ? Array.from(dialogBox.querySelectorAll(":scope > .intro, :scope > .pet-moments > p, :scope > .gift"))
+  : [];
+let lineIndex = 0;
+let lineReady = false;
+let lineTimer = 0;
+let sayToken = 0;
+
+function lineTarget(el) {
+  return el.querySelector(".gift-text") || el;
+}
+
+function lineText(el) {
+  const target = lineTarget(el);
+  target.dataset.say ??= target.textContent.trim();
+  return target.dataset.say;
+}
+
+function showLine(index) {
+  lineIndex = index;
+  dialogLines.forEach((el, i) => el.classList.toggle("is-current", i === index));
+}
+
+function settleLine(index) {
+  // Ready on the next task, so the tap that finished the typing can't also skip ahead.
+  window.setTimeout(() => {
+    lineReady = true;
+  }, 0);
+  const last = index >= dialogLines.length - 1;
+  dialogBox.classList.toggle("is-end", last);
+  if (!last) lineTimer = window.setTimeout(() => sayLine(index + 1), AUTO_MS);
+}
+
+function sayLine(index) {
+  const token = ++sayToken;
+  const el = dialogLines[index];
+  window.clearTimeout(lineTimer);
+  lineReady = false;
+  dialogBox.classList.remove("is-end");
+  const text = lineText(el);
+  showLine(index);
+  if (el.classList.contains("gift")) glowGift();
+  typeLine(lineTarget(el), text, () => {
+    if (token === sayToken) settleLine(index);
+  }, index === 0 ? 520 : 160);
+}
+
+function startDialog() {
+  if (!dialogLines.length || prefersReducedMotion()) return;
+  dialogBox.classList.add("is-seq");
+  sayLine(0);
+}
+
+dialogBox?.addEventListener("pointerdown", () => {
+  if (!dialogBox.classList.contains("is-seq") || !lineReady || waking) return;
+  sayLine(dialogBox.classList.contains("is-end") ? 0 : lineIndex + 1);
+});
+
+let sheetOpen = null;
+let sheetOpener = null;
+
+function openSheet(id, opener) {
+  const sheet = document.querySelector(`[data-sheet="${id}"]`);
+  if (!sheet || sheetOpen) return;
+  sheetOpen = sheet;
+  sheetOpener = opener || null;
+  sheet.hidden = false;
+  void sheet.offsetWidth;
+  sheet.classList.add("is-open");
+  document.body.classList.add("has-sheet");
+  sheet.querySelector("[data-sheet-close]")?.focus({ preventScroll: true });
+}
+
+function closeSheet() {
+  const sheet = sheetOpen;
+  if (!sheet) return;
+  sheetOpen = null;
+  sheet.classList.remove("is-open");
+  document.body.classList.remove("has-sheet");
+  window.setTimeout(() => {
+    sheet.hidden = true;
+  }, prefersReducedMotion() ? 0 : 300);
+  sheetOpener?.focus({ preventScroll: true });
+}
+
+document.querySelectorAll("[data-open]").forEach((button) => {
+  button.addEventListener("click", () => openSheet(button.dataset.open, button));
+});
+document.querySelectorAll("[data-sheet]").forEach((sheet) => {
+  sheet.addEventListener("click", (event) => {
+    if (event.target === sheet) closeSheet();
+  });
+  sheet.querySelector("[data-sheet-close]")?.addEventListener("click", closeSheet);
+});
+document.addEventListener("keydown", (event) => {
+  if (!sheetOpen) return;
+  if (event.key === "Escape") {
+    closeSheet();
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const items = Array.from(sheetOpen.querySelectorAll("button, [href], input"));
+  if (!items.length) return;
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
+
+const TIER_WORDS = { special: "특별한 선물", rare: "반짝 선물" };
+const giftReader = document.querySelector("[data-gift-reader]");
+document.querySelector("[data-gift-grid]")?.addEventListener("click", (event) => {
+  const tile = event.target.closest("button.tile");
+  if (!tile || !giftReader) return;
+  document.querySelectorAll(".tile.is-picked").forEach((el) => el.classList.remove("is-picked"));
+  tile.classList.add("is-picked");
+  const tier = tile.dataset.tier;
+  const parts = [];
+  if (TIER_WORDS[tier]) {
+    const label = document.createElement("span");
+    label.className = "reader-label";
+    label.textContent = TIER_WORDS[tier];
+    parts.push(label);
+  }
+  const text = document.createElement("span");
+  text.className = "reader-text";
+  parts.push(text);
+  giftReader.className = `gift-reader is-${tier}`;
+  giftReader.replaceChildren(...parts);
+  if (prefersReducedMotion()) {
+    text.textContent = tile.dataset.line;
+    return;
+  }
+  ensureAudio();
+  typeLine(text, tile.dataset.line, () => {}, 120);
+});
+
+document.querySelector("[data-dock-pat]")?.addEventListener("click", () => {
+  reactPet();
+  touchFx();
+});
+
+if (document.querySelector('[data-rewarded="1"]')) document.querySelector(".level-line")?.classList.add("is-growing");
+document.addEventListener("pointerdown", wakeAudio, { once: true, capture: true });
+
+/* Legendary reveal: 15s video, the owner's name and first-meet date drawn live over it. */
+const reveal = (function legendaryReveal() {
+  const W = 1080;
+  const H = 1920;
+  const FPS = 60;
+  const SAFE = { left: 100, right: 980, top: 200, bottom: 1830 };
+  const NAME_PX = 228;
+  const NAME_BOX = NAME_PX * 1.05;
+  const NAME_ROOM = 940;
+  const NAME_MIN = 110;
+  // Frames from the stone cue sheet.
+  const NAME_AT = 720;
+  const DATE_AT = 806;
+  const BEAT = [30, 90, 22];
+  const FAST_BEAT = [24, 60, 16];
+  const BUZZ = [
+    [8, BEAT], [44, BEAT], [190, 22], [202, 10], [209, 10], [216, 10], [223, 10], [240, 70], [330, 45], [420, 90],
+    [436, FAST_BEAT], [458, FAST_BEAT], [476, FAST_BEAT], [491, FAST_BEAT], [503, FAST_BEAT], [510, 0],
+    [570, 420], [660, 60], [690, 140], [720, 180], [738, 16], [750, 16], [762, 16], [774, 16], [786, 16],
+    [822, 40],
+  ];
+  const GOLD = "linear-gradient(180deg, #FFFBEA 0%, #FBE3A0 40%, #E2AC48 72%, #B47A22 100%)";
+
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const span = (f, a, b) => Math.min(1, Math.max(0, (f - a) / (b - a)));
+  const inQuad = (t) => t * t;
+  const outCubic = (t) => 1 - Math.pow(1 - t, 3);
+  const hitAt = (f, f0, decay) => (f < f0 ? 0 : Math.exp((-decay * (f - f0)) / FPS));
+  function spring(f, f0, hz, zeta) {
+    const t = (f - f0) / FPS;
+    if (t <= 0) return 0;
+    const w = 2 * Math.PI * hz;
+    const wd = w * Math.sqrt(1 - zeta * zeta);
+    return 1 - Math.exp(-zeta * w * t) * (Math.cos(wd * t) + ((zeta * w) / wd) * Math.sin(wd * t));
+  }
+
+  let overlay = null;
+  let stage = null;
+  let video = null;
+  let nameEl = null;
+  let dateEl = null;
+  let skip = null;
+  let kind = "";
+  let nameText = "";
+  let room = NAME_ROOM;
+  let run = null;
+
+  function build() {
+    overlay = document.createElement("div");
+    overlay.className = "reveal";
+    overlay.hidden = true;
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", "이름 공개 영상");
+    stage = document.createElement("div");
+    stage.className = "reveal-stage";
+    video = document.createElement("video");
+    video.className = "reveal-video";
+    video.preload = "auto";
+    video.playsInline = true;
+    video.setAttribute("playsinline", "");
+    video.setAttribute("disablepictureinpicture", "");
+    video.setAttribute("disableremoteplayback", "");
+    const owner = document.createElement("div");
+    owner.className = "reveal-owner";
+    nameEl = document.createElement("span");
+    nameEl.className = "reveal-name";
+    owner.appendChild(nameEl);
+    dateEl = document.createElement("div");
+    dateEl.className = "reveal-date";
+    skip = document.createElement("button");
+    skip.type = "button";
+    skip.className = "reveal-skip";
+    skip.textContent = "건너뛰기";
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "reveal-retry";
+    retry.textContent = "다시 시도";
+    const actions = document.createElement("div");
+    actions.className = "reveal-actions";
+    actions.append(retry, skip);
+    stage.append(video, owner, dateEl);
+    overlay.append(stage, actions);
+    document.body.appendChild(overlay);
+    skip.addEventListener("click", () => run?.finish());
+    retry.addEventListener("click", () => run?.retry());
+    video.addEventListener("ended", () => run?.hold());
+    video.addEventListener("error", () => run?.fail());
+    video.addEventListener("waiting", () => run?.waiting());
+    video.addEventListener("playing", () => run?.playing());
+    video.addEventListener("seeked", () => run?.seeked());
+  }
+
+  function load() {
+    video.src = `/reveal/stone-${kind}.mp4`;
+    video.load();
+  }
+
+  function prepare(next) {
+    if (!overlay) build();
+    // A failed preload keeps its kind, so reload it rather than replay the error.
+    if (kind === next && !video.error && video.networkState !== video.NETWORK_NO_SOURCE) return;
+    kind = next;
+    load();
+  }
+
+  function layout() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const s = Math.min(Math.max(vw / W, vh / H), vw / (SAFE.right - SAFE.left), vh / (SAFE.bottom - SAFE.top));
+    const place = (view, size, center) => (size > view
+      ? Math.min(0, Math.max(view - size, view / 2 - center * s))
+      : (view - size) / 2);
+    const x = place(vw, W * s, (SAFE.left + SAFE.right) / 2);
+    const y = place(vh, H * s, (SAFE.top + SAFE.bottom) / 2);
+    stage.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+    overlay.classList.toggle("is-pillar", W * s < vw - 0.5);
+    overlay.classList.toggle("is-letter", H * s < vh - 0.5);
+    // A 940 wide name would still clip on a phone that crops the stage sides.
+    room = Math.min(NAME_ROOM, Math.min(W, vw / s) - 24);
+    fitName();
+  }
+
+  function twoLines(text) {
+    const chars = Array.from(text);
+    const mid = chars.length / 2;
+    let cut = -1;
+    chars.forEach((ch, i) => {
+      if (ch === " " && (cut < 0 || Math.abs(i - mid) < Math.abs(cut - mid))) cut = i;
+    });
+    if (cut > 0) return `${chars.slice(0, cut).join("")}\n${chars.slice(cut + 1).join("")}`;
+    const half = Math.ceil(mid);
+    return `${chars.slice(0, half).join("")}\n${chars.slice(half).join("")}`;
+  }
+
+  function fitName() {
+    nameEl.textContent = nameText;
+    nameEl.style.fontSize = "";
+    nameEl.style.lineHeight = "";
+    const wide = nameEl.offsetWidth;
+    if (!wide || wide <= room) return;
+    const one = (NAME_PX * room) / wide;
+    if (one >= NAME_MIN) {
+      nameEl.style.fontSize = `${one}px`;
+      nameEl.style.lineHeight = `${NAME_BOX}px`;
+      return;
+    }
+    nameEl.textContent = twoLines(nameText);
+    const size = Math.min(NAME_BOX / 2 / 1.05, (NAME_PX * room) / nameEl.offsetWidth);
+    nameEl.style.fontSize = `${size}px`;
+    nameEl.style.lineHeight = `${NAME_BOX / 2}px`;
+  }
+
+  function paint(f) {
+    const drop = span(f, NAME_AT - 7, NAME_AT);
+    nameEl.style.visibility = drop > 0 ? "visible" : "hidden";
+    if (drop > 0) {
+      const land = f >= NAME_AT ? 1 - spring(f, NAME_AT, 3.6, 0.3) : 0;
+      const sweep = lerp(-30, 110, span(f, NAME_AT + 14, NAME_AT + 50));
+      const glow = hitAt(f, NAME_AT, 4);
+      const scale = lerp(1.9, 1, inQuad(drop));
+      nameEl.style.backgroundImage = `linear-gradient(105deg, transparent ${sweep - 12}%, rgba(255,255,255,0.95) ${sweep}%, transparent ${sweep + 12}%), ${GOLD}`;
+      nameEl.style.filter = `blur(${lerp(14, 0, inQuad(drop))}px) drop-shadow(0 10px 0 #070A16) drop-shadow(0 0 ${34 + 50 * glow}px rgba(255,206,110,${0.4 + 0.5 * glow}))`;
+      nameEl.style.transform = `scale(${scale * (1 + 0.1 * land)}, ${scale * (1 - 0.15 * land)})`;
+      nameEl.style.opacity = String(Math.min(1, drop * 2.5));
+    }
+    overlay.classList.toggle("is-named", f >= NAME_AT);
+    const dateP = span(f, DATE_AT, DATE_AT + 20);
+    dateEl.style.opacity = String(0.85 * dateP);
+    dateEl.style.transform = `translateY(${lerp(12, 0, outCubic(dateP))}px)`;
+  }
+
+  function exitFullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  }
+
+  function close() {
+    run?.stop();
+    run = null;
+    video.pause();
+    exitFullscreen();
+    overlay.hidden = true;
+    overlay.classList.remove("is-out", "is-skippable", "is-loading", "is-failed");
+    document.documentElement.classList.remove("has-reveal");
+  }
+
+  // Must run inside the tap's handler: play() with sound and fullscreen both need that gesture.
+  function play({ kind: next, name, date, onEnd }) {
+    prepare(next);
+    run?.stop();
+    nameText = name;
+    dateEl.textContent = `${date} · 첫 만남`;
+    overlay.hidden = false;
+    overlay.classList.remove("is-out", "is-skippable", "is-failed");
+    overlay.classList.add("is-loading");
+    document.documentElement.classList.add("has-reveal");
+    document.activeElement?.blur?.();
+    layout();
+    paint(0);
+
+    const fired = new Set();
+    let last = 0;
+    let done = false;
+    let frame = 0;
+    let stall = 0;
+    let attempt = 0;
+    const timers = [];
+    const later = (fn, ms) => timers.push(window.setTimeout(fn, ms));
+
+    function buzz(f) {
+      if (f > last && f - last < 30) {
+        for (const [at, pattern] of BUZZ) {
+          if (at > last && at <= f && !fired.has(at)) {
+            fired.add(at);
+            if (navigator.vibrate) tryVibrate(pattern);
+          }
+        }
+      }
+      last = f;
+    }
+    function tick(time) {
+      const f = time * FPS;
+      paint(f);
+      if (video.seeking) last = f;
+      else buzz(f);
+    }
+    function loop() {
+      if (done) return;
+      if (video.requestVideoFrameCallback) {
+        frame = video.requestVideoFrameCallback((now, meta) => {
+          tick(meta.mediaTime);
+          loop();
+        });
+      } else {
+        frame = window.requestAnimationFrame(() => {
+          tick(video.currentTime);
+          loop();
+        });
+      }
+    }
+    function stop() {
+      done = true;
+      window.clearTimeout(stall);
+      timers.forEach((id) => window.clearTimeout(id));
+      if (video.cancelVideoFrameCallback) video.cancelVideoFrameCallback(frame);
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", layout);
+      document.removeEventListener("fullscreenchange", layout);
+      if (fired.size && navigator.vibrate) tryVibrate(0);
+    }
+    function end() {
+      if (done) return;
+      stop();
+      video.pause();
+      exitFullscreen();
+      overlay.classList.add("is-out");
+      window.setTimeout(onEnd, 450);
+    }
+    function fail() {
+      if (done) return;
+      if (video.error) overlay.classList.remove("is-loading");
+      overlay.classList.add("is-skippable", "is-failed");
+    }
+    function start() {
+      const id = ++attempt;
+      window.clearTimeout(stall);
+      stall = window.setTimeout(fail, 15000);
+      video.muted = false;
+      if (video.currentTime) video.currentTime = 0;
+      Promise.resolve(video.play()).catch(() => {
+        if (id === attempt) fail();
+      });
+    }
+    const self = {
+      stop,
+      fail,
+      finish: end,
+      hold: () => later(end, 1000),
+      waiting: () => overlay.classList.add("is-loading"),
+      playing: () => {
+        window.clearTimeout(stall);
+        overlay.classList.remove("is-loading", "is-failed");
+      },
+      // Runs in the retry tap, so play() keeps the gesture.
+      retry: () => {
+        overlay.classList.remove("is-failed");
+        overlay.classList.add("is-loading");
+        load();
+        start();
+      },
+      seeked: () => {
+        paint(video.currentTime * FPS);
+        last = video.currentTime * FPS;
+      },
+    };
+    run = self;
+
+    window.addEventListener("resize", layout);
+    document.addEventListener("fullscreenchange", layout);
+    document.fonts?.load(`900 ${NAME_PX}px "Pretendard Variable"`, name).then(() => {
+      if (!done) fitName();
+    }, () => {});
+    later(() => overlay.classList.add("is-skippable"), 1500);
+
+    start();
+    loop();
+    if (overlay.requestFullscreen) overlay.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+    return true;
+  }
+
+  return { prepare, play, close };
+})();
+
+function seoulDay(ms = Date.now()) {
+  return new Date(ms + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function revealDate(day) {
+  return day.replaceAll("-", ". ");
+}
+
+function revealKind() {
+  return document.documentElement.dataset.mascot === "sheep" ? "sheep" : "horse";
+}
+
+const nameForm = document.querySelector(".name-form");
+
+function armReveal() {
+  if (nameForm && !prefersReducedMotion()) reveal.prepare(revealKind());
+}
+
+// The key card pushes the form below the fold; bring it up under the code unless the user already scrolled.
+function frameNameForm() {
+  if (!nameForm || window.scrollY > 0) return;
+  const view = window.visualViewport?.height || window.innerHeight;
+  const bottom = nameForm.getBoundingClientRect().bottom + 12;
+  if (bottom <= view) return;
+  const code = document.querySelector(".recovery .code");
+  const top = code ? Math.min(bottom - view, code.getBoundingClientRect().top - 12) : bottom - view;
+  window.scrollTo({ top, behavior: prefersReducedMotion() ? "auto" : "smooth" });
+}
+
+nameForm?.addEventListener("submit", (event) => {
+  const name = nameForm.elements.name.value.trim();
+  const size = Array.from(name).length;
+  if (!size || size > 24 || prefersReducedMotion()) return;
+  event.preventDefault();
+  const uid = nameForm.elements.uid.value;
+  const saved = fetch("/name", {
+    method: "POST",
+    body: new URLSearchParams(new FormData(nameForm)),
+    redirect: "manual",
+    credentials: "same-origin",
+  }).then((res) => res.type === "opaqueredirect", () => false);
+  reveal.play({
+    kind: revealKind(),
+    name,
+    date: revealDate(nameForm.dataset.met || seoulDay()),
+    onEnd: () => {
+      const cap = new Promise((resolve) => window.setTimeout(() => resolve(false), 10000));
+      Promise.race([saved, cap]).then((ok) => {
+        if (ok) window.location.replace(`/t?uid=${encodeURIComponent(uid)}`);
+        else nameForm.submit();
+      });
+    },
+  });
+});
+
+const demoSheet = document.querySelector("[data-demo-panel]");
+const demoHold = document.querySelector("[data-demo-hold]");
+if (demoSheet && demoHold) {
+  const HOLD_MS = 1500;
+  const replayReveal = demoSheet.querySelector("[data-reveal-replay]");
+  let holdTimer = 0;
+  let holdAt = null;
+
+  function openDemo() {
+    tryVibrate(15);
+    if (replayReveal) reveal.prepare(revealKind());
+    demoSheet.hidden = false;
+    void demoSheet.offsetWidth;
+    demoSheet.classList.add("is-open");
+  }
+  function closeDemo(then) {
+    demoSheet.classList.remove("is-open");
+    window.setTimeout(() => {
+      demoSheet.hidden = true;
+      then?.();
+    }, prefersReducedMotion() ? 0 : 260);
+  }
+  function cancelHold() {
+    window.clearTimeout(holdTimer);
+    holdAt = null;
+  }
+
+  demoHold.addEventListener("pointerdown", (event) => {
+    holdAt = [event.clientX, event.clientY];
+    window.clearTimeout(holdTimer);
+    holdTimer = window.setTimeout(() => {
+      holdAt = null;
+      openDemo();
+    }, HOLD_MS);
+  });
+  demoHold.addEventListener("pointermove", (event) => {
+    if (holdAt && Math.hypot(event.clientX - holdAt[0], event.clientY - holdAt[1]) > 12) cancelHold();
+  });
+  demoHold.addEventListener("pointerup", cancelHold);
+  demoHold.addEventListener("pointercancel", cancelHold);
+  demoHold.addEventListener("contextmenu", (event) => event.preventDefault());
+
+  demoSheet.addEventListener("click", (event) => {
+    if (event.target === demoSheet) closeDemo();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !demoSheet.hidden) closeDemo();
+  });
+  demoSheet.querySelector("[data-demo-close]")?.addEventListener("click", () => closeDemo());
+  demoSheet.querySelector("[data-demo-replay]")?.addEventListener("click", () => {
+    closeDemo(() => {
+      window.scrollTo(0, 0);
+      startWake();
+    });
+  });
+  replayReveal?.addEventListener("click", () => {
+    closeDemo();
+    reveal.play({
+      kind: revealKind(),
+      name: nameplate?.textContent.trim() || "",
+      date: revealDate(replayReveal.dataset.met || seoulDay()),
+      onEnd: () => reveal.close(),
+    });
+  });
+  demoSheet.querySelector("[data-demo-fresh]")?.addEventListener("submit", () => {
+    try {
+      sessionStorage.removeItem(claimSeenKey(pageUid()));
+    } catch {
+      /* private mode */
+    }
+  });
+}
+
+if (document.body.hasAttribute("data-wake")) {
+  startWake(() => {
+    runCelebrate();
+    armReveal();
+    frameNameForm();
+  });
+} else {
+  runCelebrate();
+  startDialog();
+  armReveal();
+}
+document.documentElement.setAttribute("data-app", "");

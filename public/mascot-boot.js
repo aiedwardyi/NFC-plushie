@@ -1,6 +1,23 @@
-/* Sync boot: apply saved mascot before deferred app.js. Default horse. */
+/* Sync boot: apply saved mascot and sky band before deferred app.js. Default horse. */
 (function () {
   try {
+    // Script-inserted, so it never blocks first paint.
+    var font = document.createElement("link");
+    font.rel = "stylesheet";
+    font.href = "https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css";
+    document.head.appendChild(font);
+  } catch (e) {}
+  try {
+    // The wake hides the name form and recovery code, so only while app.js runs to bring them back.
+    var root = document.documentElement;
+    root.classList.add("has-app");
+    document.addEventListener("DOMContentLoaded", function () {
+      if (!root.hasAttribute("data-app")) root.classList.remove("has-app");
+    });
+  } catch (e) {}
+  try {
+    var h = new Date().getHours();
+    document.documentElement.setAttribute("data-time", h >= 5 && h < 11 ? "morning" : h >= 11 && h < 18 ? "day" : h >= 18 && h < 22 ? "evening" : "night");
     var KEY = "pokkey-mascot";
     var kind = "horse";
     var q = new URLSearchParams(location.search).get("mascot");

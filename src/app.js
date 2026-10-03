@@ -12,6 +12,7 @@ const cookieAge = 400 * 24 * 60 * 60 * 1000;
 const cooldown = 15 * 60 * 1000;
 const skipAge = 2 * 60 * 1000;
 const validUid = (uid) => typeof uid === "string" && /^[0-9A-F]{14}$/.test(uid);
+const parseDemoUids = (raw) => String(raw || "").split(",").map((s) => s.trim().toUpperCase()).filter(validUid);
 
 const STALE_LINE = "폰을 진짜 저한테 톡 대 주세요!";
 const COOLDOWN_LINE = "방금 토닥여 줘서 기분 좋아요! 조금 있다가 또 토닥여 주세요.";
@@ -62,7 +63,7 @@ function petState(row, t) {
   };
 }
 
-export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now, rng = Math.random }) {
+export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now, rng = Math.random, demoUids = parseDemoUids(process.env.DEMO_UIDS) }) {
   const app = express();
   app.disable("x-powered-by");
   app.use((req, res, next) => {
@@ -70,7 +71,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       "Cache-Control": "no-store",
       "Referrer-Policy": "no-referrer",
       "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+      "Content-Security-Policy": "default-src 'self'; style-src 'self' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; script-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
     });
     next();
   });
@@ -79,7 +80,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   app.use(cookieParser());
   app.use(express.static(fileURLToPath(new URL("../public", import.meta.url)), {
     setHeaders(res, filePath) {
-      if (/\.(?:png|jpe?g|gif|webp|svg|ico)$/i.test(filePath)) {
+      if (/\.(?:png|jpe?g|gif|webp|svg|ico|mp4)$/i.test(filePath)) {
         res.setHeader("Cache-Control", "public, max-age=86400");
       }
     },
@@ -136,7 +137,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   const clearSkip = (res) => res.clearCookie("pet_skip", {
     httpOnly: true, sameSite: "lax", secure: production, path: "/",
   });
-  const invalidUid = (res) => res.status(400).send(page(null, "<p>링크가 잘 맞지 않아요. 인형에 있는 링크로 다시 찾아와 주세요.</p>"));
+  const invalidUid = (res) => res.status(400).send(page(null, "<p>어? 링크가 이상해요. 인형에 폰을 다시 톡 대 주세요.</p>"));
 
   function writePetReward(serial, st, out, row, t, today) {
     const seen = { common: [...st.seen_common], special: [...st.seen_special], rare: [...st.seen_rare] };
@@ -195,6 +196,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     if (!parsed) return invalidUid(res);
     const serial = parsed.serial;
     const counter = parsed.counter;
+    const demo = demoUids.includes(serial) ? serial : "";
     const result = db.transaction(() => {
       const row = getRow(serial);
       const state = decisions.resolveTap(row, req.cookies.owner_token || null, hash);
@@ -209,10 +211,12 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           mood_value, mood_updated_at, xp, reward_day_count, gift_seen, gift_found, days_together, last_active_day, last_counter)
           VALUES (?, ?, ?, 1, ?, ?, 100, ?, 0, 0, ?, ?, 1, ?, ?)`)
           .run(serial, hash(token), hash(code), stamp, stamp, t, EMPTY_SEEN, EMPTY_FOUND, today, counter);
-        return { html: petPage(getRow(serial), code, { celebrate: "claim" }), token };
+        return { html: petPage(getRow(serial), code, { celebrate: "claim", demo }), token };
       }
       if (state === "OWNER") {
-        db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ? WHERE uid = ?").run(stamp, serial);
+        // The skip cookie marks the redirect after /name or /claim, not a tap.
+        const skip = req.cookies.pet_skip === serial;
+        if (!skip) db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ? WHERE uid = ?").run(stamp, serial);
         const afterTap = getRow(serial);
         const raiseMirror = () => {
           if (counter !== null && (afterTap.last_counter === null || counter > afterTap.last_counter)) {
@@ -220,14 +224,16 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           }
         };
         const flash = takeCelebrate(req, res);
-        if (req.cookies.pet_skip === serial) {
+        if (skip) {
           clearSkip(res);
           raiseMirror();
-          return { html: petPage(getRow(serial), null, { celebrate: flash }) };
+          const skipped = getRow(serial);
+          const pet = petView(skipped, petState(skipped, t), { rewarded: false }, t);
+          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found) }) };
         }
         if (!afterTap.pet_name) {
           raiseMirror();
-          return { html: petPage(getRow(serial), null, { celebrate: flash }) };
+          return { html: petPage(getRow(serial), null, { celebrate: flash, demo }) };
         }
         const st = petState(afterTap, t);
         const out = applyTap(st, t, {
@@ -245,9 +251,9 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         else if (!visual && mile) visual = "milestone";
         else if (!visual && out.rewarded && out.gift && out.gift.tier === "rare") visual = "rare";
         else if (!visual && out.rewarded && out.gift && out.gift.tier === "special") visual = "special";
-        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, extra || {}) }) };
+        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, extra || {}), demo, found: parseFound(fresh.gift_found) }) };
       }
-      if (state === "STRANGER") return { html: strangerPage(row) };
+      if (state === "STRANGER") return { html: strangerPage(row, "", { demo }) };
       throw new Error("Invalid binding result");
     })();
     if (result.token) setOwner(res, result.token);
@@ -259,7 +265,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     if (!validUid(uid)) return invalidUid(res);
     const row = getRow(uid);
     if (!decisions.canRename(row, req.cookies.owner_token || null, hash)) {
-      return res.status(403).send(row ? strangerPage(row) : page(null, "<p>먼저 인형에 있는 링크로 친구를 만나보세요.</p>"));
+      return res.status(403).send(row ? strangerPage(row) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>"));
     }
     const trimmed = typeof name === "string" ? name.trim() : "";
     if (!trimmed || Array.from(trimmed).length > 24) {
@@ -280,7 +286,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const time = now();
       const attempt = db.prepare("SELECT * FROM claim_attempts WHERE uid = ?").get(uid);
       const active = attempt && time - attempt.window_start < cooldown;
-      if (active && attempt.attempts >= 5) return { status: 429, row, message: "너무 여러 번 시도했어요. 처음 시도한 때로부터 15분이 지나면 다시 해볼 수 있어요." };
+      if (active && attempt.attempts >= 5) return { status: 429, row, message: "너무 여러 번 시도했어요. 15분 안에 다시 해 볼 수 있게 돼요." };
       if (decisions.verifyClaim(row, code, hash)) {
         const existing = req.cookies.owner_token;
         const token = typeof existing === "string" && existing ? existing : ownerToken();
@@ -293,7 +299,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       db.prepare(`INSERT INTO claim_attempts (uid, attempts, window_start) VALUES (?, ?, ?)
         ON CONFLICT(uid) DO UPDATE SET attempts = excluded.attempts, window_start = excluded.window_start`).run(uid, count, active ? attempt.window_start : time);
       return { status: count >= 5 ? 429 : 403, row, message: count >= 5
-        ? "너무 여러 번 시도했어요. 처음 시도한 때로부터 15분이 지나면 다시 해볼 수 있어요."
+        ? "너무 여러 번 시도했어요. 15분 안에 다시 해 볼 수 있게 돼요."
         : "안심 코드가 맞지 않아요." };
     })();
     if (result.token) {
@@ -301,8 +307,20 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       setSkip(res, uid);
       return res.redirect(303, `/t?uid=${uid}`);
     }
-    res.status(result.status).send(result.row ? strangerPage(result.row, result.message) : page(null, "<p>먼저 인형에 있는 링크로 친구를 만나보세요.</p>"));
+    const demo = demoUids.includes(uid) ? uid : "";
+    res.status(result.status).send(result.row ? strangerPage(result.row, result.message, { demo }) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>"));
   });
+
+  if (demoUids.length) {
+    app.post("/demo/fresh-start", (req, res) => {
+      const uid = req.body?.uid;
+      if (!demoUids.includes(uid)) return res.status(403).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>"));
+      db.prepare("DELETE FROM plushies WHERE uid = ?").run(uid);
+      clearCelebrate(res);
+      clearSkip(res);
+      res.redirect(303, `/t?uid=${uid}`);
+    });
+  }
 
   if (!production) {
     app.get("/dev", (req, res) => res.send(devPage()));
@@ -313,7 +331,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const reason = req.query.reason;
       const ok = previewPetPage.validate({ kind, count, tier, reason });
       if (!ok) {
-        return res.status(404).send(page(null, "<p>이 친구는 인형에 있는 링크에서 기다리고 있어요.</p>"));
+        return res.status(404).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>"));
       }
       res.send(previewPetPage({ kind, count, tier, reason, mascot: req.demoMascot || "horse" }));
     });
@@ -321,7 +339,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const { uid, preset, tier } = req.body || {};
       if (!validUid(uid)) return invalidUid(res);
       const row = getRow(uid);
-      if (!row) return res.status(404).send(page(null, "<p>먼저 인형에 있는 링크로 친구를 만나보세요.</p>"));
+      if (!row) return res.status(404).send(page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>"));
       const t = now();
       if (preset === "lonely") {
         db.prepare("UPDATE plushies SET mood_value = 20, mood_updated_at = ?, last_rewarded_at = NULL WHERE uid = ?").run(t, uid);
@@ -349,7 +367,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       res.redirect(303, "/dev");
     });
   }
-  app.use((req, res) => res.status(404).send(page(null, "<p>이 친구는 인형에 있는 링크에서 기다리고 있어요.</p>")));
+  app.use((req, res) => res.status(404).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>")));
   app.use((error, req, res, next) => {
     const status = error.status >= 400 && error.status < 500 ? error.status : 500;
     res.status(status).send(page(null, status === 500
