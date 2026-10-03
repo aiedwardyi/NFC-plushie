@@ -731,7 +731,9 @@ function enhanceRollingCounter({ duration = 400, goldPop = false } = {}) {
 
 function currentPetSrc(pet) {
   const shown = pet?.querySelector(".pet-frame.is-show");
-  return shown?.getAttribute("src") || "/mascot-horse-512-v3.png";
+  // A theme can swap the art with content:url, so read what is on screen.
+  const art = shown ? /^url\("?(.+?)"?\)$/.exec(getComputedStyle(shown).content) : null;
+  return art?.[1] || shown?.getAttribute("src") || "/mascot-horse-512-v3.png";
 }
 
 function runEvolutionGlow({ onComplete } = {}) {
@@ -1070,10 +1072,11 @@ function blip() {
   const t = audio.currentTime;
   const osc = audio.createOscillator();
   const gain = audio.createGain();
-  osc.type = "triangle";
+  const px = document.documentElement.dataset.theme === "8bit";
+  osc.type = px ? "square" : "triangle";
   osc.frequency.setValueAtTime(820 + Math.random() * 90, t);
   gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(0.14, t + 0.006);
+  gain.gain.exponentialRampToValueAtTime(px ? 0.1 : 0.14, t + 0.006);
   gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
   osc.connect(gain).connect(audio.destination);
   osc.start(t);
@@ -1096,11 +1099,70 @@ function boop() {
   osc.stop(t + 0.22);
 }
 
+function tick() {
+  if (!audio || audio.state !== "running") return;
+  const t = audio.currentTime;
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(1500, t);
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.09, t + 0.004);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+  osc.connect(gain).connect(audio.destination);
+  osc.start(t);
+  osc.stop(t + 0.035);
+}
+
 function ensureAudio(then) {
   wakeAudio();
   if (!audio) return;
   if (audio.state === "running") then?.();
   else audio.resume?.().then(() => then?.(), () => {});
+}
+
+const SFX_V = 1;
+const SFX_LATE_MS = 1500;
+const sfx = new Map();
+
+// Bytes load without a gesture; decoding waits for the AudioContext, which needs one.
+function loadSfx(name) {
+  if (!sfx.has(name)) {
+    const bytes = fetch(`/sfx/${name}.mp3?v=${SFX_V}`).then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error(String(res.status)))));
+    bytes.catch(() => sfx.delete(name));
+    sfx.set(name, { bytes, buffer: null });
+  }
+  return sfx.get(name);
+}
+
+function sfxBuffer(name) {
+  const clip = loadSfx(name);
+  if (!clip.buffer) {
+    clip.buffer = clip.bytes.then((bytes) => audio.decodeAudioData(bytes));
+    clip.buffer.catch(() => sfx.delete(name));
+  }
+  return clip.buffer;
+}
+
+function playSfx(name) {
+  const asked = performance.now();
+  ensureAudio(() => {
+    sfxBuffer(name).then((buffer) => {
+      if (performance.now() - asked > SFX_LATE_MS || audio.state !== "running") return;
+      const source = audio.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audio.destination);
+      source.start();
+    }, () => {});
+  });
+}
+
+function cryName(mood = "happy", theme = document.documentElement.dataset.theme || "classic") {
+  return `cry-${theme}-${mood}`;
+}
+
+function cry(mood, theme) {
+  playSfx(cryName(mood, theme));
 }
 
 const HEART_SVG = '<svg viewBox="0 0 24 22" aria-hidden="true"><path d="M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z"/></svg>';
@@ -1173,6 +1235,7 @@ function typeLine(intro, line, onDone, delay = 520) {
   }
   document.addEventListener("pointerdown", finish, true);
   timer = window.setTimeout(step, delay);
+  return finish;
 }
 
 function startWake(onDone) {
@@ -1202,6 +1265,7 @@ function startWake(onDone) {
     document.removeEventListener("pointerdown", wake, true);
     document.removeEventListener("keydown", wake, true);
     wakeAudio();
+    cry();
     reactPet();
     tryVibrate(12);
     call.classList.add("is-gone");
@@ -1343,6 +1407,198 @@ document.addEventListener("keydown", (event) => {
     first.focus();
   }
 });
+
+const themeSheet = document.querySelector('[data-sheet="theme"]');
+if (themeSheet) {
+  const root = document.documentElement;
+  const LINES = {
+    classic: "다시 우리 방이에요!",
+    "8bit": "어? 제가 픽셀이 됐어요!",
+    milk: "딸기우유 냄새가 나요!",
+    najeon: "어머, 반짝반짝해요.",
+  };
+  const FONTS = { "8bit": '700 16px "Galmuri11"', milk: '16px "Cafe24Ssurround"', najeon: '700 16px "Gowun Batang"' };
+  const ART = {
+    "8bit": (kind) => [`${kind}-px.png`, `${kind}-away-px.png`, "lock.svg", "cloud.svg", "heart-full.svg", "heart-half.svg", "heart-empty.svg", "pat.svg", "gift.svg", "record.svg", "close.svg", "star.svg", "lock-dim.svg"],
+    milk: () => ["strawberry.svg"],
+    najeon: () => ["najeon-scene.svg"],
+  };
+  const READY_CAP_MS = 1200;
+  const SAY_MS = 650;
+  const cards = Array.from(themeSheet.querySelectorAll("[data-pick]"));
+  const links = new Map();
+  const ready = new Map();
+  let applied = root.dataset.theme || "classic";
+  let switching = false;
+  let say = null;
+  let sayTimer = 0;
+
+  const cryMood = (id) => (id === "8bit" ? "ask" : "happy");
+
+  function sheetLink(href) {
+    if (!links.has(href)) {
+      let link = document.querySelector(`link[href="${href}"]`);
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = href;
+        if (href.startsWith("/")) document.querySelector('link[href="/mascot-toggle.css"]').after(link);
+        else document.head.appendChild(link);
+      }
+      links.set(href, link.sheet ? Promise.resolve(true) : new Promise((resolve) => {
+        link.addEventListener("load", () => resolve(true), { once: true });
+        // A failed link never loads again, so drop it and let the next pick retry.
+        link.addEventListener("error", () => {
+          link.remove();
+          links.delete(href);
+          resolve(false);
+        }, { once: true });
+      }));
+    }
+    return links.get(href);
+  }
+
+  function decodeArt(file) {
+    const img = new Image();
+    img.src = `/themes/px/${file}`;
+    return img.decode().catch(() => {});
+  }
+
+  function prepare(id) {
+    const kind = root.dataset.mascot === "sheep" ? "sheep" : "horse";
+    const key = `${id}:${kind}`;
+    if (!ready.has(key)) {
+      const css = id === "classic" ? Promise.resolve(true) : sheetLink(`/themes/${id}.css`);
+      const faces = id === "najeon" ? Promise.all(["400", "700"].map((w) => sheetLink(`https://cdn.jsdelivr.net/npm/@fontsource/gowun-batang@5.3.0/${w}.css`))) : css;
+      const text = `${document.querySelector("main")?.textContent || ""}${LINES[id]}`;
+      const done = Promise.all([
+        css,
+        ...(ART[id]?.(kind) || []).map(decodeArt),
+        faces.then(() => FONTS[id] && document.fonts?.load(FONTS[id], text)).catch(() => {}),
+      ]);
+      ready.set(key, done);
+      css.then((ok) => {
+        if (!ok && ready.get(key) === done) ready.delete(key);
+      });
+    }
+    return ready.get(key);
+  }
+
+  function preload() {
+    for (const card of cards) {
+      const id = card.dataset.pick;
+      if (id !== applied) prepare(id);
+      for (const name of [`switch-${id}`, cryName(cryMood(id), id)]) {
+        if (audio) sfxBuffer(name);
+        else loadSfx(name);
+      }
+    }
+  }
+
+  function speak(line, still) {
+    say?.stop();
+    const win = document.querySelector("[data-window]");
+    if (!win) return;
+    const bubble = document.createElement("p");
+    bubble.className = "theme-say";
+    win.appendChild(bubble);
+    let timer = 0;
+    let finish = null;
+    const fade = () => {
+      timer = window.setTimeout(() => {
+        bubble.classList.add("is-gone");
+        timer = window.setTimeout(() => bubble.remove(), 400);
+      }, 1800);
+    };
+    if (still) {
+      bubble.textContent = line;
+      fade();
+    } else {
+      finish = typeLine(bubble, line, fade, 160);
+    }
+    say = {
+      stop() {
+        finish?.();
+        window.clearTimeout(timer);
+        bubble.remove();
+      },
+    };
+  }
+
+  function greet(id, { pop = false, still = false } = {}) {
+    reactPet();
+    cry(cryMood(id), id);
+    tryVibrate(id === "8bit" ? [30, 40, 30] : 18);
+    const pet = document.querySelector(".pet");
+    if (pop && pet) {
+      pet.classList.remove("is-pop");
+      void pet.offsetWidth;
+      pet.classList.add("is-pop");
+      window.setTimeout(() => pet.classList.remove("is-pop"), 520);
+    }
+    window.clearTimeout(sayTimer);
+    if (still) speak(LINES[id], true);
+    else sayTimer = window.setTimeout(() => speak(LINES[id], false), 260);
+  }
+
+  function apply(id) {
+    if (id === "classic") delete root.dataset.theme;
+    else root.dataset.theme = id;
+    applied = id;
+  }
+
+  function flip(id, color) {
+    playSfx(`switch-${id}`);
+    document.cookie = id === "classic"
+      ? "theme=;path=/;max-age=0;samesite=lax"
+      : `theme=${id};path=/;max-age=${400 * 24 * 60 * 60};samesite=lax`;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", color);
+    const still = prefersReducedMotion();
+    if (!document.startViewTransition) {
+      apply(id);
+      greet(id, { pop: !still, still });
+      window.setTimeout(() => {
+        switching = false;
+      }, SAY_MS);
+      return;
+    }
+    const pet = document.querySelector(".pet");
+    if (pet && !still) {
+      const box = pet.getBoundingClientRect();
+      root.style.setProperty("--vt-x", `${box.left + box.width / 2}px`);
+      root.style.setProperty("--vt-y", `${box.top + box.height * 0.45}px`);
+      root.dataset.vt = id === "8bit" ? "px" : "on";
+    }
+    const vt = document.startViewTransition(() => apply(id));
+    vt.ready.catch(() => {});
+    const greeted = new Promise((resolve) => {
+      window.setTimeout(() => {
+        greet(id, { still });
+        resolve();
+      }, still ? 0 : SAY_MS);
+    });
+    Promise.all([vt.finished.catch(() => {}), greeted]).then(() => {
+      delete root.dataset.vt;
+      switching = false;
+    });
+  }
+
+  function pick(card) {
+    const id = card.dataset.pick;
+    if (switching || id === applied) return;
+    switching = true;
+    cards.forEach((el) => el.setAttribute("aria-pressed", String(el === card)));
+    ensureAudio(tick);
+    const cap = new Promise((resolve) => window.setTimeout(resolve, READY_CAP_MS));
+    Promise.race([prepare(id), cap]).then(() => flip(id, card.dataset.color));
+  }
+
+  document.querySelector('[data-open="theme"]')?.addEventListener("click", preload);
+  themeSheet.querySelector(".theme-grid").addEventListener("click", (event) => {
+    const card = event.target.closest("[data-pick]");
+    if (card) pick(card);
+  });
+}
 
 const TIER_WORDS = { special: "특별한 선물", rare: "반짝 선물" };
 const giftReader = document.querySelector("[data-gift-reader]");
@@ -1770,6 +2026,7 @@ if (demoSheet && demoHold) {
 
   function openDemo() {
     tryVibrate(15);
+    loadSfx(cryName());
     if (replayReveal) reveal.prepare(revealKind());
     demoSheet.hidden = false;
     void demoSheet.offsetWidth;
@@ -1834,6 +2091,7 @@ if (demoSheet && demoHold) {
 }
 
 if (document.body.hasAttribute("data-wake")) {
+  if (!prefersReducedMotion()) window.addEventListener("load", () => loadSfx(cryName()), { once: true });
   startWake(() => {
     runCelebrate();
     armReveal();
