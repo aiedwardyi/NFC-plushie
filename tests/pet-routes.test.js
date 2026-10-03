@@ -100,10 +100,10 @@ test("the post-naming render is not a pet tap", async (t) => {
   assert.match(skip.html, /data-celebrate="named"/);
   assert.match(skip.html, /만나서 반가워요, Mochi!/);
   assert.doesNotMatch(skip.html, /다시 만나서 반가워요/);
-  assert.doesNotMatch(skip.html, /data-pet-state/);
+  assert.match(skip.html, /data-rewarded="0" data-reason=""/);
   assert.doesNotMatch(skip.html, /오늘의 선물|특별한 선물|반짝 선물/);
-  assert.doesNotMatch(skip.html, /행복이 가득|내일 또 만나자|콕 찍고/);
-  assert.equal(ctx.row().tap_count, 2);
+  assert.doesNotMatch(skip.html, /행복이 가득|내일 또 만나자|콕 찍고|조금 있다가 또 토닥여|class="pet-line/);
+  assert.equal(ctx.row().tap_count, 1);
   assert.equal(ctx.row().xp, 0);
   assert.equal(ctx.row().mood_value, 100);
 });
@@ -167,7 +167,7 @@ test("uid-only and uid+counter map to the same plushie", async (t) => {
   assert.equal(tap.status, 200);
   assert.match(tap.html, /data-rewarded="1"/);
   assert.equal(ctx.db.prepare("SELECT count(*) AS n FROM plushies").get().n, 1);
-  assert.equal(ctx.row().tap_count, 3);
+  assert.equal(ctx.row().tap_count, 2);
   assert.equal(ctx.row().last_counter, 10);
   ctx.advance(31 * MIN);
   const higher = await ctx.request(`/t?uid=${A}x00000B`, { jar });
@@ -386,8 +386,8 @@ test("celebration priority: levelup over milestone, reunion over milestone, rare
   assert.match(both.html, /벌써 열 번이에요!/);
   assert.match(both.html, /Lv\. 2/);
   assert.match(both.html, /pet-moments[\s\S]*쑥쑥 컸어요![\s\S]*벌써 열 번이에요![\s\S]*pet-stats/);
-  assert.match(both.html, /xp-fill" style="width:(\d+)%"/);
-  const xpPct = Number(both.html.match(/xp-fill" style="width:(\d+)%"/)[1]);
+  assert.match(both.html, /xp-fill" data-xp="(\d+)"/);
+  const xpPct = Number(both.html.match(/xp-fill" data-xp="(\d+)"/)[1]);
   assert.ok(xpPct < 50, `expected near-empty XP after level-up, got ${xpPct}%`);
   assert.notEqual(xpPct, 100);
 

@@ -84,13 +84,13 @@ test("scripted route flow: first meeting, naming, transfer, and separate plushie
   assert.match(owner.html, /만나서 반가워요, Mochi!/);
   assert.doesNotMatch(owner.html, /다시 만나서 반가워요/);
   assert.match(owner.html, /data-tap-count/);
-  assert.match(owner.html, /우리 2번 토닥였어요!/);
+  assert.match(owner.html, /count-final">2번 토닥여 줬어요!/);
   assert.match(owner.html, /data-celebrate="named"/);
   assert.match(owner.setCookies.join("\n"), /celebrate=;|celebrate=.*Max-Age=0/);
   assert.equal(calls.at(-1)[2], token);
   const reload = await request(tapUrl(), { cookie: first.cookie });
   pages.push(reload.html);
-  assert.match(reload.html, /우리 3번 토닥였어요!/);
+  assert.match(reload.html, /count-final">3번 토닥여 줬어요!/);
   assert.doesNotMatch(reload.html, /data-celebrate/);
 
   answers.tap = "STRANGER";
@@ -314,7 +314,7 @@ test("returning milestone page marks celebrate and keeps distinct lines", async 
   const mile = await request(tapUrl(), { cookie: first.cookie });
   assert.match(mile.html, /data-celebrate="milestone"/);
   assert.match(mile.html, /data-tap-count/);
-  assert.match(mile.html, /우리 50번 토닥였어요!/);
+  assert.match(mile.html, /count-final">50번 토닥여 줬어요!/);
   assert.match(mile.html, /오십 번이에요!/);
   assert.doesNotMatch(mile.html, /data-celebrate="levelup"/);
   db.prepare("UPDATE plushies SET tap_count = 50, xp = 90, last_rewarded_at = NULL WHERE uid = ?").run(A);
@@ -322,7 +322,7 @@ test("returning milestone page marks celebrate and keeps distinct lines", async 
   assert.match(level.html, /data-celebrate="levelup"/);
   assert.match(level.html, /Lv\. 2/);
   const next = await request(tapUrl(), { cookie: first.cookie });
-  assert.match(next.html, /우리 52번 토닥였어요!/);
+  assert.match(next.html, /count-final">52번 토닥여 줬어요!/);
   assert.doesNotMatch(next.html, /오십 번이에요!/);
 });
 
@@ -342,9 +342,9 @@ test("returning owner count keeps final number as plain text in HTML", async (t)
   await request("/name", { cookie: first.cookie, body: { uid: A, name: "Mochi" } });
   answers.tap = "OWNER";
   const owner = await request(tapUrl(), { cookie: first.cookie });
-  assert.match(owner.html, /우리 \d+번 토닥였어요!/);
+  assert.match(owner.html, /\d+번 토닥여 줬어요!/);
   assert.match(owner.html, /data-tap-count="\d+"/);
-  assert.match(owner.html, /<span class="count-final">우리 \d+번 토닥였어요!<\/span>/);
+  assert.match(owner.html, /<span class="count-final">\d+번 토닥여 줬어요!<\/span>/);
 });
 
 test("stranger pages expose no celebration or evolution hooks", async (t) => {
@@ -379,7 +379,7 @@ test("dev preview celebration routes render and stay hidden in production", asyn
   assert.equal(claim.status, 200);
   assert.match(claim.html, /data-celebrate="claim"/);
   assert.match(claim.html, /data-tap-count="10"/);
-  assert.match(claim.html, /count-final">우리 10번 토닥였어요!</);
+  assert.match(claim.html, /count-final">10번 토닥여 줬어요!</);
 
   const mile10 = await request("/dev/preview?kind=milestone&count=10");
   assert.equal(mile10.status, 200);
@@ -403,7 +403,7 @@ test("dev preview celebration routes render and stay hidden in production", asyn
   assert.match(levelup.html, /data-celebrate="levelup"/);
   assert.match(levelup.html, /Lv\. 2/);
   assert.match(levelup.html, /쑥쑥 컸어요! 이제 Lv\. 2!/);
-  assert.match(levelup.html, /xp-fill" style="width:0%"/);
+  assert.match(levelup.html, /xp-fill" data-xp="0"/);
 
   const reunion = await request("/dev/preview?kind=reunion&count=10");
   assert.equal(reunion.status, 200);
