@@ -1390,7 +1390,7 @@ const reveal = (function legendaryReveal() {
   const NAME_BOX = NAME_PX * 1.05;
   const NAME_ROOM = 940;
   const NAME_MIN = 110;
-  // Frames from the stone cue sheet.
+  // Frames from the legendary cue sheet.
   const NAME_AT = 720;
   const DATE_AT = 806;
   const BEAT = [30, 90, 22];
@@ -1399,7 +1399,6 @@ const reveal = (function legendaryReveal() {
     [8, BEAT], [44, BEAT], [190, 22], [202, 10], [209, 10], [216, 10], [223, 10], [240, 70], [330, 45], [420, 90],
     [436, FAST_BEAT], [458, FAST_BEAT], [476, FAST_BEAT], [491, FAST_BEAT], [503, FAST_BEAT], [510, 0],
     [570, 420], [660, 60], [690, 140], [720, 180], [738, 16], [750, 16], [762, 16], [774, 16], [786, 16],
-    [822, 40],
   ];
   const GOLD = "linear-gradient(180deg, #FFFBEA 0%, #FBE3A0 40%, #E2AC48 72%, #B47A22 100%)";
 
@@ -1420,6 +1419,8 @@ const reveal = (function legendaryReveal() {
   let stage = null;
   let video = null;
   let nameEl = null;
+  let nameEdge = null;
+  let nameGold = null;
   let dateEl = null;
   let skip = null;
   let kind = "";
@@ -1447,6 +1448,12 @@ const reveal = (function legendaryReveal() {
     owner.className = "reveal-owner";
     nameEl = document.createElement("span");
     nameEl.className = "reveal-name";
+    nameEdge = document.createElement("span");
+    nameEdge.className = "reveal-name-edge";
+    nameEdge.setAttribute("aria-hidden", "true");
+    nameGold = document.createElement("span");
+    nameGold.className = "reveal-name-gold";
+    nameEl.append(nameEdge, nameGold);
     owner.appendChild(nameEl);
     dateEl = document.createElement("div");
     dateEl.className = "reveal-date";
@@ -1474,7 +1481,7 @@ const reveal = (function legendaryReveal() {
   }
 
   function load() {
-    video.src = `/reveal/stone-${kind}.mp4`;
+    video.src = `/reveal/diamond-${kind}.mp4`;
     video.load();
   }
 
@@ -1515,8 +1522,13 @@ const reveal = (function legendaryReveal() {
     return `${chars.slice(0, half).join("")}\n${chars.slice(half).join("")}`;
   }
 
+  function setName(text) {
+    nameEdge.textContent = text;
+    nameGold.textContent = text;
+  }
+
   function fitName() {
-    nameEl.textContent = nameText;
+    setName(nameText);
     nameEl.style.fontSize = "";
     nameEl.style.lineHeight = "";
     const wide = nameEl.offsetWidth;
@@ -1527,7 +1539,7 @@ const reveal = (function legendaryReveal() {
       nameEl.style.lineHeight = `${NAME_BOX}px`;
       return;
     }
-    nameEl.textContent = twoLines(nameText);
+    setName(twoLines(nameText));
     const size = Math.min(NAME_BOX / 2 / 1.05, (NAME_PX * room) / nameEl.offsetWidth);
     nameEl.style.fontSize = `${size}px`;
     nameEl.style.lineHeight = `${NAME_BOX / 2}px`;
@@ -1541,7 +1553,7 @@ const reveal = (function legendaryReveal() {
       const sweep = lerp(-30, 110, span(f, NAME_AT + 14, NAME_AT + 50));
       const glow = hitAt(f, NAME_AT, 4);
       const scale = lerp(1.9, 1, inQuad(drop));
-      nameEl.style.backgroundImage = `linear-gradient(105deg, transparent ${sweep - 12}%, rgba(255,255,255,0.95) ${sweep}%, transparent ${sweep + 12}%), ${GOLD}`;
+      nameGold.style.backgroundImage = `linear-gradient(105deg, transparent ${sweep - 12}%, rgba(255,255,255,0.95) ${sweep}%, transparent ${sweep + 12}%), ${GOLD}`;
       nameEl.style.filter = `blur(${lerp(14, 0, inQuad(drop))}px) drop-shadow(0 10px 0 #070A16) drop-shadow(0 0 ${34 + 50 * glow}px rgba(255,206,110,${0.4 + 0.5 * glow}))`;
       nameEl.style.transform = `scale(${scale * (1 + 0.1 * land)}, ${scale * (1 - 0.15 * land)})`;
       nameEl.style.opacity = String(Math.min(1, drop * 2.5));

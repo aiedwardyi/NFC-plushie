@@ -1800,16 +1800,24 @@ html.has-reveal body::after { visibility: hidden; }
   pointer-events: none;
 }
 .reveal-name {
-  display: inline-block;
+  display: inline-grid;
   font: 900 228px/1.05 "Pretendard Variable", Pretendard, sans-serif;
   letter-spacing: -0.02em;
   white-space: pre;
-  color: transparent;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-stroke: 3px rgba(58, 34, 6, 0.92);
   transform-origin: 50% 80%;
   visibility: hidden;
+}
+.reveal-name > span {
+  grid-area: 1 / 1;
+  color: transparent;
+}
+/* Outline sits under the gold: stroked on the gold itself, it also traced the font's overlapping strokes inside each letter. */
+.reveal-name-edge {
+  -webkit-text-stroke: 6px rgba(58, 34, 6, 0.92);
+}
+.reveal-name-gold {
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 .reveal-date {
   position: absolute;
