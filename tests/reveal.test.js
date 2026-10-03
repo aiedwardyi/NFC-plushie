@@ -84,9 +84,9 @@ test("first reveal uses the stored Seoul first-meet day, not the naming day", as
 });
 
 for (const kind of ["horse", "sheep"]) {
-  test(`stone ${kind} video is served with range support`, async (t) => {
+  test(`diamond ${kind} video is served with range support`, async (t) => {
     const { request } = await setup(t);
-    const res = await request(`/reveal/stone-${kind}.mp4`, { headers: { Range: "bytes=0-99" } });
+    const res = await request(`/reveal/diamond-${kind}.mp4`, { headers: { Range: "bytes=0-99" } });
     assert.equal(res.status, 206);
     assert.equal(res.headers.get("content-type"), "video/mp4");
     assert.equal(res.headers.get("content-length"), "100");
