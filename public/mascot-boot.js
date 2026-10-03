@@ -6,6 +6,14 @@
     font.rel = "stylesheet";
     font.href = "https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css";
     document.head.appendChild(font);
+    if (document.documentElement.getAttribute("data-theme") === "najeon") {
+      ["400", "700"].forEach(function (w) {
+        var face = document.createElement("link");
+        face.rel = "stylesheet";
+        face.href = "https://cdn.jsdelivr.net/npm/@fontsource/gowun-batang@5.3.0/" + w + ".css";
+        document.head.appendChild(face);
+      });
+    }
   } catch (e) {}
   try {
     // The wake hides the name form and recovery code, so only while app.js runs to bring them back.

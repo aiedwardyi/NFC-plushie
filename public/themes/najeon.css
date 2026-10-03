@@ -1,0 +1,249 @@
+/* 자개: black lacquer, mother-of-pearl inlay, vermilion accents, 일월오봉 window */
+html[data-theme="najeon"] {
+  --lacquer: #0c0c10;
+  --lacquer-2: #141318;
+  --pearl: #ece9f2;
+  --pearl-dim: rgba(233, 231, 239, 0.55);
+  --pearl-sheen: linear-gradient(100deg, #f4f2f8 0%, #e6dff0 28%, #d6efec 48%, #f2e2ec 68%, #f4f2f8 100%);
+  --vermilion: #b8282f;
+  --navy: #0c0c10;
+  --navy2: #0c0c10;
+  --midnight: #141318;
+  --cream: #ece9f2;
+  --paper: #ece9f2;
+  --coral: #c8323c;
+  --cocoa: #ece9f2;
+  --gold: #d9d7e2;
+  --gold-light: #ece9f2;
+  --gold-deep: #8e8b99;
+  --muted: rgba(220, 217, 230, 0.6);
+  --glow: rgba(233, 231, 239, 0.06);
+}
+html[data-theme="najeon"] body::after { opacity: .05; }
+html[data-theme="najeon"] main::before {
+  background:
+    radial-gradient(circle, rgba(214, 239, 236, 0.35) 0 1px, transparent 1.5px) 3px 11px / 47px 53px,
+    radial-gradient(circle, rgba(242, 226, 236, 0.3) 0 1px, transparent 1.5px) 21px 29px / 61px 43px,
+    radial-gradient(90% 55% at 50% 36%, rgba(233, 231, 239, 0.06), transparent 70%),
+    linear-gradient(180deg, #0f0e13 0%, #08080b 60%, #0f0e13 100%);
+}
+
+/* Type */
+html[data-theme="najeon"] .wordmark { color: #cfccd8; }
+html[data-theme="najeon"] .nameplate {
+  font-family: "Gowun Batang", "Noto Serif KR", serif;
+  font-weight: 700;
+  letter-spacing: .02em;
+  background: var(--pearl-sheen);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.6));
+}
+html[data-theme="najeon"] .time-line { color: var(--muted); font-family: "Gowun Batang", serif; }
+html[data-theme="najeon"] .count { color: var(--pearl); font-family: "Gowun Batang", serif; font-weight: 700; }
+html[data-theme="najeon"] .level-pin {
+  background: var(--lacquer);
+  color: var(--pearl);
+  font-family: "Gowun Batang", serif;
+  box-shadow: 0 0 0 1.5px var(--pearl), 0 0 0 3.5px var(--lacquer), 0 0 0 4.5px rgba(233, 231, 239, 0.3), 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="najeon"] .level-pin::after { background: rgba(255, 255, 255, 0.18); }
+
+/* Window: inlay screen in a lacquer frame with a bead border */
+html[data-theme="najeon"] .window {
+  border-radius: 24px;
+  outline: 2px dotted rgba(233, 231, 239, 0.75);
+  outline-offset: 5px;
+  box-shadow:
+    0 0 0 1.5px var(--pearl),
+    0 0 0 10px #060608,
+    0 0 0 11.5px rgba(233, 231, 239, 0.45),
+    0 24px 40px -10px rgba(0, 0, 0, 0.8);
+}
+html[data-theme="najeon"] .window::before {
+  top: -17px;
+  background:
+    radial-gradient(circle at 50% 38%, #0c0c10 0 2.8px, transparent 3.3px) no-repeat,
+    linear-gradient(#0c0c10, #0c0c10) 50% 72% / 2.6px 7px no-repeat,
+    linear-gradient(180deg, #f6f4fa, #d9d7e2 60%, #a9a6b6);
+  box-shadow: 0 0 0 1.5px #060608, 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+html[data-theme="najeon"] .window::after {
+  background: linear-gradient(118deg, transparent 30%, rgba(214, 239, 236, 0.07) 42%, rgba(242, 226, 236, 0.1) 48%, transparent 60%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 10px 24px rgba(0, 0, 0, 0.4);
+}
+html[data-theme="najeon"] .sky {
+  background: url("/themes/px/najeon-scene.svg") center bottom / cover no-repeat, #0c0c10;
+}
+html[data-theme="najeon"] .sky::after,
+html[data-theme="najeon"] .stars { display: none; }
+html[data-theme="najeon"] .floor { background: radial-gradient(closest-side, rgba(233, 231, 239, 0.22), transparent); }
+html[data-theme="najeon"] .motes i { background: var(--pearl); box-shadow: 0 0 6px rgba(214, 239, 236, 0.9); }
+html[data-theme="najeon"] .pet-frame { filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6)); }
+
+/* Stats: vermilion hearts, pearl key bar */
+html[data-theme="najeon"] .heart .heart-bg { stroke: var(--pearl-dim); }
+html[data-theme="najeon"] .heart .heart-fill { fill: #c8323c; filter: drop-shadow(0 1.5px 0 #5e1014); }
+html[data-theme="najeon"] .level-badge {
+  background:
+    linear-gradient(var(--lacquer), var(--lacquer)) padding-box,
+    conic-gradient(#f4f2f8, #f2d9e5, #e9e7ef, #d2eee9, #f4f2f8, #ddd3f2, #f4f2f8) border-box;
+  color: var(--pearl);
+  font-family: "Gowun Batang", serif;
+  box-shadow: 0 2px 0 #000, 0 4px 10px rgba(0, 0, 0, 0.6);
+}
+html[data-theme="najeon"] .xp-bar { background: #050507; box-shadow: inset 0 0 0 1.5px var(--pearl-dim); }
+html[data-theme="najeon"] .xp-bar::after { background: linear-gradient(90deg, var(--pearl-dim) 0 4px, transparent 4px 8px, var(--pearl-dim) 8px); }
+html[data-theme="najeon"] .xp-fill { background: linear-gradient(90deg, #e9e7ef, #f2d9e5 35%, #d2eee9 65%, #ece9f2); }
+
+/* Dialog: a lacquer letter box, vermilion seal for the name */
+html[data-theme="najeon"] .dialog,
+html[data-theme="najeon"] .gift-reader {
+  border: 1.5px solid rgba(233, 231, 239, 0.8);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #141318, #0c0c10);
+  color: var(--pearl);
+  font-family: "Gowun Batang", "Noto Serif KR", serif;
+  font-size: 16px;
+  box-shadow: 0 0 0 4px #0c0c10, 0 0 0 5px rgba(233, 231, 239, 0.3), 0 14px 26px -8px rgba(0, 0, 0, 0.8);
+}
+html[data-theme="najeon"] .dialog-name {
+  background: linear-gradient(180deg, #d0393f, var(--vermilion));
+  color: #fff4ec;
+  font-family: "Gowun Batang", serif;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px #0c0c10, 0 0 0 3px rgba(233, 231, 239, 0.5);
+}
+html[data-theme="najeon"] .dialog .is-levelup,
+html[data-theme="najeon"] .dialog .is-reunion,
+html[data-theme="najeon"] .dialog .milestone { color: #f2d9e5; }
+html[data-theme="najeon"] .dialog-cursor,
+html[data-theme="najeon"] .dialog-cursor.is-done { background: var(--pearl); }
+html[data-theme="najeon"] .gift-label,
+html[data-theme="najeon"] .reader-label { background: #2a2930; color: var(--pearl); }
+html[data-theme="najeon"] .gift.is-special .gift-label,
+html[data-theme="najeon"] .gift-reader.is-special .reader-label { background: var(--vermilion); color: #fff4ec; }
+html[data-theme="najeon"] .gift.is-rare .gift-label,
+html[data-theme="najeon"] .gift-reader.is-rare .reader-label { background: var(--pearl-sheen); color: #0c0c10; }
+
+/* Dock: round lacquer buttons, pearl rings */
+html[data-theme="najeon"] .dock-cap {
+  background: radial-gradient(circle at 34% 26%, #3d3b46 0%, #16151b 45%, #08080a 100%);
+  color: var(--pearl);
+  box-shadow:
+    0 0 0 1.5px rgba(233, 231, 239, 0.85),
+    0 0 0 4px #08080a,
+    0 0 0 5px rgba(233, 231, 239, 0.22),
+    0 6px 0 #000,
+    0 10px 16px rgba(0, 0, 0, 0.6),
+    inset 0 2px 1px rgba(255, 255, 255, 0.16);
+}
+html[data-theme="najeon"] .dock-btn:active .dock-cap,
+html[data-theme="najeon"] .dock-btn.is-pressed .dock-cap {
+  box-shadow: 0 0 0 1.5px rgba(233, 231, 239, 0.85), 0 0 0 4px #08080a, 0 0 0 5px rgba(233, 231, 239, 0.22), 0 2px 0 #000, inset 0 2px 1px rgba(255, 255, 255, 0.16);
+}
+html[data-theme="najeon"] .dock-btn.has-new .dock-cap::after { background: var(--vermilion); box-shadow: 0 0 0 2.5px #08080a; }
+html[data-theme="najeon"] .dock-label { color: #cfccd8; }
+html[data-theme="najeon"] footer { color: rgba(207, 204, 216, 0.5); }
+
+/* Buttons and fields */
+html[data-theme="najeon"] :where(main, .sheet, .demo-sheet) :where(button:not(.pet-hit, .dock-btn, .mascot-tog, .tile, .sheet-close, .copy, .demo-close, .theme-btn, .theme-card), .button) {
+  background: linear-gradient(180deg, #d0393f, var(--vermilion) 60%, #8e1c22);
+  color: #fff4ec;
+  font-family: "Gowun Batang", serif;
+  box-shadow: 0 4px 0 #4a0d10, 0 8px 18px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+html[data-theme="najeon"] :where(main, .sheet, .demo-sheet) input { background: #050507; box-shadow: inset 0 0 0 1.5px var(--pearl-dim); }
+html[data-theme="najeon"] .recovery { background: linear-gradient(160deg, #18171d, #0c0c10 70%); }
+html[data-theme="najeon"] .recovery::before { border-color: rgba(233, 231, 239, 0.6); }
+html[data-theme="najeon"] .recovery h2 { color: var(--pearl); }
+
+/* Sheets */
+html[data-theme="najeon"] .sheet-card {
+  background: linear-gradient(180deg, #17161c 0%, #0c0c10 140px);
+  box-shadow: 0 -1.5px 0 rgba(233, 231, 239, 0.7), 0 -20px 44px rgba(0, 0, 0, 0.7);
+}
+html[data-theme="najeon"] .sheet-card::before { background: var(--pearl-dim); }
+html[data-theme="najeon"] .sheet-head h2 { font-family: "Gowun Batang", serif; color: var(--pearl); }
+html[data-theme="najeon"] .gift-tally { color: #cfccd8; }
+html[data-theme="najeon"] .tile.is-common {
+  background: radial-gradient(circle at 35% 28%, #fbfaff, #e6e3ee 55%, #c9c6d4);
+  color: #141318;
+  box-shadow: 0 3px 0 #5a5766, 0 0 12px rgba(233, 231, 239, 0.12);
+}
+html[data-theme="najeon"] .tile.is-special { background: radial-gradient(circle at 35% 28%, #e86a6f, var(--vermilion) 60%, #7a161b); color: #fff4ec; box-shadow: 0 3px 0 #3d0a0d; }
+html[data-theme="najeon"] .tile.is-special svg { fill: rgba(255, 244, 236, 0.18); }
+html[data-theme="najeon"] .tile.is-rare {
+  background: conic-gradient(from 210deg, #f4f2f8, #f2d9e5, #e9e7ef, #d2eee9, #f4f2f8, #ddd3f2, #f4f2f8);
+  color: #141318;
+  box-shadow: 0 3px 0 #5a5766, 0 0 18px rgba(214, 239, 236, 0.35);
+}
+html[data-theme="najeon"] .tile.is-locked { background: #08080a; color: rgba(233, 231, 239, 0.2); box-shadow: inset 0 0 0 1px rgba(233, 231, 239, 0.18); }
+html[data-theme="najeon"] .tile.is-new { outline-color: var(--pearl); }
+html[data-theme="najeon"] .mascot-toggle { background: #050507; box-shadow: inset 0 0 0 1px rgba(233, 231, 239, 0.25); }
+html[data-theme="najeon"] .mascot-tog.is-active { background: #1c1b22; box-shadow: inset 0 0 0 1.5px var(--pearl); }
+
+/* 꾸미기 */
+html[data-theme="najeon"] .topbar .theme-btn { background: #0c0c10; box-shadow: 0 0 0 1.5px var(--pearl), 0 0 0 3.5px #0c0c10, 0 0 0 4.5px rgba(233, 231, 239, 0.3); }
+html[data-theme="najeon"] .theme-grid .theme-card { border-radius: 12px; box-shadow: 0 0 0 1px rgba(233, 231, 239, 0.3); }
+html[data-theme="najeon"] .theme-grid .theme-card[aria-pressed="true"] { box-shadow: 0 0 0 1.5px var(--pearl), 0 0 0 4px #0c0c10, 0 0 0 5px rgba(233, 231, 239, 0.4); }
+html[data-theme="najeon"] .theme-name { font-family: "Gowun Batang", serif; font-weight: 700; }
+
+/* The reveal stays classic */
+html[data-theme="najeon"] body > .reveal {
+  --navy: #141b2b;
+  --gold-light: #f1d68c;
+  color: #f8f0e3;
+}
+
+/* First meet: lights off, the wake call, the key card */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme="najeon"].has-app body[data-wake]:not(.is-awake) main::before {
+    background: linear-gradient(180deg, #08080b 0%, #040406 55%, #08080b 100%);
+  }
+  html[data-theme="najeon"].has-app body[data-wake]:not(.is-awake) .window {
+    outline-color: rgba(233, 231, 239, 0.28);
+    box-shadow:
+      0 0 0 1.5px rgba(233, 231, 239, 0.4),
+      0 0 0 10px #060608,
+      0 0 0 11.5px rgba(233, 231, 239, 0.16),
+      0 24px 40px -10px rgba(0, 0, 0, 0.8);
+  }
+  html[data-theme="najeon"].has-app body[data-wake] .pet::before {
+    background: radial-gradient(circle, rgba(236, 233, 242, 0.46) 0%, rgba(214, 239, 236, 0.16) 42%, transparent 68%);
+  }
+}
+html[data-theme="najeon"] .sky::before { background: radial-gradient(70% 60% at 50% 55%, #141318, #050507); }
+html[data-theme="najeon"] .wake-call,
+html[data-theme="najeon"] .theme-say {
+  border-radius: 14px;
+  background: linear-gradient(180deg, #17161c, #0c0c10);
+  color: var(--pearl);
+  font-family: "Gowun Batang", "Noto Serif KR", serif;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1.5px rgba(233, 231, 239, 0.8), 0 0 0 3px #0c0c10, 0 0 0 4px rgba(233, 231, 239, 0.3), 0 12px 24px -8px rgba(0, 0, 0, 0.8);
+}
+html[data-theme="najeon"] .wake-call::before,
+html[data-theme="najeon"] .theme-say::after { background: var(--pearl); }
+html[data-theme="najeon"] .copy { color: var(--pearl); box-shadow: inset 0 0 0 1.5px var(--pearl-dim); }
+html[data-theme="najeon"] .nameplate.is-placeholder { opacity: .45; }
+html[data-theme="najeon"] .dialog .is-soft { color: rgba(233, 231, 239, 0.66); }
+html[data-theme="najeon"] .dialog .is-lonely-line { color: #c9c2e0; }
+html[data-theme="najeon"] .dialog .milestone.is-still-gold { color: #f2d9e5; }
+html[data-theme="najeon"] .still-claim-card,
+html[data-theme="najeon"] .still-named-card { color: #141318; }
+
+/* Record, stranger, dad panel */
+html[data-theme="najeon"] .record-hero { font-family: "Gowun Batang", serif; color: var(--pearl); }
+html[data-theme="najeon"] .record-list dt::after { border-bottom-color: rgba(233, 231, 239, 0.22); }
+html[data-theme="najeon"] .mini-heart.is-full,
+html[data-theme="najeon"] .mini-heart.is-half { color: #c8323c; }
+html[data-theme="najeon"] .window.is-away::after { background: linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.42)); }
+html[data-theme="najeon"] .demo-card {
+  background: linear-gradient(180deg, #17161c 0%, #0c0c10 140px);
+  box-shadow: 0 -1.5px 0 rgba(233, 231, 239, 0.7), 0 -20px 44px rgba(0, 0, 0, 0.7);
+}
+html[data-theme="najeon"] .demo-card::before { background: var(--pearl-dim); }
+html[data-theme="najeon"] .demo-close { color: #cfccd8; }

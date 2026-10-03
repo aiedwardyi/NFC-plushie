@@ -28,6 +28,17 @@ const ICONS = {
   copy: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="2.2"/><path d="M15.5 8.5V6.7a2.2 2.2 0 0 0-2.2-2.2H6.7a2.2 2.2 0 0 0-2.2 2.2v6.6a2.2 2.2 0 0 0 2.2 2.2h1.8"/></svg>`,
 };
 
+export const THEMES = [
+  { id: "classic", name: "클래식", color: "#141B2B" },
+  { id: "8bit", name: "8비트", color: "#1d2b53" },
+  { id: "milk", name: "딸기우유", color: "#ffe3ea" },
+  { id: "najeon", name: "자개", color: "#0f0e13" },
+];
+
+export function themeOf(value) {
+  return THEMES.find((t) => t.id === value) || THEMES[0];
+}
+
 // Demo mascot: default horse. Pass mascot:"sheep" (or use ?mascot=sheep / cookie via public/app.js).
 function mascotKind(mascot) {
   return mascot === "sheep" ? "sheep" : "horse";
@@ -148,6 +159,12 @@ function dockHtml({ gift = false } = {}) {
     </nav>`;
 }
 
+function themeSheet(current) {
+  const cards = THEMES.map((t) => `<li><button type="button" class="theme-card" data-pick="${t.id}" data-color="${t.color}" aria-pressed="${t.id === current ? "true" : "false"}"><span class="theme-thumb" aria-hidden="true"></span><span class="theme-name">${t.name}</span></button></li>`).join("");
+  return sheetHtml("theme", "꾸미기", `<p class="theme-lede">어떤 세상에서 놀까요?</p>
+      <ul class="theme-grid">${cards}</ul>`);
+}
+
 function sheetHtml(id, title, body) {
   return `<div class="sheet" data-sheet="${id}" role="dialog" aria-modal="true" aria-labelledby="sheet-${id}-title" hidden>
     <section class="sheet-card">
@@ -243,7 +260,8 @@ function nameSize(name) {
   return "";
 }
 
-export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = "horse", wake = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, meet = false } = {}) {
+export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = "horse", wake = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, meet = false, theme = "classic" } = {}) {
+  const look = themeOf(theme);
   const title = escapeHtml(row?.pet_name || "새 친구");
   const timeEl = timeLine ? `<p class="time-line" data-time-line></p>` : "";
   const celebrateAttr = celebrate === "claim" || celebrate === "named" || celebrate === "milestone" || celebrate === "levelup" || celebrate === "reunion" || celebrate === "rare" || celebrate === "special"
@@ -263,6 +281,10 @@ export function page(row, content, { waving = false, away = false, lonely = fals
     </button>
   </aside>`;
   const pin = level ? `<span class="level-pin">Lv. ${level}</span>` : "";
+  const topEnd = dock
+    ? `<span class="topbar-end"><button type="button" class="theme-btn" data-open="theme" aria-haspopup="dialog" aria-label="꾸미기"><span class="swatch" aria-hidden="true"></span></button>${pin}</span>`
+    : pin;
+  const themed = look.id !== "classic";
   const unnamed = meet && !row?.pet_name;
   const nameplate = unnamed
     ? `<h1 class="nameplate is-placeholder" data-nameplate data-placeholder="${title}">${title}</h1>`
@@ -272,17 +294,18 @@ export function page(row, content, { waving = false, away = false, lonely = fals
     : "";
   const bodyClass = dock ? "is-home" : meet ? "is-meet" : away ? "is-stranger" : "";
   return `<!doctype html>
-<html lang="ko" data-mascot="${kind}">
+<html lang="ko" data-mascot="${kind}"${themed ? ` data-theme="${look.id}"` : ""}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#141B2B">
+  <meta name="theme-color" content="${look.color}">
   <meta name="color-scheme" content="light dark">
   <title>${title} | 인형 친구</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"></noscript>
   <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/mascot-toggle.css">
+  <link rel="stylesheet" href="/mascot-toggle.css">${themed ? `
+  <link rel="stylesheet" href="/themes/${look.id}.css">` : ""}
   <script src="/mascot-boot.js"></script>
   <script src="/app.js" defer></script>
 </head>
@@ -291,7 +314,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
     <header class="topbar">
       <span class="wordmark">POKKEY</span>
       ${toggle}
-      ${pin}
+      ${topEnd}
     </header>
     <section class="plate">
       ${timeEl}
@@ -308,7 +331,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
     ${dock}
     <footer${demo ? " data-demo-hold" : ""}>토닥이면 깨어나는 작은 친구</footer>
   </main>
-  ${sheets}
+  ${sheets}${dock ? themeSheet(look.id) : ""}
   ${demo ? demoPanel(demo, row) : ""}
 </body>
 </html>`;
@@ -331,7 +354,7 @@ function homeExtras(row, pet, found) {
   };
 }
 
-export function petPage(row, code = null, { celebrate = "", pet = null, mascot = "horse", demo = "", found = [] } = {}) {
+export function petPage(row, code = null, { celebrate = "", pet = null, mascot = "horse", demo = "", found = [], theme = "classic" } = {}) {
   const firstMeet = celebrate === "claim" || celebrate === "named";
   const greeting = row.pet_name
     ? (firstMeet
@@ -365,12 +388,12 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
     `${recovery}${prompt}`,
     {
       waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet, mascot, wake: Boolean(code), demo,
-      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, meet: !row.pet_name, ...extras,
+      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, meet: !row.pet_name, theme, ...extras,
     },
   );
 }
 
-export function strangerPage(row, message = "", { mascot = "horse", demo = "" } = {}) {
+export function strangerPage(row, message = "", { mascot = "horse", demo = "", theme = "classic" } = {}) {
   return page(row, `${message ? `<p class="notice" role="alert">${escapeHtml(message)}</p>` : ""}
     <button type="button" id="claim-toggle" class="ghost" aria-expanded="${Boolean(message)}" aria-controls="claim-form">제가 주인이에요</button>
     <form action="/claim" method="post" id="claim-form" ${message ? "" : "hidden"}>
@@ -379,7 +402,7 @@ export function strangerPage(row, message = "", { mascot = "horse", demo = "" } 
       <input id="code" name="code" required autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="claim-help">
       <p id="claim-help">처음 만났을 때 적어둔 안심 코드를 넣어주세요.</p>
       <button type="submit" class="primary">내 친구를 데려올래요!</button>
-    </form>`, { away: true, mascot, demo, dialog: `<p class="intro">이 작은 친구는 이미 주인이 있어요.</p>` });
+    </form>`, { away: true, mascot, demo, theme, dialog: `<p class="intro">이 작은 친구는 이미 주인이 있어요.</p>` });
 }
 
 export const fakeUids = ["04AAAAAAAAAAA1", "04BBBBBBBBBBB2", "04CCCCCCCCCCC3"];
@@ -388,7 +411,7 @@ const PREVIEW_KINDS = new Set(["claim", "levelup", "reunion", "milestone", "gift
 const PREVIEW_TIERS = new Set(["common", "special", "rare"]);
 const PREVIEW_REASONS = new Set(["cooldown", "cap", "stale"]);
 
-export function previewPetPage({ kind, count, tier = "common", reason = "", mascot = "horse" } = {}) {
+export function previewPetPage({ kind, count, tier = "common", reason = "", mascot = "horse", theme = "classic" } = {}) {
   const n = Number(count);
   const row = {
     uid: "04PREVIEW00001",
@@ -429,7 +452,7 @@ export function previewPetPage({ kind, count, tier = "common", reason = "", masc
     row,
     "",
     {
-      timeLine: true, celebrate: visual, countHtml, lonely: kind === "lonely", mascot,
+      timeLine: true, celebrate: visual, countHtml, lonely: kind === "lonely", mascot, theme,
       dialog: `<p class="intro">${greeting}</p>${momentsHtml}${giftHtml}`, speaker: row.pet_name,
       stats: `<section class="pet-stats" aria-label="돌봄 상태">${stats}</section>`, level,
       dock: dockHtml({ gift: showGift }),
@@ -449,7 +472,7 @@ previewPetPage.validate = ({ kind, count, tier = "common", reason = "" }) => {
   return true;
 };
 
-export function devPage(uids = fakeUids) {
+export function devPage(uids = fakeUids, { theme = "classic" } = {}) {
   return page(null, `<p class="intro">연습용 친구들을 만나보세요</p>
     <nav aria-label="연습용 친구들">${uids.map((uid, i) => `<a class="button" href="/t?uid=${uid}">인형 친구 ${String.fromCharCode(65 + i)} <small>${uid}</small></a>`).join("")}</nav>
     <nav aria-label="축하 미리보기" class="dev-preview">
@@ -476,5 +499,5 @@ export function devPage(uids = fakeUids) {
       <input id="prime-tier" name="tier" autocomplete="off" placeholder="common, special, rare, none">
       <button class="secondary" type="submit">상태 만들기</button>
     </form>
-    <form action="/dev/reset" method="post"><button class="secondary" type="submit">연습용 친구들을 모두 처음으로 돌리기</button></form>`);
+    <form action="/dev/reset" method="post"><button class="secondary" type="submit">연습용 친구들을 모두 처음으로 돌리기</button></form>`, { theme });
 }

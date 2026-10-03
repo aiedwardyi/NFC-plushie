@@ -6,7 +6,7 @@ import { hash, ownerToken, recoveryCode } from "./secrets.js";
 import { EMPTY_FOUND, EMPTY_SEEN } from "./db.js";
 import { GIFT_COUNT as GIFT_TOTAL, GIFT_TIERS, GIFTS } from "./gifts.js";
 import { PET, applyTap, currentMood, parseTapUid, seoulDayKey, xpProgress } from "./pet.js";
-import { devPage, milestoneLine, page, petPage, previewPetPage, strangerPage } from "./pages.js";
+import { devPage, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
 
 const cookieAge = 400 * 24 * 60 * 60 * 1000;
 const cooldown = 15 * 60 * 1000;
@@ -75,12 +75,17 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     });
     next();
   });
+  // Before the body parsers, so their error pages still get the theme.
+  app.use(cookieParser());
+  app.use((req, res, next) => {
+    req.theme = themeOf(req.cookies?.theme).id;
+    next();
+  });
   app.use(express.urlencoded({ extended: false, limit: "4kb" }));
   app.use(express.json({ limit: "4kb" }));
-  app.use(cookieParser());
   app.use(express.static(fileURLToPath(new URL("../public", import.meta.url)), {
     setHeaders(res, filePath) {
-      if (/\.(?:png|jpe?g|gif|webp|svg|ico|mp4)$/i.test(filePath)) {
+      if (/\.(?:png|jpe?g|gif|webp|svg|ico|mp4|mp3)$/i.test(filePath)) {
         res.setHeader("Cache-Control", "public, max-age=86400");
       }
     },
@@ -137,7 +142,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   const clearSkip = (res) => res.clearCookie("pet_skip", {
     httpOnly: true, sameSite: "lax", secure: production, path: "/",
   });
-  const invalidUid = (res) => res.status(400).send(page(null, "<p>어? 링크가 이상해요. 인형에 폰을 다시 톡 대 주세요.</p>"));
+  const invalidUid = (req, res) => res.status(400).send(page(null, "<p>어? 링크가 이상해요. 인형에 폰을 다시 톡 대 주세요.</p>", { theme: req.theme }));
 
   function writePetReward(serial, st, out, row, t, today) {
     const seen = { common: [...st.seen_common], special: [...st.seen_special], rare: [...st.seen_rare] };
@@ -193,10 +198,11 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   app.get("/health", (req, res) => res.type("text").send("ok"));
   app.get("/t", (req, res) => {
     const parsed = parseTapUid(req.query.uid);
-    if (!parsed) return invalidUid(res);
+    if (!parsed) return invalidUid(req, res);
     const serial = parsed.serial;
     const counter = parsed.counter;
     const demo = demoUids.includes(serial) ? serial : "";
+    const theme = req.theme;
     const result = db.transaction(() => {
       const row = getRow(serial);
       const state = decisions.resolveTap(row, req.cookies.owner_token || null, hash);
@@ -211,7 +217,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           mood_value, mood_updated_at, xp, reward_day_count, gift_seen, gift_found, days_together, last_active_day, last_counter)
           VALUES (?, ?, ?, 1, ?, ?, 100, ?, 0, 0, ?, ?, 1, ?, ?)`)
           .run(serial, hash(token), hash(code), stamp, stamp, t, EMPTY_SEEN, EMPTY_FOUND, today, counter);
-        return { html: petPage(getRow(serial), code, { celebrate: "claim", demo }), token };
+        return { html: petPage(getRow(serial), code, { celebrate: "claim", demo, theme }), token };
       }
       if (state === "OWNER") {
         // The skip cookie marks the redirect after /name or /claim, not a tap.
@@ -229,11 +235,11 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           raiseMirror();
           const skipped = getRow(serial);
           const pet = petView(skipped, petState(skipped, t), { rewarded: false }, t);
-          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found) }) };
+          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found), theme }) };
         }
         if (!afterTap.pet_name) {
           raiseMirror();
-          return { html: petPage(getRow(serial), null, { celebrate: flash, demo }) };
+          return { html: petPage(getRow(serial), null, { celebrate: flash, demo, theme }) };
         }
         const st = petState(afterTap, t);
         const out = applyTap(st, t, {
@@ -251,9 +257,9 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         else if (!visual && mile) visual = "milestone";
         else if (!visual && out.rewarded && out.gift && out.gift.tier === "rare") visual = "rare";
         else if (!visual && out.rewarded && out.gift && out.gift.tier === "special") visual = "special";
-        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, extra || {}), demo, found: parseFound(fresh.gift_found) }) };
+        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, extra || {}), demo, found: parseFound(fresh.gift_found), theme }) };
       }
-      if (state === "STRANGER") return { html: strangerPage(row, "", { demo }) };
+      if (state === "STRANGER") return { html: strangerPage(row, "", { demo, theme }) };
       throw new Error("Invalid binding result");
     })();
     if (result.token) setOwner(res, result.token);
@@ -262,14 +268,14 @@ export function createApp({ db, decisions = binding, production = process.env.NO
 
   app.post("/name", (req, res) => {
     const { uid, name } = req.body || {};
-    if (!validUid(uid)) return invalidUid(res);
+    if (!validUid(uid)) return invalidUid(req, res);
     const row = getRow(uid);
     if (!decisions.canRename(row, req.cookies.owner_token || null, hash)) {
-      return res.status(403).send(row ? strangerPage(row) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>"));
+      return res.status(403).send(row ? strangerPage(row, "", { theme: req.theme }) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>", { theme: req.theme }));
     }
     const trimmed = typeof name === "string" ? name.trim() : "";
     if (!trimmed || Array.from(trimmed).length > 24) {
-      return res.status(400).send(page(row, `<p>이름은 1글자에서 24글자 사이로 지어주세요.</p><a class="button" href="/t?uid=${uid}">다시 지어볼래요</a>`));
+      return res.status(400).send(page(row, `<p>이름은 1글자에서 24글자 사이로 지어주세요.</p><a class="button" href="/t?uid=${uid}">다시 지어볼래요</a>`, { theme: req.theme }));
     }
     const firstName = !row.pet_name;
     db.prepare("UPDATE plushies SET pet_name = ? WHERE uid = ?").run(trimmed, uid);
@@ -280,7 +286,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
 
   app.post("/claim", (req, res) => {
     const { uid, code } = req.body || {};
-    if (!validUid(uid)) return invalidUid(res);
+    if (!validUid(uid)) return invalidUid(req, res);
     const result = db.transaction(() => {
       const row = getRow(uid);
       const time = now();
@@ -308,13 +314,13 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       return res.redirect(303, `/t?uid=${uid}`);
     }
     const demo = demoUids.includes(uid) ? uid : "";
-    res.status(result.status).send(result.row ? strangerPage(result.row, result.message, { demo }) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>"));
+    res.status(result.status).send(result.row ? strangerPage(result.row, result.message, { demo, theme: req.theme }) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>", { theme: req.theme }));
   });
 
   if (demoUids.length) {
     app.post("/demo/fresh-start", (req, res) => {
       const uid = req.body?.uid;
-      if (!demoUids.includes(uid)) return res.status(403).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>"));
+      if (!demoUids.includes(uid)) return res.status(403).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>", { theme: req.theme }));
       db.prepare("DELETE FROM plushies WHERE uid = ?").run(uid);
       clearCelebrate(res);
       clearSkip(res);
@@ -323,7 +329,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   }
 
   if (!production) {
-    app.get("/dev", (req, res) => res.send(devPage()));
+    app.get("/dev", (req, res) => res.send(devPage(undefined, { theme: req.theme })));
     app.get("/dev/preview", (req, res) => {
       const kind = req.query.kind;
       const count = Number(req.query.count);
@@ -331,15 +337,15 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const reason = req.query.reason;
       const ok = previewPetPage.validate({ kind, count, tier, reason });
       if (!ok) {
-        return res.status(404).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>"));
+        return res.status(404).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>", { theme: req.theme }));
       }
-      res.send(previewPetPage({ kind, count, tier, reason, mascot: req.demoMascot || "horse" }));
+      res.send(previewPetPage({ kind, count, tier, reason, mascot: req.demoMascot || "horse", theme: req.theme }));
     });
     app.post("/dev/prime", (req, res) => {
       const { uid, preset, tier } = req.body || {};
-      if (!validUid(uid)) return invalidUid(res);
+      if (!validUid(uid)) return invalidUid(req, res);
       const row = getRow(uid);
-      if (!row) return res.status(404).send(page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>"));
+      if (!row) return res.status(404).send(page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>", { theme: req.theme }));
       const t = now();
       if (preset === "lonely") {
         db.prepare("UPDATE plushies SET mood_value = 20, mood_updated_at = ?, last_rewarded_at = NULL WHERE uid = ?").run(t, uid);
@@ -348,14 +354,14 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       } else if (preset === "fresh") {
         db.prepare("UPDATE plushies SET last_rewarded_at = NULL, reward_day_count = 0 WHERE uid = ?").run(uid);
       } else if (preset) {
-        return res.status(400).send(page(null, "<p>잘 알아듣지 못했어요. 다시 한 번 해보세요.</p>"));
+        return res.status(400).send(page(null, "<p>잘 알아듣지 못했어요. 다시 한 번 해보세요.</p>", { theme: req.theme }));
       }
       if (tier === "none") {
         db.prepare("UPDATE plushies SET next_gift_tier = NULL WHERE uid = ?").run(uid);
       } else if (tier === "common" || tier === "special" || tier === "rare") {
         db.prepare("UPDATE plushies SET next_gift_tier = ?, last_gift_day = NULL, last_rewarded_at = NULL WHERE uid = ?").run(tier, uid);
       } else if (tier) {
-        return res.status(400).send(page(null, "<p>잘 알아듣지 못했어요. 다시 한 번 해보세요.</p>"));
+        return res.status(400).send(page(null, "<p>잘 알아듣지 못했어요. 다시 한 번 해보세요.</p>", { theme: req.theme }));
       }
       res.redirect(303, "/dev");
     });
@@ -367,12 +373,12 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       res.redirect(303, "/dev");
     });
   }
-  app.use((req, res) => res.status(404).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>")));
+  app.use((req, res) => res.status(404).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>", { theme: req.theme })));
   app.use((error, req, res, next) => {
     const status = error.status >= 400 && error.status < 500 ? error.status : 500;
     res.status(status).send(page(null, status === 500
       ? "<p>친구가 아직 깨어나지 못했어요. 잠시 후에 다시 찾아와 주세요.</p>"
-      : "<p>잘 알아듣지 못했어요. 다시 한 번 해보세요.</p>"));
+      : "<p>잘 알아듣지 못했어요. 다시 한 번 해보세요.</p>", { theme: req.theme }));
   });
   return app;
 }
