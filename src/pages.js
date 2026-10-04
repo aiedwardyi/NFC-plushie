@@ -79,11 +79,13 @@ const SKY = `<div class="sky" aria-hidden="true">
 
 const HEART_PATH = "M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z";
 
+export function heartHalves(mood) {
+  return Math.max(1, Math.min(10, Math.ceil(Number(mood) / 10) || 1));
+}
+
 export function heartRow(mood, { animate = false, before = null } = {}) {
-  const halves = Math.max(1, Math.min(10, Math.ceil(Number(mood) / 10) || 1));
-  const start = animate && before !== null
-    ? Math.max(1, Math.min(10, Math.ceil(Number(before) / 10) || 1))
-    : halves;
+  const halves = heartHalves(mood);
+  const start = animate && before !== null ? heartHalves(before) : halves;
   let hearts = "";
   for (let i = 1; i <= 5; i++) {
     const fill = Math.max(0, Math.min(2, start - (i - 1) * 2));
@@ -151,8 +153,9 @@ function petStats(pet) {
   </section>`;
 }
 
-function dockHtml({ gift = false } = {}) {
-  return `<nav class="dock" aria-label="메뉴">
+function dockHtml({ gift = false, want = "", meals = 0, uid = "" } = {}) {
+  const owner = uid ? ` data-care-uid="${escapeHtml(uid)}"` : "";
+  return `<nav class="dock" aria-label="메뉴" data-want="${escapeHtml(want)}" data-meals="${Number(meals) || 0}"${owner}>
       <button type="button" class="dock-btn" data-dock-pat><span class="dock-cap">${ICONS.pat}</span><span class="dock-label">토닥</span></button>
       <button type="button" class="dock-btn${gift ? " has-new" : ""}" data-open="gifts" aria-haspopup="dialog"><span class="dock-cap">${ICONS.gift}</span><span class="dock-label">선물함</span></button>
       <button type="button" class="dock-btn" data-open="record" aria-haspopup="dialog"><span class="dock-cap">${ICONS.record}</span><span class="dock-label">우리 기록</span></button>
@@ -202,7 +205,7 @@ export function giftCollection(found = [], today = null) {
 }
 
 function miniHearts(mood) {
-  const halves = Math.max(1, Math.min(10, Math.ceil(Number(mood) / 10) || 1));
+  const halves = heartHalves(mood);
   let out = "";
   for (let i = 0; i < 5; i++) {
     const fill = Math.max(0, Math.min(2, halves - i * 2));
@@ -243,7 +246,11 @@ function demoPanel(uid, row) {
         </button>
       </aside>
       <button type="button" data-demo-replay>처음 인사 다시 보기</button>
-      ${reveal}
+      ${reveal}${row?.pet_name ? `
+      <form action="/demo/care-reset" method="post" data-demo-care>
+        <input type="hidden" name="uid" value="${escapeHtml(uid)}">
+        <button type="submit" class="secondary">돌봄 처음으로 돌리기</button>
+      </form>` : ""}
       <form action="/demo/fresh-start" method="post" data-demo-fresh>
         <input type="hidden" name="uid" value="${escapeHtml(uid)}">
         <button type="submit" class="secondary">처음 만나는 날로 돌아가기</button>
@@ -260,7 +267,7 @@ function nameSize(name) {
   return "";
 }
 
-export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = "horse", wake = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, meet = false, theme = "classic" } = {}) {
+export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = "horse", wake = false, morning = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, meet = false, theme = "classic" } = {}) {
   const look = themeOf(theme);
   const title = escapeHtml(row?.pet_name || "새 친구");
   const timeEl = timeLine ? `<p class="time-line" data-time-line></p>` : "";
@@ -309,7 +316,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
   <script src="/mascot-boot.js"></script>
   <script src="/app.js" defer></script>
 </head>
-<body${bodyClass ? ` class="${bodyClass}"` : ""}${celebrateAttr}${wake ? " data-wake" : ""}>
+<body${bodyClass ? ` class="${bodyClass}"` : ""}${celebrateAttr}${wake ? " data-wake" : ""}${morning ? " data-morning" : ""}>
   <main>
     <header class="topbar">
       <span class="wordmark">POKKEY</span>
@@ -348,7 +355,7 @@ function keyCard(code) {
 
 function homeExtras(row, pet, found) {
   return {
-    dock: dockHtml({ gift: Boolean(pet?.gift) }),
+    dock: dockHtml({ gift: Boolean(pet?.gift), want: pet?.want, meals: pet?.meals, uid: row.uid }),
     sheets: sheetHtml("gifts", "선물함", giftCollection(found, pet?.gift || null))
       + sheetHtml("record", "우리 기록", recordSheet(row, pet)),
   };
@@ -356,11 +363,12 @@ function homeExtras(row, pet, found) {
 
 export function petPage(row, code = null, { celebrate = "", pet = null, mascot = "horse", demo = "", found = [], theme = "classic" } = {}) {
   const firstMeet = celebrate === "claim" || celebrate === "named";
-  const greeting = row.pet_name
+  let greeting = row.pet_name
     ? (firstMeet
       ? `만나서 반가워요, ${escapeHtml(row.pet_name)}!`
       : `다시 만나서 반가워요, ${escapeHtml(row.pet_name)}!`)
     : "안녕하세요! 찾아와 줘서 정말 기뻐요.";
+  if (pet?.morning) greeting = "쿨쿨… 쿨쿨…";
   const recovery = code ? keyCard(code) : "";
   const prompt = row.pet_name ? "" : `<form action="/name" method="post" class="name-form" data-met="${metDay(row)}">
     <input type="hidden" name="uid" value="${escapeHtml(row.uid)}">
@@ -387,7 +395,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
     row,
     `${recovery}${prompt}`,
     {
-      waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet, mascot, wake: Boolean(code), demo,
+      waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet, mascot, wake: Boolean(code), morning: Boolean(pet?.morning), demo,
       dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, meet: !row.pet_name, theme, ...extras,
     },
   );
