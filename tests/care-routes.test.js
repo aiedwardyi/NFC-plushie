@@ -83,7 +83,7 @@ test("owner feeds: full, nibble, then a stash that writes nothing", async (t) =>
   const { jar } = await meet(ctx, A, "Mochi");
   ctx.db.prepare("UPDATE plushies SET mood_value = 10, mood_updated_at = ? WHERE uid = ?").run(T0, A);
   const home = await ctx.request(`/t?uid=${A}`, { jar });
-  assert.match(home.html, /<nav class="dock" aria-label="메뉴" data-want="feed" data-meals="0" data-plays="0" data-care-uid="04AAAAAAAAAAA1" data-combo="0">/);
+  assert.match(home.html, /<nav class="dock" aria-label="메뉴" data-want="feed" data-meals="0" data-plays="0" data-care-uid="04AAAAAAAAAAA1" data-arcade-left="3" data-gi-best="0" data-combo="0">/);
   ctx.db.prepare("UPDATE plushies SET mood_value = 10, mood_updated_at = ? WHERE uid = ?").run(T0, A);
   const one = await care(ctx, jar, "feed");
   assert.equal(one.status, 200);

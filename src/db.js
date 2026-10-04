@@ -27,6 +27,9 @@ const petColumns = [
   "slept_at INTEGER",
   "combo_count INTEGER",
   "combo_at INTEGER",
+  "arcade_day TEXT",
+  "arcade_plays INTEGER",
+  "gi_best INTEGER",
 ];
 
 export function migratePetColumns(db, migrationMs = Date.now()) {

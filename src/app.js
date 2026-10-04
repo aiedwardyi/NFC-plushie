@@ -5,9 +5,10 @@ import * as binding from "./binding.js";
 import { hash, ownerToken, recoveryCode } from "./secrets.js";
 import { EMPTY_FOUND, EMPTY_SEEN } from "./db.js";
 import { GIFT_COUNT as GIFT_TOTAL, GIFT_TIERS, GIFTS } from "./gifts.js";
-import { PET, applyTap, currentMood, parseTapUid, seoulDayKey, xpProgress } from "./pet.js";
+import { PET, applyTap, currentMood, levelForXp, parseTapUid, seoulDayKey, xpProgress } from "./pet.js";
 import { applyCare, careWant, mealsNow, playsNow } from "./care.js";
 import { comboNext, comboTap } from "./combo.js";
+import { ARCADE, applyPlay, xpPlaysLeft } from "./arcade.js";
 import { devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
 
 const cookieAge = 400 * 24 * 60 * 60 * 1000;
@@ -15,6 +16,7 @@ const cooldown = 15 * 60 * 1000;
 const skipAge = 2 * 60 * 1000;
 const validUid = (uid) => typeof uid === "string" && /^[0-9A-F]{14}$/.test(uid);
 const CARE_ACTS = ["feed", "play", "sleep"];
+const validHeight = (h) => Number.isInteger(h) && h % 10 === 0 && h >= 0 && h <= ARCADE.maxHeight;
 const parseDemoUids = (raw) => String(raw || "").split(",").map((s) => s.trim().toUpperCase()).filter(validUid);
 
 const STALE_LINE = "폰을 진짜 저한테 톡 대 주세요!";
@@ -67,6 +69,9 @@ function petState(row, t) {
     sleptAt: row.slept_at ?? null,
     comboCount: row.combo_count ?? 0,
     comboAt: row.combo_at ?? null,
+    arcadeDay: row.arcade_day ?? null,
+    arcadePlays: row.arcade_plays ?? 0,
+    giBest: row.gi_best ?? 0,
     seen_common: seen.common,
     seen_special: seen.special,
     seen_rare: seen.rare,
@@ -210,6 +215,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       plays: playsNow(care, t),
       morning: Boolean(extra.morning),
       combo: extra.combo || 0,
+      arcadeLeft: xpPlaysLeft(care, t),
+      giBest: care.giBest,
     };
   }
 
@@ -371,6 +378,36 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       return { ok: true, combo: c.combo, same: c.same, tapCount: getRow(uid).tap_count };
     })();
     if (!reply) return res.status(403).json({ ok: false });
+    res.json(reply);
+  });
+
+  app.post("/arcade", (req, res) => {
+    const { uid, game, height } = req.body || {};
+    if (!validUid(uid) || game !== "gi" || !validHeight(height)) return res.status(400).json({ ok: false });
+    const reply = db.transaction(() => {
+      const row = getRow(uid);
+      if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row.pet_name) return 403;
+      if (row.slept_at !== null) return 409;
+      const t = now();
+      const st = petState(row, t);
+      const out = applyPlay(st, height, t);
+      const xpAfter = st.xp + out.xpGain;
+      db.prepare("UPDATE plushies SET arcade_day = ?, arcade_plays = ?, gi_best = ?, xp = ? WHERE uid = ?")
+        .run(out.arcadeDay, out.arcadePlays, out.best, xpAfter, uid);
+      const after = xpProgress(xpAfter);
+      return {
+        ok: true,
+        xpGain: out.xpGain,
+        xpLeft: out.xpLeft,
+        best: out.best,
+        isBest: out.isBest,
+        level: after.level,
+        leveledUp: levelForXp(xpAfter) > levelForXp(st.xp),
+        xpInto: after.into,
+        xpSpan: after.span,
+      };
+    })();
+    if (typeof reply === "number") return res.status(reply).json({ ok: false });
     res.json(reply);
   });
 
