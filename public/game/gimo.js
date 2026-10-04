@@ -1023,7 +1023,7 @@ export async function createGimo(api) {
     const tier = tierOf(target);
     const height = meters(target);
     // The save runs through the flight; the result card gives a slow one a moment more.
-    reply = Promise.resolve().then(() => api.onLaunch(height, tier)).catch(() => null);
+    reply = Promise.resolve().then(() => api.onLaunch(height)).catch(() => null);
     say(pick(LINES.launch));
     face("blink");
     // Inhale: aura sucks in, the pet coils.
@@ -1300,7 +1300,7 @@ export async function createGimo(api) {
       begin().catch((error) => {
         if (error === STOP) return;
         finish("aborted");
-        throw error;
+        console.error(error);
       });
       return promise;
     },
