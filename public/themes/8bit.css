@@ -504,3 +504,40 @@ html[data-theme="8bit"] .sun-flash { background: #fff1e8; animation-timing-funct
   html[data-theme="8bit"] .dialog-cursor.is-done,
   html[data-theme="8bit"] .dock-btn.is-want .dock-cap::after { animation: none; }
 }
+
+/* Tap combo: a crisp pixel key, Galmuri pill and word, stepped ripple, square floor ring */
+html[data-theme="8bit"] {
+  --k-fill: #ffec27;
+  --k-fill2: #ffa300;
+  --k-edge: #1d1d2b;
+  --k-hole: #1d1d2b;
+  --k-ring: #ffec27;
+  --k-ghost: rgba(29, 29, 43, .45);
+  --k-pill: #1d1d2b;
+  --k-pill-ink: #ffec27;
+  --k-ray: 255, 236, 39;
+}
+html[data-theme="8bit"] .combo-key svg { filter: drop-shadow(3px 3px 0 rgba(0, 0, 0, .35)); }
+html[data-theme="8bit"] .combo-key .tooth { stroke: none; fill: var(--k-ghost); opacity: .55; }
+html[data-theme="8bit"] .combo-key .tooth.on { fill: var(--k-fill); opacity: 1; }
+html[data-theme="8bit"] .combo-key .tooth.is-pop { animation: tooth-pop-px .3s steps(3) both; }
+@keyframes tooth-pop-px {
+  0% { transform: scaleY(0); }
+  100% { transform: scaleY(1); }
+}
+html[data-theme="8bit"] .combo-pill { border-radius: 0; font-family: "Galmuri11", monospace; font-weight: 700; box-shadow: 3px 3px 0 rgba(0, 0, 0, .35); animation: pill-blink 1s steps(2) infinite; }
+@keyframes pill-blink {
+  0% { opacity: 1; }
+  100% { opacity: .35; }
+}
+html[data-theme="8bit"] .tap-ripple { border-radius: 0; border-width: 4px; animation: tap-ripple-px .45s steps(4) forwards; }
+@keyframes tap-ripple-px {
+  0% { transform: scale(.5); opacity: 1; }
+  100% { transform: scale(5); opacity: 0; }
+}
+html[data-theme="8bit"] .tap-word { font-family: "Galmuri11", monospace; -webkit-text-stroke: 0; color: #ffec27; text-shadow: 3px 3px 0 #1d1d2b; }
+html[data-theme="8bit"] .unlock-rays i { background: repeating-conic-gradient(from 0deg, rgba(var(--k-ray), .7) 0deg 8deg, rgba(var(--k-ray), 0) 8deg 24deg); image-rendering: pixelated; }
+html[data-theme="8bit"] .floor-ring { border-radius: 0; }
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="8bit"] .combo-pill { animation: none; }
+}

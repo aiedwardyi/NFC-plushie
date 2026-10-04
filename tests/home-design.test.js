@@ -180,6 +180,7 @@ test("the dock runs gift box, the three care verbs, then records", async (t) => 
   const preview = await request("/dev/preview?kind=gift&count=10");
   assert.match(preview.html, /data-care="feed"/);
   assert.doesNotMatch(preview.html, /data-care-uid/);
+  assert.match(preview.html, /<nav class="dock"[^>]* data-combo="0">/);
 });
 
 for (const kind of ["horse", "sheep"]) {

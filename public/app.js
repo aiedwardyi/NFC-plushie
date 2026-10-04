@@ -1588,6 +1588,7 @@ if (themeSheet) {
     else root.dataset.theme = id;
     applied = id;
     care?.restyle();
+    combo?.restyle();
   }
 
   function flip(id, color) {
@@ -1944,7 +1945,7 @@ const care = (function careLoop() {
 
   function screenBusy() {
     return Boolean(sheetOpen || waking || (demo && !demo.hidden) || root.classList.contains("has-reveal")
-      || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump, .gift.is-glow"));
+      || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump, .gift.is-glow, .combo-key"));
   }
 
   // The bubble waits for ms of quiet: no sheet, reveal or celebration on screen.
@@ -2423,6 +2424,22 @@ const care = (function careLoop() {
     }, 0);
   }
 
+  // A tap combo stage holds the pet like an action, but leaves the opening dialog running.
+  function hold() {
+    careHold.busy = true;
+    setWant(null);
+    pet.classList.add("is-care");
+    motion.getAnimations().forEach((a) => a.cancel());
+  }
+
+  function release() {
+    motion.getAnimations().forEach((a) => a.cancel());
+    pet.classList.remove("is-care");
+    careHold.busy = false;
+    face();
+    if (opened) wantLater(dock.dataset.want, 800);
+  }
+
   function restyle() {
     if (wantEl) wantEl.querySelector(".want-cloud").innerHTML = wantArt(wantEl.dataset.want);
     if (moonEl) moonEl.innerHTML = art().moon();
@@ -2434,7 +2451,477 @@ const care = (function careLoop() {
     if (id) press(id);
   });
   if (owner) window.addEventListener("load", () => preload(world()), { once: true });
-  return { morning, opened: open, restyle };
+  return { morning, opened: open, restyle, hold, release, fx: { say, sparkles, cheer, box, move, sound, voice } };
+})();
+
+/* Tap combo: plushie taps in a row play a hello, the world's trick, then the secret move; the key counts them. */
+const combo = (function tapCombo() {
+  const dock = document.querySelector(".dock[data-care-uid]");
+  const win = document.querySelector("[data-window]");
+  if (!dock || !care || !win) return null;
+  const root = document.documentElement;
+  const motion = pet.querySelector(".pet-motion");
+  const { say, sparkles, cheer, box, sound, voice } = care.fx;
+  const world = () => root.dataset.theme || "classic";
+  const kit = () => (world() === "8bit" ? "chip" : "soft");
+  const still = () => prefersReducedMotion();
+  const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+  // The server keeps a chain for 12 s; the extra 2 s cover the trip from the tap to the drawn ring.
+  const WINDOW_MS = 10000;
+  const PROMPTS = ["한 번 더 톡!", "마지막 한 번!"];
+  const TRICK_LINES = { classic: "빙글빙글~ 멋있죠?", "8bit": "픽셀 댄스! 삐빅 삐빅!", milk: "말랑말랑 젤리 댄스~", najeon: "공손하게 인사드려요!" };
+  const SECRET_LINES = { classic: "짜잔! 우리만 아는 비밀 동작이에요!", "8bit": "히든 커맨드 발동! 비밀 기술이에요!", milk: "딸기 별똥별! 우리만의 비밀이에요!", najeon: "보름달까지 훌쩍! 우리만 아는 비밀이에요." };
+
+  // Chrome logs an intervention for a buzz before the page's first touch.
+  function buzz(pattern) {
+    if (navigator.userActivation?.hasBeenActive === false) return;
+    tryVibrate(pattern);
+  }
+
+  function cryAt(mood, rate, at = 0) {
+    const name = cryName(mood, world());
+    if (at) window.setTimeout(() => playSfx(name, { rate }), at);
+    else playSfx(name, { rate });
+  }
+
+  function chime(name, at = 0) {
+    const file = `tap-${kit()}-${name}`;
+    if (at) window.setTimeout(() => playSfx(file), at);
+    else playSfx(file);
+  }
+
+  function preload() {
+    for (const name of ["unlock", "fanfare"]) loadSfx(`tap-${kit()}-${name}`);
+  }
+
+  function add(className, x, y) {
+    const el = document.createElement("div");
+    el.className = className;
+    el.setAttribute("aria-hidden", "true");
+    if (x !== undefined) {
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+    }
+    win.appendChild(el);
+    return el;
+  }
+
+  // Like care's move, but starting now: a held pet's moves otherwise each start a frame late, slowing chained steps.
+  function step(el, frames, options) {
+    if (still()) return wait(options.duration);
+    const a = el.animate(frames, { fill: "forwards", ...options });
+    if (document.timeline.currentTime !== null) a.startTime = document.timeline.currentTime;
+    return a.finished.catch(() => {});
+  }
+
+  function once(el, frames, options) {
+    return el.animate(frames, { fill: "forwards", ...options }).finished.catch(() => {}).then(() => el.remove());
+  }
+
+  // The bow carries the countdown, then one tooth per tap; colors come from the world's --k-* properties.
+  function keySvg() {
+    if (world() === "8bit") {
+      let px = "";
+      const R = (x, y, w, h, c) => {
+        px += `<rect class="${c}" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
+      };
+      for (let y = 0; y < 13; y++) {
+        for (let x = 0; x < 13; x++) {
+          const d = Math.hypot(x - 6, y - 6);
+          if (d <= 6.4 && d > 5.3) R(x, y, 1.02, 1.02, "k-edge");
+          else if (d <= 5.3 && d > 2.3) R(x, y, 1.02, 1.02, d > 4.4 && x + y > 12 ? "k-fill2" : "k-fill");
+          else if (d <= 2.3 && d > 1.3) R(x, y, 1.02, 1.02, "k-edge");
+        }
+      }
+      R(12, 4, 22, 1, "k-edge");
+      R(12, 5, 21, 2, "k-fill");
+      R(12, 7, 21, 1, "k-fill2");
+      R(12, 8, 22, 1, "k-edge");
+      R(33, 5, 1, 3, "k-edge");
+      const teeth = [[17, 4], [23, 3], [29, 5]].map(([x, h], i) => `<rect class="tooth" data-tooth="${i + 1}" x="${x}" y="9" width="3" height="${h}"/>`).join("");
+      const timer = Array.from({ length: 10 }, (_, i) => `<rect data-tick="${i}" x="${12 + i * 2.2}" y="15.4" width="1.6" height="1.6"/>`).join("");
+      return `<svg viewBox="-1 -1 37 19" shape-rendering="crispEdges" aria-hidden="true">${px}${teeth}<g class="px-timer">${timer}</g></svg>`;
+    }
+    return `<svg viewBox="0 0 132 56" aria-hidden="true"><defs><linearGradient id="combo-grad" x1="0" y1="0" x2="0" y2="1"><stop class="k-stop" offset="0"/><stop class="k-stop2" offset="1"/></linearGradient></defs>
+      <circle class="ring-bg" cx="26" cy="28" r="23"/>
+      <circle class="ring" cx="26" cy="28" r="23" pathLength="100" stroke-dasharray="100 100" transform="rotate(-90 26 28)"/>
+      <rect class="k-body" x="40" y="22" width="86" height="11" rx="3.5" fill="url(#combo-grad)" stroke-width="2.2"/>
+      <circle class="k-body" cx="26" cy="28" r="17" fill="url(#combo-grad)" stroke-width="2.4"/>
+      <circle class="k-hole" cx="26" cy="28" r="6"/>
+      <path d="M14 22c3-6 9-8 14-7" stroke="#fff" stroke-opacity=".7" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      ${[[60, 16], [81, 11], [102, 19]].map(([x, h], i) => `<rect class="tooth" data-tooth="${i + 1}" x="${x}" y="32" width="13" height="${h}" rx="2.5" fill="url(#combo-grad)"/>`).join("")}</svg>`;
+  }
+
+  let key = null;
+  let leaving = null;
+  let lit = 0;
+  let from = 0;
+  let ring = null;
+  let tickTimer = 0;
+  let endTimer = 0;
+  const left = () => WINDOW_MS - (performance.now() - from);
+
+  function stopCountdown() {
+    window.clearTimeout(endTimer);
+    window.clearTimeout(tickTimer);
+    ring?.cancel();
+    ring = null;
+  }
+
+  function countdown() {
+    stopCountdown();
+    const ms = left();
+    if (ms <= 0) return;
+    endTimer = window.setTimeout(expire, ms);
+    if (still()) return;
+    const arc = key.querySelector(".ring");
+    if (arc) {
+      ring = arc.animate([{ strokeDashoffset: 0 }, { strokeDashoffset: 100 }], { duration: WINDOW_MS, fill: "forwards" });
+      ring.currentTime = WINDOW_MS - ms;
+    }
+    const ticks = Array.from(key.querySelectorAll("[data-tick]"));
+    if (!ticks.length) return;
+    (function paint() {
+      const gone = WINDOW_MS - left();
+      ticks.forEach((el, i) => el.classList.toggle("off", i >= ticks.length - Math.floor(gone / 1000)));
+      tickTimer = window.setTimeout(paint, 1000 - (gone % 1000));
+    })();
+  }
+
+  function expire() {
+    stopCountdown();
+    if (!key) return;
+    const old = key;
+    key = null;
+    lit = 0;
+    if (still()) {
+      old.remove();
+      return;
+    }
+    leaving = old;
+    once(old, [{ transform: "translateY(0) scale(1)", opacity: 1 }, { transform: "translateY(-30px) scale(.4)", opacity: 0 }], { duration: 420, easing: "ease-in" });
+  }
+
+  function build() {
+    leaving?.remove();
+    leaving = null;
+    const el = document.createElement("div");
+    el.className = "combo-key";
+    el.innerHTML = `${keySvg()}<p class="combo-pill" role="status"></p>`;
+    win.appendChild(el);
+    return el;
+  }
+
+  function paintKey(n) {
+    key.querySelectorAll(".tooth").forEach((el) => el.classList.toggle("on", Number(el.dataset.tooth) <= n));
+    const pill = key.querySelector(".combo-pill");
+    pill.textContent = PROMPTS[n - 1] || "";
+    pill.hidden = n >= 3;
+  }
+
+  // A new key drops in from the keyhole with the earlier teeth lit; tooth n pops with its chime.
+  function showKey(n, start) {
+    let drop = Promise.resolve();
+    if (!key) {
+      key = build();
+      if (!still()) {
+        drop = key.animate([
+          { transform: "translateY(-34px) scale(.3)", opacity: 0 },
+          { transform: "translateY(4px) scale(1.06)", opacity: 1, offset: 0.7 },
+          { transform: "translateY(0) scale(1)", opacity: 1 },
+        ], { duration: 420, easing: "cubic-bezier(.3,1.4,.5,1)", fill: "forwards" }).finished.catch(() => {});
+      }
+    }
+    lit = n;
+    paintKey(n);
+    if (!still()) key.querySelector(`[data-tooth="${n}"]`).classList.add("is-pop");
+    sound("sparkle", 60, { rate: [1, 1.12, 1.26][n - 1], gain: 0.9 });
+    if (n < 3) {
+      from = start;
+      countdown();
+    } else {
+      window.clearTimeout(endTimer);
+      window.clearTimeout(tickTimer);
+      ring?.pause();
+      if (!still()) key.classList.add("is-full");
+    }
+    return drop;
+  }
+
+  // The plushie's tap landing on the phone.
+  function tapFx() {
+    sound("press");
+    buzz(18);
+    if (still()) return;
+    const b = box();
+    const cx = b.x + b.w / 2;
+    const ripple = add("tap-ripple", cx, b.y + b.h * 0.42);
+    const word = add("tap-word", cx + b.w * 0.2, b.y + b.h * 0.02);
+    word.textContent = "톡!";
+    window.setTimeout(() => {
+      ripple.remove();
+      word.remove();
+    }, 950);
+  }
+
+  async function hello() {
+    facePet("react");
+    voice("happy", 80);
+    await step(motion, [
+      { transform: "translateY(0) scale(1)" },
+      { transform: "translateY(3%) scale(1.06,.92)", offset: 0.2 },
+      { transform: "translateY(-12%) scale(.96,1.05)", offset: 0.55, easing: "ease-out" },
+      { transform: "translateY(0) scale(1.05,.95)", offset: 0.88 },
+      { transform: "translateY(0) scale(1)" },
+    ], { duration: 620 });
+    cheer();
+    await wait(500);
+    facePet();
+  }
+
+  async function trick() {
+    const b = box();
+    const w = world();
+    voice("excited", 60);
+    if (w === "8bit") {
+      const steps = [-9, 9, -9, 9, 0];
+      for (let i = 0; i < steps.length; i++) {
+        sound("click", 0, { rate: 1 + (i % 2) * 0.25, gain: 0.8 });
+        if (!still()) {
+          motion.style.transform = `translateX(${steps[i]}%) scaleX(${i % 2 ? -1 : 1})${i % 2 ? "" : " translateY(-4%)"}`;
+          const note = add("px-note", b.x + b.w * (i % 2 ? 0.85 : 0.1), b.y + b.h * 0.2);
+          note.textContent = i % 2 ? "♪" : "♫";
+          once(note, [{ transform: "translateY(0)", opacity: 1 }, { transform: "translateY(-50px)", opacity: 0 }], { duration: 800, easing: "steps(5)" });
+        }
+        await wait(230);
+      }
+      motion.style.transform = "";
+      facePet("react");
+    } else if (w === "milk") {
+      facePet("react");
+      sound("boing", 0, { rate: 1.3 });
+      sound("boing", 380, { rate: 1.1 });
+      sound("boing", 760, { rate: 1.45 });
+      await step(motion, [
+        { transform: "scale(1)" },
+        { transform: "scale(1.22,.78) translateY(10%)", offset: 0.12 },
+        { transform: "scale(.82,1.2) translateY(-8%)", offset: 0.26 },
+        { transform: "scale(1.14,.88)", offset: 0.4 },
+        { transform: "scale(.9,1.1) translateY(-14%)", offset: 0.55 },
+        { transform: "scale(1.1,.9)", offset: 0.7 },
+        { transform: "scale(.97,1.03)", offset: 0.85 },
+        { transform: "scale(1)" },
+      ], { duration: 1150, easing: "ease-in-out" });
+      const p = pet.getBoundingClientRect();
+      floatHearts(p.left + p.width / 2, p.top + p.height * 0.3);
+    } else if (w === "najeon") {
+      motion.style.transformOrigin = "50% 100%";
+      facePet("blink");
+      sound("dim", 0, { rate: 1.2, gain: 0.7 });
+      await step(motion, [{ transform: "scale(1) translateY(0)" }, { transform: "scale(1.04,.8) translateY(4%)" }], { duration: 520, easing: "ease-in-out" });
+      await wait(450);
+      facePet("react");
+      sound("sparkle", 0, { rate: 0.8 });
+      await step(motion, [
+        { transform: "scale(1.04,.8) translateY(4%)" },
+        { transform: "scale(.98,1.04) translateY(-4%)", offset: 0.6 },
+        { transform: "scale(1) translateY(0)" },
+      ], { duration: 480, easing: "ease-out" });
+      sparkles(b.x + b.w / 2, b.y + b.h * 0.3, 7, b.w * 0.8);
+    } else {
+      sound("whoosh");
+      const spin = (a, z, f) => step(motion, [{ transform: `translateY(-14%) scaleX(${a})` }, { transform: `translateY(-14%) scaleX(${z})` }], { duration: 95, easing: "ease-in-out" })
+        .then(() => f && facePet(f));
+      await step(motion, [{ transform: "translateY(0)" }, { transform: "translateY(-14%)" }], { duration: 200, easing: "ease-out" });
+      // Without the spin, the back of the head would only flash.
+      for (let i = 0; i < 2; i++) {
+        await spin(1, 0, still() ? "" : "away");
+        await spin(0, 1);
+        await spin(1, 0, "react");
+        await spin(0, 1);
+      }
+      await step(motion, [
+        { transform: "translateY(-14%)" },
+        { transform: "translateY(0) scale(1.07,.93)", offset: 0.8 },
+        { transform: "translateY(0) scale(1)" },
+      ], { duration: 300, easing: "ease-in" });
+      sound("land");
+      sparkles(b.x + b.w / 2, b.y + b.h * 0.35, 6, b.w * 0.9);
+    }
+    say(TRICK_LINES[w]);
+    buzz([16, 40, 16]);
+    await wait(600);
+    facePet();
+  }
+
+  function showerArt(w, i) {
+    if (w === "8bit") return `<svg viewBox="0 0 5 5" shape-rendering="crispEdges"><path d="M2 0h1v2h2v1H3v2H2V3H0V2h2z" fill="${i % 2 ? "#ffec27" : "#ff77a8"}"/></svg>`;
+    if (w === "milk") {
+      return i % 3 === 0
+        ? `<svg viewBox="0 0 24 24"><path d="M12 6c-5-4-11 1-8 8 2 4 6 6 8 8 2-2 6-4 8-8 3-7-3-12-8-8z" fill="#ff4f7b"/><path d="M8 5c2 2 6 2 8 0" stroke="#4fae55" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>`
+        : `<svg viewBox="0 0 24 22"><path d="M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z" fill="${i % 2 ? "#ff8fb3" : "#fff"}"/></svg>`;
+    }
+    if (w === "najeon") return `<svg viewBox="0 0 24 24"><g fill="${["#eef3ff", "#dff6ff", "#f6e8ff"][i % 3]}" opacity=".95">${[0, 72, 144, 216, 288].map((a) => `<ellipse cx="12" cy="6" rx="3.6" ry="5.4" transform="rotate(${a} 12 12)"/>`).join("")}</g><circle cx="12" cy="12" r="2.4" fill="#ffd98a"/></svg>`;
+    return `<svg viewBox="0 0 24 24"><path d="M12 1l3 7.5 8 .6-6.1 5.2 1.9 7.8L12 17.8 5.2 22.1l1.9-7.8L1 9.1l8-.6z" fill="${i % 2 ? "#ffe38a" : "#fff6d6"}" stroke="#c9932e" stroke-width="1"/></svg>`;
+  }
+
+  async function secret(drop) {
+    const w = world();
+    const k = key;
+    key = null;
+    lit = 0;
+    await drop;
+    await wait(350);
+    const b = box();
+    // The finished key turns upright, slides its tip into the window's keyhole and turns.
+    const kb = k.getBoundingClientRect();
+    const wb = win.getBoundingClientRect();
+    const dx = wb.width / 2 - (kb.left - wb.left + kb.width * 0.955);
+    const dy = 10 - (kb.top - wb.top + kb.height * 0.5);
+    const inHole = `translate(${dx}px, ${dy}px) rotate(-90deg) scale(.7)`;
+    k.style.transformOrigin = "95.5% 50%";
+    sound("whoosh", 0, { rate: 1.1 });
+    await step(k, [
+      { transform: "translate(0,0) rotate(0) scale(1)" },
+      { transform: `translate(${dx}px, ${dy + 40}px) rotate(-90deg) scale(.7)`, offset: 0.7 },
+      { transform: inHole },
+    ], { duration: 560, easing: "cubic-bezier(.45,0,.4,1)" });
+    sound("click", 0, { rate: 0.85 });
+    buzz(30);
+    await step(k, [{ transform: `${inHole} scaleY(1)` }, { transform: `${inHole} scaleY(.12)` }], { duration: 220, easing: w === "8bit" ? "steps(3)" : "cubic-bezier(.5,1.6,.6,1)" });
+    // Unlock: a flash and rays pour from the keyhole.
+    if (still()) {
+      k.remove();
+    } else {
+      once(add("keyhole-flash"), [{ transform: "scale(.2)", opacity: 1 }, { transform: "scale(4)", opacity: 0 }], { duration: 650, easing: "ease-out" });
+      once(k, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 150 });
+    }
+    pulseFlash(0.5, 200);
+    chime("unlock");
+    sound("whistle-up", 120);
+    if (!still()) {
+      const rays = add("unlock-rays");
+      rays.innerHTML = "<i></i>";
+      once(rays.firstChild, [
+        { opacity: 0, transform: "rotate(0)" },
+        { opacity: 1, transform: "rotate(25deg)", offset: 0.15 },
+        { opacity: 0.9, transform: "rotate(70deg)", offset: 0.8 },
+        { opacity: 0, transform: "rotate(90deg)" },
+      ], { duration: 4200, easing: "linear" }).then(() => rays.remove());
+    }
+    // Charge, then launch out of the top of the window.
+    await wait(250);
+    facePet("blink");
+    await step(motion, [{ transform: "translateY(0) scale(1)" }, { transform: "translateY(6%) scale(1.14,.82)" }], { duration: 300, easing: "ease-in" });
+    facePet("react");
+    voice("excited");
+    sound("trail");
+    buzz(24);
+    const trail = still() ? 0 : window.setInterval(() => {
+      const p = box();
+      sparkles(p.x + p.w / 2, p.y + p.h * 0.85, 2, 30);
+    }, 60);
+    await step(motion, [
+      { transform: "translateY(6%) scale(1.14,.82)" },
+      { transform: "translateY(-30%) scale(.9,1.16)", offset: 0.3 },
+      { transform: "translateY(-170%) scale(.9,1.12)" },
+    ], { duration: 520, easing: "cubic-bezier(.3,.1,.5,1)" });
+    window.clearInterval(trail);
+    // The world's shower falls while the pet is up there.
+    for (let i = 0; i < (still() ? 0 : 22); i++) {
+      const s = 16 + Math.random() * 16;
+      const drift = (Math.random() - 0.5) * 60;
+      const bit = add("shower", Math.random() * (b.W - s), -s);
+      bit.style.width = `${s}px`;
+      bit.style.height = `${s}px`;
+      bit.innerHTML = showerArt(w, i);
+      once(bit, [{ transform: "translate(0,0) rotate(0)" }, { transform: `translate(${drift}px, ${b.H + s * 2}px) rotate(${(Math.random() - 0.5) * 540}deg)` }],
+        { duration: 1500 + Math.random() * 900, delay: i * 55, easing: w === "8bit" ? "steps(14)" : "cubic-bezier(.4,.1,.7,1)" });
+    }
+    sound("sparkle", 100, { rate: 1.3 });
+    sound("sparkle", 420, { rate: 1.5 });
+    sound("sparkle", 760, { rate: 1.2 });
+    // Wiggles up top so the wait never reads as a freeze.
+    await step(motion, [
+      { transform: "translateY(-170%) rotate(0)" },
+      { transform: "translateY(-165%) rotate(-10deg)", offset: 0.25 },
+      { transform: "translateY(-172%) rotate(10deg)", offset: 0.75 },
+      { transform: "translateY(-170%) rotate(0)" },
+    ], { duration: 900, easing: "ease-in-out" });
+    // Spins back down and lands to a fanfare.
+    sound("whistle-up", 0, { rate: 0.7 });
+    await step(motion, [{ transform: "translateY(-170%) rotate(0) scale(1)" }, { transform: "translateY(0) rotate(720deg) scale(1)" }], { duration: 620, easing: "cubic-bezier(.5,0,.8,.6)" });
+    await step(motion, [
+      { transform: "translateY(0) scale(1.18,.8)" },
+      { transform: "translateY(-6%) scale(.95,1.06)", offset: 0.5 },
+      { transform: "translateY(0) scale(1)" },
+    ], { duration: 380, easing: "ease-out" });
+    sound("land");
+    if (!still()) {
+      const floor = add("floor-ring", b.x + b.w * 0.2, b.y + b.h * 0.9);
+      floor.style.width = `${b.w * 0.6}px`;
+      once(floor, [{ transform: "scale(.4)", opacity: 1 }, { transform: "scale(2.2)", opacity: 0 }], { duration: 700, easing: "ease-out" });
+    }
+    cryAt("excited", 1);
+    cryAt("happy", 1.12, 420);
+    chime("fanfare", 60);
+    buzz([40, 60, 40, 60, 160]);
+    sparkles(b.x + b.w / 2, b.y + b.h * 0.3, 10, b.w);
+    const p = pet.getBoundingClientRect();
+    floatHearts(p.left + p.width / 2, p.top + p.height * 0.2);
+    say(SECRET_LINES[w]);
+    await wait(1400);
+    facePet();
+  }
+
+  let queue = Promise.resolve();
+
+  async function run(n, start) {
+    while (careHold.busy) await wait(100);
+    care.hold();
+    try {
+      tapFx();
+      const drop = showKey(n, start);
+      if (n === 1) await hello();
+      else if (n === 2) await trick();
+      else await secret(drop);
+    } finally {
+      motion.style.transform = "";
+      motion.style.transformOrigin = "";
+      care.release();
+    }
+    if (key && left() <= 0) expire();
+  }
+
+  // A stage asked for mid-stage plays right after it.
+  function play(n, start) {
+    queue = queue.catch(() => {}).then(() => run(n, start));
+    return queue;
+  }
+
+  function start() {
+    const n = Number(dock.dataset.combo) || 0;
+    if (n < 1 || n > 3) return;
+    const at = performance.getEntriesByType?.("navigation")[0]?.responseStart || performance.now();
+    window.requestAnimationFrame(() => play(n, at));
+  }
+
+  function restyle() {
+    preload();
+    if (!key) return;
+    if (left() <= 0) {
+      expire();
+      return;
+    }
+    const old = key;
+    key = build();
+    old.remove();
+    paintKey(lit);
+    countdown();
+  }
+
+  window.addEventListener("load", preload, { once: true });
+  return { start, restyle };
 })();
 
 const TIER_WORDS = { special: "특별한 선물", rare: "반짝 선물" };
@@ -2937,6 +3424,7 @@ if (document.body.hasAttribute("data-wake")) {
 } else {
   runCelebrate();
   startDialog(() => care?.opened());
+  combo?.start();
   armReveal();
 }
 document.documentElement.setAttribute("data-app", "");
