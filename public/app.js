@@ -2490,6 +2490,8 @@ const combo = (function tapCombo() {
   // The server keeps a chain for 12 s; the extra 2 s cover the trip from the tap to the drawn ring.
   const WINDOW_MS = 10000;
   const SAME_TAP_MS = 800;
+  // A game counts every plushie tap, so its reads only merge when they come this close.
+  const SINK_SAME_MS = 250;
   const TAP_UID = /^[0-9A-F]{14}(x[0-9A-F]{6})?$/;
   const uid = dock.dataset.careUid;
   const loaded = performance.getEntriesByType?.("navigation")[0]?.responseStart || 0;
@@ -2955,6 +2957,7 @@ const combo = (function tapCombo() {
   let ready = false;
   let listening = null;
   let lastRead = -Infinity;
+  let sinkFn = null;
 
   function nfcState(on) {
     if (!nfcButton) return;
@@ -3007,6 +3010,13 @@ const combo = (function tapCombo() {
   // Only a chain the key still shows continues in place; anything else loads a full tap.
   function heard(event) {
     const now = performance.now();
+    // While a game holds the reader, this plushie's taps go to it and nothing navigates.
+    if (sinkFn) {
+      const twice = now - lastRead < SINK_SAME_MS;
+      lastRead = now;
+      if (!twice && identify(event).serial === uid) sinkFn();
+      return;
+    }
     const again = now - lastRead < SAME_TAP_MS;
     lastRead = now;
     if (again) return;
@@ -3084,8 +3094,16 @@ const combo = (function tapCombo() {
     listening?.then((controller) => controller?.abort());
     listening = null;
   });
+  function sink(fn) {
+    sinkFn = fn || null;
+  }
+
+  function end() {
+    if (key) expire();
+  }
+
   window.addEventListener("load", preload, { once: true });
-  return { start, restyle };
+  return { start, restyle, listen, sink, end };
 })();
 
 /* 오락실: 기 모으기 on a WebGL stage, loaded when the room first opens; the first 3 plays a day give XP. */
@@ -3106,6 +3124,7 @@ const arcade = (function arcadeRoom() {
   const BLURB = blurb.textContent;
   const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
   const VENDOR = ["/vendor/pixi-8.22.0.min.js", "/vendor/pixi-unsafe-eval-8.22.0.min.js", "/vendor/pixi-filters-6.1.5.js"];
+  const NFC_WAIT_MS = 15000;
   const SOUNDS = ["count", "go", "note-c5", "note-c6", "note-c7", "tier", "rocket", "ding", "chime", "chime-low", "fall", "result", "best", "wind-2", "wind-3", "wind-4"];
   const scripts = new Map();
   let retry = 0;
@@ -3319,16 +3338,23 @@ const arcade = (function arcadeRoom() {
     ready.tap("screen");
   }
 
-  async function run(g) {
-    const mode = "screen";
+  async function run(g, listening) {
+    let mode = "screen";
+    if (listening) {
+      const reader = await Promise.race([listening, new Promise((resolve) => window.setTimeout(() => resolve(null), NFC_WAIT_MS))]);
+      if (reader) mode = "nfc";
+    }
     closeSheet();
+    combo.end();
     care.hold();
     root.classList.add("g-on");
+    combo.sink(() => g.tap("nfc"));
     document.addEventListener("pointerdown", onScreen, true);
     let out = "again";
     try {
       while (out === "again") out = await g.play(mode, Number(dock.dataset.giBest) || 0);
     } finally {
+      combo.sink(null);
       document.removeEventListener("pointerdown", onScreen, true);
       root.classList.remove("g-on");
       care.release();
@@ -3345,7 +3371,8 @@ const arcade = (function arcadeRoom() {
     playing = true;
     playSfx(`care-${kit()}-press`);
     buzz(12);
-    run(g);
+    // scan() must run inside the click: that is what shows Chrome's permission prompt.
+    run(g, "NDEFReader" in window ? combo.listen() : null);
   }
 
   function restyle() {
