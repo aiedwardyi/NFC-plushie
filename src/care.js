@@ -17,6 +17,10 @@ export function mealsNow(state, now) {
   return within(state.fedAt, now) ? state.meals : 0;
 }
 
+export function playsNow(state, now) {
+  return within(state.playedAt, now) ? state.plays : 0;
+}
+
 export function careWant(state, now) {
   if (state.sleptAt !== null) return null;
   const hour = seoulHour(now);

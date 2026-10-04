@@ -1800,10 +1800,10 @@ const care = (function careLoop() {
   const art = () => ART[world()] || ART.classic;
 
   const LINES = {
-    classic: { feed: "냠냠! 사과가 아삭아삭 맛있어요!", nibble: "한 입만 더 먹을게요!", stash: "배불러요! 이건 나중에 먹을게요.", play: "와아, 신나요! 한 번 더!", sleep: "잘 자요… 인형을 톡 하면 깨어날게요.", morning: "잘 잤어요! 좋은 아침이에요!", wake: "잘 잤어요! 몸이 가뿐해요!" },
-    "8bit": { feed: "냠냠! HP가 가득 찼어요!", nibble: "한 입만 더! 냠!", stash: "HP가 꽉 찼어요! 이건 저장해 둘게요.", play: "점프! 점프! 최고 기록이에요!", sleep: "세이브 완료… 인형을 톡 하면 이어서 해요.", morning: "새 게임 시작! 좋은 아침이에요!", wake: "이어서 하기! 체력이 가득해요!" },
-    milk: { feed: "쪼옥~ 달콤한 딸기우유 최고예요!", nibble: "한 모금만 더 마실게요!", stash: "배불러요! 이건 나중에 마실게요.", play: "말랑말랑 딸기공 받아라!", sleep: "달콤한 꿈 꿀게요… 인형을 톡 하면 깨어날게요.", morning: "잘 잤어요! 딸기처럼 상큼한 아침이에요!", wake: "잘 잤어요! 딸기처럼 상큼해요!" },
-    najeon: { feed: "약과가 달콤하고 쫀득해요!", nibble: "한 입만 더 먹을게요!", stash: "배불러요! 약과는 나중에 먹을게요.", play: "제기차기 열 번 성공!", sleep: "달빛 아래 잘 자요… 인형을 톡 하면 깨어날게요.", morning: "잘 잤어요! 해님이 떴어요!", wake: "잘 잤어요! 마음이 반짝반짝해요." },
+    classic: { feed: "냠냠! 사과가 아삭아삭 맛있어요!", nibble: "한 입만 더 먹을게요!", stash: "배불러요! 이건 나중에 먹을게요.", play: "와아, 신나요!", again: "헤헤, 진짜 재밌어요!", tired: "헥헥… 숨차요! 조금 쉬었다 놀아요.", content: "배부르고 신나요! 인형을 한 번 더 톡 해 볼래요?", sleep: "잘 자요… 인형을 톡 하면 깨어날게요.", morning: "잘 잤어요! 좋은 아침이에요!", wake: "잘 잤어요! 몸이 가뿐해요!" },
+    "8bit": { feed: "냠냠! HP가 가득 찼어요!", nibble: "한 입만 더! 냠!", stash: "HP가 꽉 찼어요! 이건 저장해 둘게요.", play: "점프! 점프! 최고 기록이에요!", again: "보너스 스테이지! 헤헤, 재밌어요!", tired: "헥헥… 스태미나 바닥! 조금 쉬었다 놀아요.", content: "HP도 기분도 MAX! 인형을 한 번 더 톡 해 볼래요?", sleep: "세이브 완료… 인형을 톡 하면 이어서 해요.", morning: "새 게임 시작! 좋은 아침이에요!", wake: "이어서 하기! 체력이 가득해요!" },
+    milk: { feed: "쪼옥~ 달콤한 딸기우유 최고예요!", nibble: "한 모금만 더 마실게요!", stash: "배불러요! 이건 나중에 마실게요.", play: "말랑말랑 딸기공 받아라!", again: "헤헤, 딸기공 또 잡았어요!", tired: "헥헥… 몸이 말랑말랑 녹았어요! 조금 쉬었다 놀아요.", content: "배부르고 달콤해요! 인형을 한 번 더 톡 해 볼래요?", sleep: "달콤한 꿈 꿀게요… 인형을 톡 하면 깨어날게요.", morning: "잘 잤어요! 딸기처럼 상큼한 아침이에요!", wake: "잘 잤어요! 딸기처럼 상큼해요!" },
+    najeon: { feed: "약과가 달콤하고 쫀득해요!", nibble: "한 입만 더 먹을게요!", stash: "배불러요! 약과는 나중에 먹을게요.", play: "제기차기 열 번 성공!", again: "이번엔 스무 번! 헤헤, 재밌어요!", tired: "헥헥… 다리가 후들후들해요. 조금 쉬었다 놀아요.", content: "배도 마음도 든든해요! 인형을 한 번 더 톡 해 볼래요?", sleep: "달빛 아래 잘 자요… 인형을 톡 하면 깨어날게요.", morning: "잘 잤어요! 해님이 떴어요!", wake: "잘 잤어요! 마음이 반짝반짝해요." },
   };
   const MUMBLE = "음냐… 인형을 톡 해 주면 일어날게요…";
   const WANTS = { feed: "배고파요", play: "놀고 싶어요", sleep: "졸려요" };
@@ -1948,17 +1948,21 @@ const care = (function careLoop() {
       || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump, .gift.is-glow, .combo-key"));
   }
 
-  // The bubble waits for ms of quiet: no sheet, reveal or celebration on screen.
-  function wantLater(id, ms) {
+  // Waits for ms of quiet: no sheet, reveal or celebration on screen.
+  function whenCalm(ms, fn) {
     window.clearTimeout(wantTimer);
-    if (!id) return;
     let calm = 0;
     wantTimer = window.setTimeout(function check() {
       if (careHold.busy || careHold.asleep) return;
       calm = screenBusy() ? 0 : calm + 100;
-      if (calm >= ms) setWant(id);
+      if (calm >= ms) fn();
       else wantTimer = window.setTimeout(check, 100);
     }, 100);
+  }
+
+  function wantLater(id, ms) {
+    window.clearTimeout(wantTimer);
+    if (id) whenCalm(ms, () => setWant(id));
   }
 
   function hush() {
@@ -1979,6 +1983,7 @@ const care = (function careLoop() {
   }
 
   let meals = Number(dock.dataset.meals) || 0;
+  let plays = Number(dock.dataset.plays) || 0;
   let heartsFrame = 0;
 
   function tweenHearts(to) {
@@ -2001,6 +2006,7 @@ const care = (function careLoop() {
   function settle(reply) {
     if (!reply) {
       meals = Number(dock.dataset.meals) || 0;
+      plays = Number(dock.dataset.plays) || 0;
       return;
     }
     tweenHearts(reply.hearts);
@@ -2008,6 +2014,8 @@ const care = (function careLoop() {
     dock.dataset.want = reply.want || "";
     dock.dataset.meals = String(reply.meals);
     meals = reply.meals;
+    dock.dataset.plays = String(reply.plays);
+    plays = reply.plays;
   }
 
   function post(act) {
@@ -2118,7 +2126,7 @@ const care = (function careLoop() {
     return 700;
   }
 
-  async function play() {
+  async function play(beat) {
     const a = art();
     const b = box();
     const s = b.w * 0.26;
@@ -2195,9 +2203,14 @@ const care = (function careLoop() {
     ], { duration: 700, easing: "cubic-bezier(.25,.5,.4,1)" });
     window.clearInterval(trail);
     el.remove();
-    voice("happy", 40);
-    cheer();
-    say(line("play"));
+    if (beat === "tired") {
+      face("yawn");
+      voice("sleepy", 40);
+    } else {
+      voice("happy", 40);
+      cheer();
+    }
+    say(line(beat));
     await wait(800);
     return 800;
   }
@@ -2281,7 +2294,7 @@ const care = (function careLoop() {
     end();
   }
 
-  async function run(action, reply) {
+  async function run(action, reply, wanted) {
     begin();
     const mine = actions;
     sound("press");
@@ -2292,7 +2305,10 @@ const care = (function careLoop() {
       end();
     }
     reply.then((r) => {
-      if (mine === actions && !careHold.busy) wantLater(r ? r.want : dock.dataset.want, next);
+      if (mine !== actions || careHold.busy) return;
+      // Meeting the last want sends the owner back to the plushie.
+      if (wanted && r && !r.want) whenCalm(1800, () => say(line("content")));
+      else wantLater(r ? r.want : dock.dataset.want, next);
     });
   }
 
@@ -2305,10 +2321,14 @@ const care = (function careLoop() {
     const btn = dock.querySelector(`[data-care="${id}"]`);
     btn.classList.add("is-pressed");
     window.setTimeout(() => btn.classList.remove("is-pressed"), 140);
-    const beat = id !== "feed" ? id : meals >= 2 ? "stash" : meals === 1 ? "nibble" : "full";
+    const beat = id === "feed" ? (meals >= 2 ? "stash" : meals === 1 ? "nibble" : "full")
+      : id === "play" ? (plays >= 2 ? "tired" : plays === 1 ? "again" : "play")
+      : id;
     if (beat === "full" || beat === "nibble") meals += 1;
+    if (id === "play") plays += 1;
+    const wanted = id !== "sleep" && dock.dataset.want;
     const reply = post(id);
-    run(id === "feed" ? () => feed(beat) : id === "play" ? play : sleep, reply);
+    run(id === "feed" ? () => feed(beat) : id === "play" ? () => play(beat) : sleep, reply, wanted);
   }
 
   let lastHappy = -Infinity;

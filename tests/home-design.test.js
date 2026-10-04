@@ -165,7 +165,7 @@ test("the dock runs gift box, the three care verbs, then records", async (t) => 
   const { request, jar } = await named(t);
   const home = await request(`/t?uid=${A}`, { jar });
   const dock = home.html.match(/<nav class="dock"[\s\S]*?<\/nav>/)[0];
-  assert.match(dock, /^<nav class="dock" aria-label="메뉴" data-want="feed" data-meals="0" data-care-uid="04AAAAAAAAAAA1" data-combo="1">/);
+  assert.match(dock, /^<nav class="dock" aria-label="메뉴" data-want="feed" data-meals="0" data-plays="0" data-care-uid="04AAAAAAAAAAA1" data-combo="1">/);
   const buttons = dock.match(/<button [^>]*>/g);
   assert.deepEqual(buttons, [
     '<button type="button" class="dock-btn is-side has-new" data-open="gifts" aria-haspopup="dialog">',

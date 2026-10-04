@@ -83,28 +83,43 @@ test("owner feeds: full, nibble, then a stash that writes nothing", async (t) =>
   const { jar } = await meet(ctx, A, "Mochi");
   ctx.db.prepare("UPDATE plushies SET mood_value = 10, mood_updated_at = ? WHERE uid = ?").run(T0, A);
   const home = await ctx.request(`/t?uid=${A}`, { jar });
-  assert.match(home.html, /<nav class="dock" aria-label="메뉴" data-want="feed" data-meals="0" data-care-uid="04AAAAAAAAAAA1" data-combo="0">/);
+  assert.match(home.html, /<nav class="dock" aria-label="메뉴" data-want="feed" data-meals="0" data-plays="0" data-care-uid="04AAAAAAAAAAA1" data-combo="0">/);
   ctx.db.prepare("UPDATE plushies SET mood_value = 10, mood_updated_at = ? WHERE uid = ?").run(T0, A);
   const one = await care(ctx, jar, "feed");
   assert.equal(one.status, 200);
-  assert.deepEqual(one.body, { ok: true, beat: "full", gain: 20, hearts: 3, lonely: true, want: "play", meals: 1 });
+  assert.deepEqual(one.body, { ok: true, beat: "full", gain: 20, hearts: 3, lonely: true, want: "play", meals: 1, plays: 0 });
   assert.deepEqual(careCols(ctx.row()), [T0, 1, null, 0, null]);
   assert.deepEqual([ctx.row().mood_value, ctx.row().mood_updated_at], [30, T0]);
   ctx.advance(MIN);
   const two = await care(ctx, jar, "feed");
-  assert.deepEqual(two.body, { ok: true, beat: "nibble", gain: 10, hearts: 4, lonely: false, want: "play", meals: 2 });
+  assert.deepEqual(two.body, { ok: true, beat: "nibble", gain: 10, hearts: 4, lonely: false, want: "play", meals: 2, plays: 0 });
   assert.deepEqual(careCols(ctx.row()), [T0 + MIN, 2, null, 0, null]);
   assert.deepEqual([ctx.row().mood_value, ctx.row().mood_updated_at], [40, T0 + MIN]);
   ctx.advance(MIN);
   const before = ctx.row();
   const three = await care(ctx, jar, "feed");
-  assert.deepEqual(three.body, { ok: true, beat: "stash", gain: 0, hearts: 4, lonely: false, want: "play", meals: 2 });
+  assert.deepEqual(three.body, { ok: true, beat: "stash", gain: 0, hearts: 4, lonely: false, want: "play", meals: 2, plays: 0 });
   assert.deepEqual(ctx.row(), before);
   const played = await care(ctx, jar, "play");
   assert.deepEqual([played.body.beat, played.body.gain, played.body.want], ["play", 20, null]);
   assert.deepEqual(careCols(ctx.row()), [T0 + MIN, 2, T0 + 2 * MIN, 1, null]);
   const after = await ctx.request(`/t?uid=${A}`, { jar });
-  assert.match(after.html, /data-want="" data-meals="2" data-care-uid=/);
+  assert.match(after.html, /data-want="" data-meals="2" data-plays="1" data-care-uid=/);
+});
+
+test("the dock and care replies count plays for the window", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  const one = await care(ctx, jar, "play");
+  assert.equal(one.body.plays, 1);
+  ctx.advance(MIN);
+  const two = await care(ctx, jar, "play");
+  assert.equal(two.body.plays, 2);
+  const back = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.match(back.html, /data-meals="0" data-plays="2"/);
+  ctx.advance(4 * 60 * MIN);
+  const later = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.match(later.html, /data-meals="0" data-plays="0"/);
 });
 
 test("care is the owner's alone and only for a named pet", async (t) => {

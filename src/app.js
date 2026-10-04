@@ -6,7 +6,7 @@ import { hash, ownerToken, recoveryCode } from "./secrets.js";
 import { EMPTY_FOUND, EMPTY_SEEN } from "./db.js";
 import { GIFT_COUNT as GIFT_TOTAL, GIFT_TIERS, GIFTS } from "./gifts.js";
 import { PET, applyTap, currentMood, parseTapUid, seoulDayKey, xpProgress } from "./pet.js";
-import { applyCare, careWant, mealsNow } from "./care.js";
+import { applyCare, careWant, mealsNow, playsNow } from "./care.js";
 import { comboNext, comboTap } from "./combo.js";
 import { devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
 
@@ -207,6 +207,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       reunionLine: out.rewarded && out.reunion ? REUNION_LINE : "",
       want: careWant(care, t) || "",
       meals: mealsNow(care, t),
+      plays: playsNow(care, t),
       morning: Boolean(extra.morning),
       combo: extra.combo || 0,
     };
@@ -340,6 +341,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         lonely: out.moodAfter <= PET.moodLonelyAt,
         want: careWant(after, t),
         meals: mealsNow(after, t),
+        plays: playsNow(after, t),
       };
     })();
     if (!reply) return res.status(403).json({ ok: false });
