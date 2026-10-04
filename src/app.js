@@ -6,7 +6,8 @@ import { hash, ownerToken, recoveryCode } from "./secrets.js";
 import { EMPTY_FOUND, EMPTY_SEEN } from "./db.js";
 import { GIFT_COUNT as GIFT_TOTAL, GIFT_TIERS, GIFTS } from "./gifts.js";
 import { PET, applyTap, currentMood, parseTapUid, seoulDayKey, xpProgress } from "./pet.js";
-import { applyCare, careWant, mealsNow } from "./care.js";
+import { applyCare, careWant, mealsNow, playsNow } from "./care.js";
+import { comboNext, comboTap } from "./combo.js";
 import { devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
 
 const cookieAge = 400 * 24 * 60 * 60 * 1000;
@@ -64,6 +65,8 @@ function petState(row, t) {
     playedAt: row.played_at ?? null,
     plays: row.plays ?? 0,
     sleptAt: row.slept_at ?? null,
+    comboCount: row.combo_count ?? 0,
+    comboAt: row.combo_at ?? null,
     seen_common: seen.common,
     seen_special: seen.special,
     seen_rare: seen.rare,
@@ -197,12 +200,16 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       giftFound: out.rewarded ? extra.foundCount : parseFound(fresh.gift_found).length,
       giftTotal: GIFT_TOTAL,
       days: fresh.days_together ?? 1,
-      unrewardedLine: out.rewarded || extra.morning ? "" : (UNREWARDED_LINES[out.reason] || ""),
+      unrewardedLine: out.rewarded || extra.morning || extra.combo > 0 ? "" : (UNREWARDED_LINES[out.reason] || ""),
+      // The key says 한 번 더 톡!, so a combo page saves the line for after the key runs out.
+      comboLaterLine: out.rewarded || extra.morning || !(extra.combo > 0) ? "" : (UNREWARDED_LINES[out.reason] || ""),
       lonelyLine: !out.rewarded && moodAfter <= PET.moodLonelyAt ? LONELY_LINE : "",
       reunionLine: out.rewarded && out.reunion ? REUNION_LINE : "",
       want: careWant(care, t) || "",
       meals: mealsNow(care, t),
+      plays: playsNow(care, t),
       morning: Boolean(extra.morning),
+      combo: extra.combo || 0,
     };
   }
 
@@ -271,7 +278,19 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         else if (!visual && mile) visual = "milestone";
         else if (!visual && out.rewarded && out.gift && out.gift.tier === "rare") visual = "rare";
         else if (!visual && out.rewarded && out.gift && out.gift.tier === "special") visual = "special";
-        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning }), demo, found: parseFound(fresh.gift_found), theme }) };
+        // A celebration or a morning takes the whole visit; a stale reload is not a tap.
+        let combo = 0;
+        if (morning || visual) {
+          db.prepare("UPDATE plushies SET combo_count = 0, combo_at = NULL WHERE uid = ?").run(serial);
+        } else if (out.reason !== "stale") {
+          // The page saw this chain's key run out, so the tap starts over though the server's window has 2 s left.
+          const ended = req.cookies.combo_done === serial;
+          if (ended) res.clearCookie("combo_done", { path: "/" });
+          const c = comboTap(ended ? { comboCount: 0, comboAt: null } : st, t);
+          if (!c.same) db.prepare("UPDATE plushies SET combo_count = ?, combo_at = ? WHERE uid = ?").run(c.comboCount, c.comboAt, serial);
+          combo = c.combo;
+        }
+        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo }), demo, found: parseFound(fresh.gift_found), theme }) };
       }
       if (state === "STRANGER") return { html: strangerPage(row, "", { demo, theme }) };
       throw new Error("Invalid binding result");
@@ -322,7 +341,34 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         lonely: out.moodAfter <= PET.moodLonelyAt,
         want: careWant(after, t),
         meals: mealsNow(after, t),
+        plays: playsNow(after, t),
       };
+    })();
+    if (!reply) return res.status(403).json({ ok: false });
+    res.json(reply);
+  });
+
+  app.post("/combo", (req, res) => {
+    const parsed = parseTapUid(req.body?.uid);
+    if (!parsed) return res.status(400).json({ ok: false });
+    const { serial: uid, counter } = parsed;
+    const reply = db.transaction(() => {
+      const row = getRow(uid);
+      if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row.pet_name) return null;
+      const t = now();
+      const st = petState(row, t);
+      const stale = counter === null ? st.lastCounter !== null : st.lastCounter !== null && !(counter > st.lastCounter);
+      const c = row.slept_at === null && !stale ? comboNext(st, t) : null;
+      // A milestone needs /t's celebration, so the page loads that tap in full.
+      if (!c || (!c.same && milestoneLine(row.tap_count + 1))) return { ok: true, combo: 0 };
+      if (!c.same) {
+        db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ?, combo_count = ?, combo_at = ? WHERE uid = ?")
+          .run(new Date(t).toISOString(), c.comboCount, c.comboAt, uid);
+        if (counter !== null && (st.lastCounter === null || counter > st.lastCounter)) {
+          db.prepare("UPDATE plushies SET last_counter = ? WHERE uid = ?").run(counter, uid);
+        }
+      }
+      return { ok: true, combo: c.combo, same: c.same, tapCount: getRow(uid).tap_count };
     })();
     if (!reply) return res.status(403).json({ ok: false });
     res.json(reply);

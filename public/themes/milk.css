@@ -288,3 +288,16 @@ html[data-theme="milk"] .still-wash { background: radial-gradient(ellipse at cen
 html[data-theme="milk"] .zzz { color: #fff; text-shadow: 0 2px 0 rgba(180, 70, 120, .45); }
 html[data-theme="milk"] .dock-btn.is-want .dock-cap::after { border-color: #ff8fb3; }
 html[data-theme="milk"] .sparkle { background: #fff; }
+
+/* Tap combo: a strawberry milk key */
+html[data-theme="milk"] {
+  --k-fill: #ffd3e3;
+  --k-fill2: #ff7fa8;
+  --k-edge: #c94f7a;
+  --k-hole: #ff8fb3;
+  --k-ring: #ff7aa8;
+  --k-ghost: rgba(224, 127, 163, .6);
+  --k-pill: #ff8fb3;
+  --k-pill-ink: #fff;
+  --k-ray: 255, 182, 210;
+}

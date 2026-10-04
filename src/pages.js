@@ -161,9 +161,10 @@ function petStats(pet) {
 
 const CARE_VERBS = [["feed", "밥"], ["play", "놀이"], ["sleep", "잠"]];
 
-function dockHtml({ gift = false, want = "", meals = 0, uid = "" } = {}) {
+function dockHtml({ gift = false, want = "", meals = 0, plays = 0, uid = "", combo = 0, later = "" } = {}) {
   const owner = uid ? ` data-care-uid="${escapeHtml(uid)}"` : "";
-  return `<nav class="dock" aria-label="메뉴" data-want="${escapeHtml(want)}" data-meals="${Number(meals) || 0}"${owner}>
+  const after = later ? ` data-combo-later="${escapeHtml(later)}"` : "";
+  return `<nav class="dock" aria-label="메뉴" data-want="${escapeHtml(want)}" data-meals="${Number(meals) || 0}" data-plays="${Number(plays) || 0}"${owner}${after} data-combo="${Number(combo) || 0}">
       <button type="button" class="dock-btn is-side${gift ? " has-new" : ""}" data-open="gifts" aria-haspopup="dialog"><span class="dock-cap">${ICONS.gift}</span><span class="dock-label">선물함</span></button>
       ${CARE_VERBS.map(([id, label]) => `<button type="button" class="dock-btn is-verb" data-care="${id}"><span class="dock-cap">${ICONS[id]}</span><span class="dock-label">${label}</span></button>`).join("")}
       <button type="button" class="dock-btn is-side" data-open="record" aria-haspopup="dialog"><span class="dock-cap">${ICONS.record}</span><span class="dock-label">우리 기록</span></button>
@@ -258,7 +259,8 @@ function demoPanel(uid, row) {
       <form action="/demo/care-reset" method="post" data-demo-care>
         <input type="hidden" name="uid" value="${escapeHtml(uid)}">
         <button type="submit" class="secondary">돌봄 처음으로 돌리기</button>
-      </form>` : ""}
+      </form>
+      <button type="button" class="secondary" data-demo-nfc hidden>NFC 바로 인식 켜기</button>` : ""}
       <form action="/demo/fresh-start" method="post" data-demo-fresh>
         <input type="hidden" name="uid" value="${escapeHtml(uid)}">
         <button type="submit" class="secondary">처음 만나는 날로 돌아가기</button>
@@ -363,7 +365,7 @@ function keyCard(code) {
 
 function homeExtras(row, pet, found) {
   return {
-    dock: dockHtml({ gift: Boolean(pet?.gift), want: pet?.want, meals: pet?.meals, uid: row.uid }),
+    dock: dockHtml({ gift: Boolean(pet?.gift), want: pet?.want, meals: pet?.meals, plays: pet?.plays, uid: row.uid, combo: pet?.combo, later: pet?.comboLaterLine }),
     sheets: sheetHtml("gifts", "선물함", giftCollection(found, pet?.gift || null))
       + sheetHtml("record", "우리 기록", recordSheet(row, pet)),
   };

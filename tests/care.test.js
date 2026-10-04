@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyCare, careWant, mealsNow, seoulHour } from "../src/care.js";
+import { applyCare, careWant, mealsNow, playsNow, seoulHour } from "../src/care.js";
 
 const HOUR = 3600000;
 const T0 = Date.parse("2026-05-01T10:00:00+09:00");
@@ -50,6 +50,13 @@ test("play: always the full play, hearts 20 then 10 then 0", () => {
   }
   assert.deepEqual(gains, [20, 10, 0]);
   assert.equal(applyCare(s, "play", T0 + 2 * 60000 + 4 * HOUR).gain, 20);
+});
+
+test("play: the play count resets once the window passes", () => {
+  const s = care({ playedAt: T0, plays: 3 });
+  assert.equal(playsNow(s, T0 + 4 * HOUR - 1), 3);
+  assert.equal(playsNow(s, T0 + 4 * HOUR), 0);
+  assert.equal(playsNow(care(), T0), 0);
 });
 
 test("mood caps at 100 and decays before the gain", () => {
