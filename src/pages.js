@@ -28,6 +28,8 @@ const ICONS = {
   keyhole: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9.6" r="3.4"/><path d="M10.4 11.8 9.2 18.4h5.6l-1.2-6.6z"/></svg>`,
   close: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>`,
   copy: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="2.2"/><path d="M15.5 8.5V6.7a2.2 2.2 0 0 0-2.2-2.2H6.7a2.2 2.2 0 0 0-2.2 2.2v6.6a2.2 2.2 0 0 0 2.2 2.2h1.8"/></svg>`,
+  arcade: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.6 8.5h8.8a4.6 4.6 0 0 1 4.4 5.9l-.8 2.9a2.3 2.3 0 0 1-3.9 1L14.4 16H9.6l-1.7 2.3a2.3 2.3 0 0 1-3.9-1l-.8-2.9a4.6 4.6 0 0 1 4.4-5.9z"/><path d="M8 10.9v3.4M6.3 12.6h3.4M15.4 11.6h.01M17.4 13.6h.01"/></svg>`,
+  lock: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
 };
 
 export const THEMES = [
@@ -161,11 +163,12 @@ function petStats(pet) {
 
 const CARE_VERBS = [["feed", "밥"], ["play", "놀이"], ["sleep", "잠"]];
 
-function dockHtml({ gift = false, want = "", meals = 0, plays = 0, uid = "", combo = 0, later = "" } = {}) {
+function dockHtml({ gift = false, want = "", meals = 0, plays = 0, uid = "", combo = 0, later = "", arcadeLeft = 0, giBest = 0 } = {}) {
   const owner = uid ? ` data-care-uid="${escapeHtml(uid)}"` : "";
   const after = later ? ` data-combo-later="${escapeHtml(later)}"` : "";
-  return `<nav class="dock" aria-label="메뉴" data-want="${escapeHtml(want)}" data-meals="${Number(meals) || 0}" data-plays="${Number(plays) || 0}"${owner}${after} data-combo="${Number(combo) || 0}">
-      <button type="button" class="dock-btn is-side${gift ? " has-new" : ""}" data-open="gifts" aria-haspopup="dialog"><span class="dock-cap">${ICONS.gift}</span><span class="dock-label">선물함</span></button>
+  const left = Number(arcadeLeft) || 0;
+  return `<nav class="dock" aria-label="메뉴" data-want="${escapeHtml(want)}" data-meals="${Number(meals) || 0}" data-plays="${Number(plays) || 0}"${owner}${after} data-arcade-left="${left}" data-gi-best="${Number(giBest) || 0}" data-combo="${Number(combo) || 0}">
+      <button type="button" class="dock-btn is-side${gift || left > 0 ? " has-new" : ""}" data-open="arcade" aria-haspopup="dialog"><span class="dock-cap">${ICONS.arcade}</span><span class="dock-label">오락실</span></button>
       ${CARE_VERBS.map(([id, label]) => `<button type="button" class="dock-btn is-verb" data-care="${id}"><span class="dock-cap">${ICONS[id]}</span><span class="dock-label">${label}</span></button>`).join("")}
       <button type="button" class="dock-btn is-side" data-open="record" aria-haspopup="dialog"><span class="dock-cap">${ICONS.record}</span><span class="dock-label">우리 기록</span></button>
     </nav>`;
@@ -211,6 +214,22 @@ export function giftCollection(found = [], today = null) {
   return `<p class="gift-tally">선물 ${count}/${GIFT_COUNT}</p>
       ${reader}
       <ul class="gift-grid" data-gift-grid>${tiles}</ul>`;
+}
+
+const LOCKED_GAMES = ["낚시", "풍선 사냥"];
+
+function arcadeSheet(pet, found = [], mascot = "horse") {
+  const left = Number(pet?.arcadeLeft) || 0;
+  const pips = Array.from({ length: 3 }, (_, i) => `<i class="g-pip${i < 3 - left ? " is-used" : ""}"></i>`).join("");
+  const have = new Set(found);
+  const count = GIFTS.common.concat(GIFTS.special, GIFTS.rare).filter((g) => have.has(g.id)).length;
+  const locked = LOCKED_GAMES.map((name) => `<li class="g-card is-locked"><span class="g-thumb">${ICONS.lock}</span><span class="g-txt"><b>${name}</b><small>곧 만나요</small></span></li>`).join("");
+  return sheetHtml("arcade", "오락실", `<p class="g-today" data-arcade-today><span>오늘 XP 놀이</span>${pips}<b>${left ? `${left}번 남았어요` : "다 했어요!"}</b></p>
+      <ul class="g-list">
+        <li class="g-card is-ready"><span class="g-thumb"><span class="g-thumb-aura"></span><img class="g-thumb-pet" src="/mascot-${mascotKind(mascot)}-512-v3.png" alt=""></span><span class="g-txt"><b>기 모으기</b><small>인형을 톡톡! 하늘 끝까지 날아가요</small></span><button type="button" class="g-start" data-game="gi">시작</button></li>
+        ${locked}
+      </ul>
+      <button type="button" class="g-gifts${pet?.gift ? " has-new" : ""}" data-open-gifts><span class="g-gift-ic">${ICONS.gift}</span>모은 선물 <b>${count}/${GIFT_COUNT}</b><span class="g-chev" aria-hidden="true">›</span></button>`);
 }
 
 function miniHearts(mood) {
@@ -363,10 +382,11 @@ function keyCard(code) {
   </aside>`;
 }
 
-function homeExtras(row, pet, found) {
+function homeExtras(row, pet, found, mascot) {
   return {
-    dock: dockHtml({ gift: Boolean(pet?.gift), want: pet?.want, meals: pet?.meals, plays: pet?.plays, uid: row.uid, combo: pet?.combo, later: pet?.comboLaterLine }),
-    sheets: sheetHtml("gifts", "선물함", giftCollection(found, pet?.gift || null))
+    dock: dockHtml({ gift: Boolean(pet?.gift), want: pet?.want, meals: pet?.meals, plays: pet?.plays, uid: row.uid, combo: pet?.combo, later: pet?.comboLaterLine, arcadeLeft: pet?.arcadeLeft, giBest: pet?.giBest }),
+    sheets: arcadeSheet(pet, found, mascot)
+      + sheetHtml("gifts", "선물함", giftCollection(found, pet?.gift || null))
       + sheetHtml("record", "우리 기록", recordSheet(row, pet)),
   };
 }
@@ -400,7 +420,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
   let kind = celebrate;
   if (!kind && mile) kind = "milestone";
   const dialog = `<p class="intro"${pet ? petAttr : ""}>${greeting}</p>${moments}${giftHtml}`;
-  const extras = row.pet_name ? homeExtras(row, pet, found) : { dock: "", sheets: "" };
+  const extras = row.pet_name ? homeExtras(row, pet, found, mascot) : { dock: "", sheets: "" };
   return page(
     row,
     `${recovery}${prompt}`,
@@ -466,6 +486,7 @@ export function previewPetPage({ kind, count, tier = "common", reason = "", masc
     : `다시 만나서 반가워요, ${escapeHtml(row.pet_name)}!`;
   const previewGift = showGift ? { tier, gift: { id: "", line: giftLine } } : null;
   const previewPet = { level, xpInto: kind === "levelup" ? 0 : 20, xpSpan: kind === "levelup" ? 100 : 50, moodAfter: kind === "lonely" ? 20 : 80, days: 12 };
+  const previewFound = ["c01", "c02", "c05", "c09", "c14", "s05", "r01"];
   return page(
     row,
     "",
@@ -473,8 +494,9 @@ export function previewPetPage({ kind, count, tier = "common", reason = "", masc
       timeLine: true, celebrate: visual, countHtml, lonely: kind === "lonely", mascot, theme,
       dialog: `<p class="intro">${greeting}</p>${momentsHtml}${giftHtml}`, speaker: row.pet_name,
       stats: `<section class="pet-stats" aria-label="돌봄 상태">${stats}</section>`, level,
-      dock: dockHtml({ gift: showGift }),
-      sheets: sheetHtml("gifts", "선물함", giftCollection(["c01", "c02", "c05", "c09", "c14", "s05", "r01"], previewGift))
+      dock: dockHtml({ gift: showGift, arcadeLeft: 3 }),
+      sheets: arcadeSheet({ arcadeLeft: 3, gift: previewGift }, previewFound, mascot)
+        + sheetHtml("gifts", "선물함", giftCollection(previewFound, previewGift))
         + sheetHtml("record", "우리 기록", recordSheet(row, previewPet)),
     },
   );

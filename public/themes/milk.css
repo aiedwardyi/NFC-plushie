@@ -301,3 +301,30 @@ html[data-theme="milk"] {
   --k-pill-ink: #fff;
   --k-ray: 255, 182, 210;
 }
+
+/* 오락실 and 기 모으기 */
+html[data-theme="milk"] {
+  --g-ink: #7a2e45;
+  --g-stroke: #fff;
+  --g-fill-a: #ffd0dc;
+  --g-fill-b: #ff7fa8;
+  --g-track: rgba(122, 46, 69, .14);
+  --g-aura: 255, 143, 179;
+  --g-card: #fff;
+  --g-card-ink: #7a2e45;
+  --g-accent: #ff7fa8;
+  --g-accent-ink: #fff;
+  --g-xp: #ff7fa8;
+  --g-big: #fff;
+  --g-big-edge: #e0577c;
+  --g-label: #ff8fb3;
+  --g-label-ink: #fff;
+}
+html[data-theme="milk"] .g-card { background: #fff; box-shadow: inset 0 0 0 1.5px #ffd0dc; }
+html[data-theme="milk"] .g-card.is-ready { background: linear-gradient(135deg, #fff0f5, #fff); box-shadow: inset 0 0 0 2px #ff8fb3, 0 6px 16px rgba(255, 143, 179, .25); }
+html[data-theme="milk"] .g-start { background: linear-gradient(180deg, #ffb3cb, #ff7fa8); color: #fff; box-shadow: 0 3px 0 #e0577c; }
+html[data-theme="milk"] .g-thumb { background: #ffe4ec; }
+html[data-theme="milk"] .g-thumb-aura { background: radial-gradient(circle, rgba(255, 143, 179, .9) 0 22%, rgba(255, 143, 179, .3) 42%, transparent 66%); }
+html[data-theme="milk"] .g-gifts { background: none; color: var(--muted); font-family: inherit; font-weight: 700; box-shadow: none; }
+html[data-theme="milk"] svg[data-icon="moon"] .i-a { fill: #ffe3ec; stroke: #e0577c; }
+html[data-theme="milk"] svg[data-icon="star"] .i-a { fill: #fff; stroke: #ff7fa8; }

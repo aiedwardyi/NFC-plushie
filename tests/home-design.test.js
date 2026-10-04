@@ -8,6 +8,7 @@ import { GIFT_COUNT, GIFTS } from "../src/gifts.js";
 import { giftCollection, recordSheet } from "../src/pages.js";
 
 const A = "04AAAAAAAAAAA1";
+const T0 = Date.parse("2026-05-01T10:00:00+09:00");
 
 function updateJar(jar, setCookies) {
   for (const sc of setCookies || []) {
@@ -23,7 +24,7 @@ function updateJar(jar, setCookies) {
 async function setup(t) {
   const dir = mkdtempSync(join(process.cwd(), ".test-data-"));
   const db = openDatabase(dir);
-  const server = createApp({ db, rng: () => 0, demoUids: [] }).listen(0, "localhost");
+  const server = createApp({ db, now: () => T0, rng: () => 0, demoUids: [] }).listen(0, "localhost");
   await new Promise((r) => server.once("listening", r));
   t.after(async () => {
     await new Promise((r) => server.close(r));
@@ -103,9 +104,9 @@ test("rewarded owner home carries the dock, both sheets and the found gift", asy
   const home = await request(`/t?uid=${A}`, { jar });
   assert.match(home.html, /data-rewarded="1"/);
   assert.match(home.html, /<button type="button" class="dock-btn is-verb" data-care="feed">.*밥<\/span><\/button>/);
-  assert.match(home.html, /class="dock-btn is-side has-new" data-open="gifts" aria-haspopup="dialog">.*선물함<\/span>/);
+  assert.match(home.html, /class="dock-btn is-side has-new" data-open="arcade" aria-haspopup="dialog">.*오락실<\/span>/);
   assert.match(home.html, /data-open="record" aria-haspopup="dialog">.*우리 기록<\/span>/);
-  for (const id of ["gifts", "record"]) {
+  for (const id of ["arcade", "gifts", "record"]) {
     assert.match(home.html, new RegExp(`<div class="sheet" data-sheet="${id}" role="dialog" aria-modal="true" aria-labelledby="sheet-${id}-title" hidden>`));
     assert.match(home.html, new RegExp(`<h2 id="sheet-${id}-title">`));
   }
@@ -124,7 +125,7 @@ test("unrewarded tap keeps the collection from the database without a new mark",
   const cool = await request(`/t?uid=${A}`, { jar });
   assert.match(cool.html, /data-reason="cooldown"/);
   assert.match(cool.html, /class="tile is-common" data-tile="c01"/);
-  assert.doesNotMatch(cool.html, /is-new|has-new|reader-label/);
+  assert.doesNotMatch(cool.html, /is-new|g-gifts has-new|reader-label/);
   assert.match(cool.html, /선물 1\/30/);
 });
 
@@ -143,7 +144,7 @@ test("post-naming page is the full home with read-only stats and the first tap o
   assert.match(skip.html, /<dt>기분<\/dt>/);
   assert.match(skip.html, /만나서 반가워요, Mochi!/);
   assert.match(skip.html, /data-rewarded="0"/);
-  assert.doesNotMatch(skip.html, /data-hearts-animate|has-new|is-new|<p class="gift |class="pet-line/);
+  assert.doesNotMatch(skip.html, /data-hearts-animate|g-gifts has-new|is-new|<p class="gift |class="pet-line/);
 });
 
 test("first meet has the live nameplate and key card hooks but no dock", async (t) => {
@@ -161,20 +162,20 @@ test("stranger page has no dock, sheets or collection", async (t) => {
   assert.doesNotMatch(stranger.html, /data-care|class="dock"|data-sheet=|data-tile=|level-pin|gift-tally/);
 });
 
-test("the dock runs gift box, the three care verbs, then records", async (t) => {
+test("the dock runs the arcade, the three care verbs, then records", async (t) => {
   const { request, jar } = await named(t);
   const home = await request(`/t?uid=${A}`, { jar });
   const dock = home.html.match(/<nav class="dock"[\s\S]*?<\/nav>/)[0];
-  assert.match(dock, /^<nav class="dock" aria-label="메뉴" data-want="feed" data-meals="0" data-plays="0" data-care-uid="04AAAAAAAAAAA1" data-combo="1">/);
+  assert.match(dock, /^<nav class="dock" aria-label="메뉴" data-want="feed" data-meals="0" data-plays="0" data-care-uid="04AAAAAAAAAAA1" data-arcade-left="3" data-gi-best="0" data-combo="1">/);
   const buttons = dock.match(/<button [^>]*>/g);
   assert.deepEqual(buttons, [
-    '<button type="button" class="dock-btn is-side has-new" data-open="gifts" aria-haspopup="dialog">',
+    '<button type="button" class="dock-btn is-side has-new" data-open="arcade" aria-haspopup="dialog">',
     '<button type="button" class="dock-btn is-verb" data-care="feed">',
     '<button type="button" class="dock-btn is-verb" data-care="play">',
     '<button type="button" class="dock-btn is-verb" data-care="sleep">',
     '<button type="button" class="dock-btn is-side" data-open="record" aria-haspopup="dialog">',
   ]);
-  assert.deepEqual(dock.match(/<span class="dock-label">[^<]*<\/span>/g).map((s) => s.replace(/<[^>]+>/g, "")), ["선물함", "밥", "놀이", "잠", "우리 기록"]);
+  assert.deepEqual(dock.match(/<span class="dock-label">[^<]*<\/span>/g).map((s) => s.replace(/<[^>]+>/g, "")), ["오락실", "밥", "놀이", "잠", "우리 기록"]);
   assert.equal(count(dock, /<svg viewBox="0 0 24 24" aria-hidden="true">/g), 5);
   assert.doesNotMatch(home.html, /data-dock-pat|토닥<\/span>/);
   const preview = await request("/dev/preview?kind=gift&count=10");
