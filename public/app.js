@@ -2468,6 +2468,10 @@ const combo = (function tapCombo() {
   const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
   // The server keeps a chain for 12 s; the extra 2 s cover the trip from the tap to the drawn ring.
   const WINDOW_MS = 10000;
+  const SAME_TAP_MS = 800;
+  const TAP_UID = /^[0-9A-F]{14}(x[0-9A-F]{6})?$/;
+  const uid = dock.dataset.careUid;
+  const loaded = performance.getEntriesByType?.("navigation")[0]?.responseStart || 0;
   const PROMPTS = ["한 번 더 톡!", "마지막 한 번!"];
   const TRICK_LINES = { classic: "빙글빙글~ 멋있죠?", "8bit": "픽셀 댄스! 삐빅 삐빅!", milk: "말랑말랑 젤리 댄스~", najeon: "공손하게 인사드려요!" };
   const SECRET_LINES = { classic: "짜잔! 우리만 아는 비밀 동작이에요!", "8bit": "히든 커맨드 발동! 비밀 기술이에요!", milk: "딸기 별똥별! 우리만의 비밀이에요!", najeon: "보름달까지 훌쩍! 우리만 아는 비밀이에요." };
@@ -2875,6 +2879,8 @@ const combo = (function tapCombo() {
   }
 
   let queue = Promise.resolve();
+  let asked = 0;
+  let secretOn = false;
 
   async function run(n, start) {
     while (careHold.busy) await wait(100);
@@ -2888,6 +2894,7 @@ const combo = (function tapCombo() {
     } finally {
       motion.style.transform = "";
       motion.style.transformOrigin = "";
+      if (n === 3) secretOn = false;
       care.release();
     }
     if (key && left() <= 0) expire();
@@ -2895,14 +2902,128 @@ const combo = (function tapCombo() {
 
   // A stage asked for mid-stage plays right after it.
   function play(n, start) {
+    asked = n;
+    if (n === 3) secretOn = true;
     queue = queue.catch(() => {}).then(() => run(n, start));
     return queue;
   }
 
+  // Web NFC (Android Chrome): while the page listens, a plushie tap reaches it without a reload.
+  const nfcButton = document.querySelector("[data-demo-nfc]");
+  const demo = document.querySelector("[data-demo-panel]");
+  // The tag that opened this page; read again with the same counter, it is still that tap.
+  const pageTag = new URLSearchParams(window.location.search).get("uid") || "";
+  let ready = false;
+  let listening = null;
+  let lastRead = -Infinity;
+
+  function nfcState(on) {
+    if (!nfcButton) return;
+    nfcButton.textContent = on ? "NFC 바로 인식 켜짐" : "NFC 권한을 허용해 주세요";
+    nfcButton.disabled = on;
+  }
+
+  async function granted() {
+    try {
+      return (await navigator.permissions.query({ name: "nfc" })).state === "granted";
+    } catch {
+      return false;
+    }
+  }
+
+  function listen() {
+    if (!listening) {
+      const controller = new AbortController();
+      try {
+        const reader = new NDEFReader();
+        reader.addEventListener("reading", heard);
+        listening = reader.scan({ signal: controller.signal }).then(() => controller, () => null);
+      } catch {
+        listening = Promise.resolve(null);
+      }
+      // A tag still on the phone is read again as soon as a fresh page listens, so the same-tap window opens here.
+      listening.then((controller) => {
+        if (controller) lastRead = Math.max(lastRead, performance.now());
+        else listening = null;
+        nfcState(Boolean(controller));
+      });
+    }
+    return listening;
+  }
+
+  function identify(event) {
+    for (const record of event.message?.records || []) {
+      if (record.recordType !== "url" && record.recordType !== "absolute-url") continue;
+      try {
+        const url = new URL(new TextDecoder().decode(record.data), window.location.href);
+        const raw = url.searchParams.get("uid") || "";
+        if (url.origin === window.location.origin && url.pathname === "/t" && TAP_UID.test(raw)) return { serial: raw.slice(0, 14), raw, url: url.href };
+      } catch {
+        /* not a URL */
+      }
+    }
+    return { serial: String(event.serialNumber || "").replaceAll(":", "").toUpperCase(), raw: "", url: "" };
+  }
+
+  // Only a chain the key still shows continues in place; anything else loads a full tap.
+  function heard(event) {
+    const now = performance.now();
+    const again = now - lastRead < SAME_TAP_MS;
+    lastRead = now;
+    if (again) return;
+    const tag = identify(event);
+    if (tag.serial !== uid) {
+      if (tag.url) window.location.replace(tag.url);
+      return;
+    }
+    const raw = tag.raw || uid;
+    if (raw.includes("x") && raw === pageTag) return;
+    if (!ready || secretOn || waking || root.classList.contains("has-reveal")
+      || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump")) return;
+    if (careHold.asleep || !key || lit >= 3) {
+      window.location.replace(`/t?uid=${raw}`);
+      return;
+    }
+    closeSheet();
+    if (demo && !demo.hidden) demo.querySelector("[data-demo-close]")?.click();
+    const sent = performance.now();
+    fetch("/combo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: raw }),
+      credentials: "same-origin",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .catch(() => null)
+      .then((reply) => {
+        if (reply?.ok && (reply.same || (reply.combo > 1 && reply.combo <= asked))) return;
+        if (!reply?.ok || !(reply.combo >= 2 && reply.combo <= 3)) {
+          if (!secretOn) window.location.replace(`/t?uid=${raw}`);
+          return;
+        }
+        const count = document.querySelector("[data-tap-count]");
+        if (count) {
+          count.dataset.tapCount = String(reply.tapCount);
+          enhanceRollingCounter({ duration: 400 });
+        }
+        play(reply.combo, sent);
+      });
+  }
+
+  if (nfcButton && "NDEFReader" in window) {
+    nfcButton.hidden = false;
+    granted().then((yes) => yes && nfcState(true));
+    // scan() must run inside the click: that is what shows Chrome's permission prompt.
+    nfcButton.addEventListener("click", () => listen());
+  }
+
+  // Called once the opening is over: the page's own stage, then listening when NFC is already allowed.
   function start() {
+    ready = true;
+    if ("NDEFReader" in window) granted().then((yes) => yes && listen());
     const n = Number(dock.dataset.combo) || 0;
     if (n < 1 || n > 3) return;
-    const at = performance.getEntriesByType?.("navigation")[0]?.responseStart || performance.now();
+    const at = loaded || performance.now();
     window.requestAnimationFrame(() => play(n, at));
   }
 
@@ -2920,6 +3041,10 @@ const combo = (function tapCombo() {
     countdown();
   }
 
+  window.addEventListener("pagehide", () => {
+    listening?.then((controller) => controller?.abort());
+    listening = null;
+  });
   window.addEventListener("load", preload, { once: true });
   return { start, restyle };
 })();
@@ -3420,6 +3545,7 @@ if (document.body.hasAttribute("data-wake")) {
   care.morning(() => {
     runCelebrate();
     armReveal();
+    combo?.start();
   });
 } else {
   runCelebrate();
