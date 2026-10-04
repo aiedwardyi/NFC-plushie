@@ -201,6 +201,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       giftTotal: GIFT_TOTAL,
       days: fresh.days_together ?? 1,
       unrewardedLine: out.rewarded || extra.morning || extra.combo > 0 ? "" : (UNREWARDED_LINES[out.reason] || ""),
+      // The key says 한 번 더 톡!, so a combo page saves the line for after the key runs out.
+      comboLaterLine: out.rewarded || extra.morning || !(extra.combo > 0) ? "" : (UNREWARDED_LINES[out.reason] || ""),
       lonelyLine: !out.rewarded && moodAfter <= PET.moodLonelyAt ? LONELY_LINE : "",
       reunionLine: out.rewarded && out.reunion ? REUNION_LINE : "",
       want: careWant(care, t) || "",
@@ -280,7 +282,10 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         if (morning || visual) {
           db.prepare("UPDATE plushies SET combo_count = 0, combo_at = NULL WHERE uid = ?").run(serial);
         } else if (out.reason !== "stale") {
-          const c = comboTap(st, t);
+          // The page saw this chain's key run out, so the tap starts over though the server's window has 2 s left.
+          const ended = req.cookies.combo_done === serial;
+          if (ended) res.clearCookie("combo_done", { path: "/" });
+          const c = comboTap(ended ? { comboCount: 0, comboAt: null } : st, t);
           if (!c.same) db.prepare("UPDATE plushies SET combo_count = ?, combo_at = ? WHERE uid = ?").run(c.comboCount, c.comboAt, serial);
           combo = c.combo;
         }
@@ -352,7 +357,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const st = petState(row, t);
       const stale = counter === null ? st.lastCounter !== null : st.lastCounter !== null && !(counter > st.lastCounter);
       const c = row.slept_at === null && !stale ? comboNext(st, t) : null;
-      if (!c) return { ok: true, combo: 0 };
+      // A milestone needs /t's celebration, so the page loads that tap in full.
+      if (!c || (!c.same && milestoneLine(row.tap_count + 1))) return { ok: true, combo: 0 };
       if (!c.same) {
         db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ?, combo_count = ?, combo_at = ? WHERE uid = ?")
           .run(new Date(t).toISOString(), c.comboCount, c.comboAt, uid);

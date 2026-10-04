@@ -538,6 +538,11 @@ html[data-theme="8bit"] .tap-ripple { border-radius: 0; border-width: 4px; anima
 html[data-theme="8bit"] .tap-word { font-family: "Galmuri11", monospace; -webkit-text-stroke: 0; color: #ffec27; text-shadow: 3px 3px 0 #1d1d2b; }
 html[data-theme="8bit"] .unlock-rays i { background: repeating-conic-gradient(from 0deg, rgba(var(--k-ray), .7) 0deg 8deg, rgba(var(--k-ray), 0) 8deg 24deg); image-rendering: pixelated; }
 html[data-theme="8bit"] .floor-ring { border-radius: 0; }
+/* The pixel key is taller for its width, so it shrinks sooner. */
+@container (max-height: 360px) {
+  html[data-theme="8bit"] .combo-key { --kw: min(clamp(140px, 45cqw, 184px), max(56px, 49cqh - 54px)); }
+  html[data-theme="8bit"] .combo-pill { font-size: 11px; }
+}
 @media (prefers-reduced-motion: reduce) {
   html[data-theme="8bit"] .combo-pill { animation: none; }
 }

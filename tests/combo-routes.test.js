@@ -114,15 +114,35 @@ test("the chain closes at 12 s and a request within 800 ms is the same tap", asy
   assert.deepEqual(chainOf(ctx.row()), [1, at]);
 });
 
-test("a combo drops the cooldown line; a stale counter shows 0 and leaves the chain", async (t) => {
+test("a tap after the page's key ran out starts a new chain", async (t) => {
   const ctx = await setup(t);
   const { jar } = await meet(ctx, A, "Mochi");
-  await tap(ctx, jar, `${A}x000005`);
+  await tap(ctx, jar);
+  ctx.advance(4 * SEC);
+  jar.combo_done = B;
+  assert.equal(comboOf((await tap(ctx, jar)).html), 2);
+  ctx.advance(11 * SEC);
+  jar.combo_done = A;
+  const fresh = await tap(ctx, jar);
+  assert.equal(comboOf(fresh.html), 1);
+  assert.deepEqual(chainOf(ctx.row()), [1, ctx.now()]);
+  updateJar(jar, fresh.setCookies);
+  assert.equal(jar.combo_done, undefined);
+  ctx.advance(4 * SEC);
+  assert.equal(comboOf((await tap(ctx, jar)).html), 2);
+});
+
+test("a combo holds the cooldown line for after the key; a stale counter shows 0 and leaves the chain", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  const rewarded = await tap(ctx, jar, `${A}x000005`);
+  assert.doesNotMatch(rewarded.html, /data-combo-later/);
   ctx.advance(4 * SEC);
   const cool = await tap(ctx, jar, `${A}x000006`);
   assert.match(cool.html, /data-reason="cooldown"/);
   assert.equal(comboOf(cool.html), 2);
-  assert.doesNotMatch(cool.html, /is-soft|조금 있다가 또 토닥여/);
+  assert.doesNotMatch(cool.html, /is-soft/);
+  assert.match(cool.html, /data-combo-later="방금 토닥여 줘서 기분 좋아요! 조금 있다가 또 토닥여 주세요\."/);
   const chain = chainOf(ctx.row());
   ctx.advance(4 * SEC);
   const stale = await tap(ctx, jar, `${A}x000006`);
@@ -226,6 +246,20 @@ test("POST /combo: asleep and stale counters give 0 and write nothing", async (t
   ctx.advance(SEC);
   assert.deepEqual((await combo(ctx, jar, `${A}x000008`)).body, { ok: true, combo: 0 });
   assert.deepEqual(ctx.row(), asleep);
+});
+
+test("POST /combo leaves a milestone tap to /t", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await tap(ctx, jar);
+  ctx.db.prepare("UPDATE plushies SET tap_count = 9 WHERE uid = ?").run(A);
+  const before = ctx.row();
+  ctx.advance(3 * SEC);
+  assert.deepEqual(await combo(ctx, jar), { status: 200, body: { ok: true, combo: 0 } });
+  assert.deepEqual(ctx.row(), before);
+  const mile = await tap(ctx, jar);
+  assert.match(mile.html, /data-celebrate="milestone"/);
+  assert.equal(ctx.row().tap_count, 10);
 });
 
 test("POST /combo is the owner's alone, for a named pet and a valid uid", async (t) => {

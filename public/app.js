@@ -1125,7 +1125,7 @@ function ensureAudio(then) {
   else audio.resume?.().then(() => then?.(), () => {});
 }
 
-const SFX_V = 1;
+const SFX_V = 3;
 const SFX_LATE_MS = 1500;
 const sfx = new Map();
 
@@ -2592,12 +2592,27 @@ const combo = (function tapCombo() {
     })();
   }
 
+  // Tells the next tap that the key ran out on screen, so the server starts a new chain.
+  function ended(on) {
+    document.cookie = `combo_done=${on ? uid : ""};path=/;max-age=${on ? 30 : 0};samesite=lax`;
+  }
+
+  // The cooldown line waits for the key: next to 한 번 더 톡! it would say the opposite.
+  function sayLater() {
+    const line = dock.dataset.comboLater;
+    if (!line || careHold.busy || careHold.asleep || root.classList.contains("has-reveal")) return;
+    delete dock.dataset.comboLater;
+    say(line);
+  }
+
   function expire() {
     stopCountdown();
     if (!key) return;
+    ended(true);
     const old = key;
     key = null;
     lit = 0;
+    sayLater();
     if (still()) {
       old.remove();
       return;
@@ -2626,6 +2641,7 @@ const combo = (function tapCombo() {
   // A new key drops in from the keyhole with the earlier teeth lit; tooth n pops with its chime.
   function showKey(n, start) {
     let drop = Promise.resolve();
+    ended(false);
     if (!key) {
       key = build();
       if (!still()) {
@@ -2884,6 +2900,8 @@ const combo = (function tapCombo() {
 
   async function run(n, start) {
     while (careHold.busy) await wait(100);
+    // A reply that lands after 잠 or during the reveal must not pull the pet into a stage.
+    if (careHold.asleep || root.classList.contains("has-reveal")) return;
     care.hold();
     try {
       tapFx();
