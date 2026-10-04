@@ -100,7 +100,10 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   app.use(express.json({ limit: "4kb" }));
   app.use(express.static(fileURLToPath(new URL("../public", import.meta.url)), {
     setHeaders(res, filePath) {
-      if (/\.(?:png|jpe?g|gif|webp|svg|ico|mp4|mp3)$/i.test(filePath)) {
+      // Vendor files carry their version in the name, so they never change in place.
+      if (/[\\/]public[\\/]vendor[\\/]/.test(filePath)) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      } else if (/\.(?:png|jpe?g|gif|webp|svg|ico|mp4|mp3)$/i.test(filePath)) {
         res.setHeader("Cache-Control", "public, max-age=86400");
       }
     },

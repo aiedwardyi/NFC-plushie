@@ -215,6 +215,18 @@ test("the preview page shows the 오락실 with nothing to play", async (t) => {
   assert.doesNotMatch(preview.html, /data-care-uid/);
 });
 
+test("vendor files cache for a year; the app script still never caches", async (t) => {
+  const ctx = await setup(t);
+  for (const file of ["pixi-8.22.0.min.js", "pixi-unsafe-eval-8.22.0.min.js", "pixi-filters-6.1.5.js"]) {
+    const res = await ctx.request(`/vendor/${file}`);
+    assert.equal(res.status, 200, file);
+    assert.equal(res.headers.get("cache-control"), "public, max-age=31536000, immutable");
+    assert.doesNotMatch(res.html.slice(-200), /sourceMappingURL/);
+  }
+  assert.equal((await ctx.request("/app.js")).headers.get("cache-control"), "no-store");
+  assert.equal((await ctx.request("/game/gimo.js")).headers.get("cache-control"), "no-store");
+});
+
 test("a pre-arcade database gains the arcade columns as no plays and no best", async (t) => {
   const dir = mkdtempSync(join(process.cwd(), ".test-data-"));
   const token = "owner-token";

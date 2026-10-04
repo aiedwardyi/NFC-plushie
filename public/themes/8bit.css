@@ -271,7 +271,7 @@ html[data-theme="8bit"] .dock-cap::before {
   background: center / contain no-repeat;
   image-rendering: pixelated;
 }
-html[data-theme="8bit"] [data-open="gifts"] .dock-cap::before { background-image: url("/themes/px/gift.svg"); }
+html[data-theme="8bit"] [data-open="arcade"] .dock-cap::before { background-image: url("/themes/px/arcade.svg"); }
 html[data-theme="8bit"] [data-open="record"] .dock-cap::before { background-image: url("/themes/px/record.svg"); }
 html[data-theme="8bit"] .dock-btn.has-new .dock-cap::after {
   top: -6px;
@@ -546,3 +546,41 @@ html[data-theme="8bit"] .floor-ring { border-radius: 0; }
 @media (prefers-reduced-motion: reduce) {
   html[data-theme="8bit"] .combo-pill { animation: none; }
 }
+
+/* 오락실 and 기 모으기 */
+html[data-theme="8bit"] {
+  --g-ink: #fff1e8;
+  --g-stroke: #1d2b53;
+  --g-fill-a: #ffec27;
+  --g-fill-b: #ffa300;
+  --g-track: rgba(29, 43, 83, .6);
+  --g-aura: 255, 236, 39;
+  --g-card: #1d2b53;
+  --g-card-ink: #fff1e8;
+  --g-accent: #ffec27;
+  --g-accent-ink: #1d2b53;
+  --g-xp: #ffec27;
+  --g-big: #ffec27;
+  --g-big-edge: #1d2b53;
+  --g-label: #1d2b53;
+  --g-label-ink: #ffec27;
+}
+html[data-theme="8bit"] .g-pip { border-radius: 0; background: #ffec27; box-shadow: 2px 2px 0 #ab5236; }
+html[data-theme="8bit"] .g-pip.is-used { box-shadow: none; }
+html[data-theme="8bit"] .g-card, html[data-theme="8bit"] .g-thumb, html[data-theme="8bit"] .g-start { border-radius: 0; }
+html[data-theme="8bit"] .g-start { font-family: "Galmuri11", monospace; background: #ffec27; color: #1d2b53; box-shadow: 3px 3px 0 #ab5236; }
+html[data-theme="8bit"] .g-gifts { border-radius: 0; background: none; color: var(--muted); box-shadow: none; }
+html[data-theme="8bit"] .g-gifts.has-new .g-gift-ic::after { border-radius: 0; }
+html[data-theme="8bit"] .g-thumb-pet { image-rendering: pixelated; }
+html[data-theme="8bit"][data-mascot="horse"] .g-thumb-pet { content: url("/themes/px/horse-px.png"); }
+html[data-theme="8bit"][data-mascot="sheep"] .g-thumb-pet { content: url("/themes/px/sheep-px.png"); }
+html[data-theme="8bit"] .g-label { border-radius: 0; font-family: "Galmuri11", monospace; box-shadow: 3px 3px 0 rgba(0, 0, 0, .35); }
+html[data-theme="8bit"] .g-tier svg { image-rendering: pixelated; }
+html[data-theme="8bit"] .g-big { font-family: "Galmuri11", monospace; -webkit-text-stroke: 0; text-shadow: 5px 5px 0 #1d2b53, -2px -2px 0 #1d2b53, 2px -2px 0 #1d2b53, -2px 2px 0 #1d2b53; }
+html[data-theme="8bit"] .g-result, html[data-theme="8bit"] .g-badge, html[data-theme="8bit"] .g-actions button, html[data-theme="8bit"] .g-best { border-radius: 0; font-family: "Galmuri11", monospace; }
+html[data-theme="8bit"] .g-result { box-shadow: 0 0 0 4px #ffec27, 6px 6px 0 4px rgba(0, 0, 0, .45); }
+html[data-theme="8bit"] .g-badge { box-shadow: 0 0 0 4px #ffec27; }
+html[data-theme="8bit"] .g-height { font-family: "Galmuri11", monospace; -webkit-text-stroke: 0; text-shadow: 3px 3px 0 #1d2b53, -2px 0 0 #1d2b53, 2px 0 0 #1d2b53, 0 -2px 0 #1d2b53; }
+html[data-theme="8bit"] .g-height small { -webkit-text-stroke: 0; }
+html[data-theme="8bit"] .g-timer, html[data-theme="8bit"] .g-timer i, html[data-theme="8bit"] .g-meter, html[data-theme="8bit"] .g-fill { border-radius: 0; }
+html[data-theme="8bit"] .g-fill { background: repeating-linear-gradient(0deg, #ffec27 0 6px, #ffa300 6px 8px); }

@@ -271,3 +271,31 @@ html[data-theme="najeon"] {
   --k-pill-ink: #e9f0ff;
   --k-ray: 225, 238, 255;
 }
+
+/* 오락실 and 기 모으기 */
+html[data-theme="najeon"] {
+  --g-ink: #ece9f2;
+  --g-stroke: #0c0c10;
+  --g-fill-a: #f4f7ff;
+  --g-fill-b: #b9c8ef;
+  --g-track: rgba(236, 233, 242, .16);
+  --g-aura: 225, 238, 255;
+  --g-card: #121118;
+  --g-card-ink: #ece9f2;
+  --g-accent: #dbe9ff;
+  --g-accent-ink: #0c0c10;
+  --g-xp: #dbe9ff;
+  --g-big: #f4f7ff;
+  --g-big-edge: #3b3a48;
+  --g-label: rgba(13, 12, 16, .9);
+  --g-label-ink: #e9f0ff;
+}
+html[data-theme="najeon"] .g-thumb-aura { background: radial-gradient(circle, rgba(225, 238, 255, .9) 0 22%, rgba(225, 238, 255, .3) 42%, transparent 66%); }
+html[data-theme="najeon"] .g-start { background: linear-gradient(135deg, #f4f7ff, #dff6ff 50%, #f6e8ff); color: #0c0c10; box-shadow: 0 3px 0 #8e8b99; }
+html[data-theme="najeon"] .g-gifts { background: none; color: var(--muted); font-family: inherit; box-shadow: none; }
+html[data-theme="najeon"] svg[data-icon] .i-a { fill: #eef3ff; stroke: #8d9bbd; }
+html[data-theme="najeon"] svg[data-icon] .i-b { stroke: #c9d8f5; }
+html[data-theme="najeon"] .g-fill, html[data-theme="najeon"] .g-timer i { background: linear-gradient(0deg, #c9d8f5, #f4f7ff 50%, #f6e8ff); }
+html[data-theme="najeon"] .g-result { box-shadow: 0 0 0 1.5px #8d9bbd, 0 0 0 5px #0c0c10, 0 0 0 6.5px #c9d8f5, 0 18px 40px rgba(0, 0, 0, .5); }
+html[data-theme="najeon"] .g-badge { box-shadow: 0 0 0 1.5px #c9d8f5, 0 0 20px rgba(225, 238, 255, .6); }
+html[data-theme="najeon"] .g-result .g-again { background: linear-gradient(135deg, #f4f7ff, #dff6ff 50%, #f6e8ff) !important; }

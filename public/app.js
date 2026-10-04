@@ -1589,6 +1589,7 @@ if (themeSheet) {
     applied = id;
     care?.restyle();
     combo?.restyle();
+    arcade?.restyle();
   }
 
   function flip(id, color) {
@@ -1944,7 +1945,7 @@ const care = (function careLoop() {
   }
 
   function screenBusy() {
-    return Boolean(sheetOpen || waking || (demo && !demo.hidden) || root.classList.contains("has-reveal")
+    return Boolean(sheetOpen || waking || (demo && !demo.hidden) || root.classList.contains("has-reveal") || root.classList.contains("g-on")
       || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump, .gift.is-glow, .combo-key"));
   }
 
@@ -3085,6 +3086,291 @@ const combo = (function tapCombo() {
   });
   window.addEventListener("load", preload, { once: true });
   return { start, restyle };
+})();
+
+/* 오락실: 기 모으기 on a WebGL stage, loaded when the room first opens; the first 3 plays a day give XP. */
+const arcade = (function arcadeRoom() {
+  const dock = document.querySelector(".dock[data-care-uid]");
+  const sheet = document.querySelector('[data-sheet="arcade"]');
+  const win = document.querySelector("[data-window]");
+  if (!dock || !care || !combo || !sheet || !win) return null;
+  const root = document.documentElement;
+  const button = dock.querySelector('[data-open="arcade"]');
+  const start = sheet.querySelector('[data-game="gi"]');
+  const blurb = start.closest(".g-card").querySelector("small");
+  const giftRow = sheet.querySelector("[data-open-gifts]");
+  const thumb = sheet.querySelector(".g-thumb-pet");
+  const uid = dock.dataset.careUid;
+  const world = () => root.dataset.theme || "classic";
+  const kit = () => (world() === "8bit" ? "chip" : "soft");
+  const BLURB = blurb.textContent;
+  const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
+  const VENDOR = ["/vendor/pixi-8.22.0.min.js", "/vendor/pixi-unsafe-eval-8.22.0.min.js", "/vendor/pixi-filters-6.1.5.js"];
+  const SOUNDS = ["count", "go", "note-c5", "note-c6", "note-c7", "tier", "rocket", "ding", "chime", "chime-low", "fall", "result", "best", "wind-2", "wind-3", "wind-4"];
+  const scripts = new Map();
+  let retry = 0;
+  let game = null;
+  let ready = null;
+  let playing = false;
+
+  function buzz(pattern) {
+    if (navigator.userActivation?.hasBeenActive === false) return;
+    tryVibrate(pattern);
+  }
+
+  // The hum under the charge: one oscillator through the app's limiter, its pitch and level following the gauge.
+  const drone = (function chargeHum() {
+    let osc = null;
+    let level = null;
+    let fade = null;
+    let chip = false;
+    const loud = (c) => (chip ? 1.3 * (0.02 + 0.04 * c) : 0.03 + 0.07 * c);
+    return {
+      start(isChip) {
+        this.stop();
+        if (!audio || audio.state !== "running") return;
+        chip = isChip;
+        const t = audio.currentTime;
+        osc = audio.createOscillator();
+        level = audio.createGain();
+        fade = audio.createGain();
+        if (chip) {
+          osc.type = "square";
+          const lowpass = audio.createBiquadFilter();
+          lowpass.type = "lowpass";
+          lowpass.frequency.value = 5000;
+          osc.connect(lowpass).connect(level);
+        } else {
+          osc.setPeriodicWave(audio.createPeriodicWave(new Float32Array(4), new Float32Array([0, 1, 0.5, 0.2]), { disableNormalization: true }));
+          osc.connect(level);
+        }
+        osc.frequency.value = 98;
+        level.gain.value = loud(0);
+        fade.gain.setValueAtTime(0, t);
+        fade.gain.linearRampToValueAtTime(1, t + 0.2);
+        level.connect(fade).connect(sfxOut());
+        osc.start(t);
+      },
+      set(charge) {
+        if (!osc) return;
+        const t = audio.currentTime;
+        osc.frequency.setTargetAtTime(98 * 2 ** (0.9 * charge), t, 0.03);
+        level.gain.setTargetAtTime(loud(charge), t, 0.03);
+      },
+      stop() {
+        if (!osc) return;
+        const t = audio.currentTime;
+        fade.gain.cancelScheduledValues(t);
+        fade.gain.setValueAtTime(fade.gain.value, t);
+        fade.gain.linearRampToValueAtTime(0, t + 0.04);
+        osc.stop(t + 0.05);
+        osc = null;
+      },
+    };
+  })();
+
+  function percent(r) {
+    return r.xpSpan > 0 ? Math.max(0, Math.min(100, Math.round((r.xpInto / r.xpSpan) * 100))) : 100;
+  }
+
+  function recordRow(label) {
+    const dt = Array.from(document.querySelectorAll('[data-sheet="record"] dt')).find((el) => el.textContent === label);
+    return dt?.nextElementSibling || null;
+  }
+
+  function paintLeft(left) {
+    dock.dataset.arcadeLeft = String(left);
+    sheet.querySelectorAll(".g-pip").forEach((pip, i) => pip.classList.toggle("is-used", i < 3 - left));
+    sheet.querySelector("[data-arcade-today] b").textContent = left ? `${left}번 남았어요` : "다 했어요!";
+    button.classList.toggle("has-new", giftRow.classList.contains("has-new") || left > 0);
+  }
+
+  // The reply updates everything a reload would show.
+  function settle(r) {
+    paintLeft(r.xpLeft);
+    dock.dataset.giBest = String(r.best);
+    const left = r.xpSpan - r.xpInto;
+    const pin = document.querySelector(".level-pin");
+    if (pin) pin.textContent = `Lv. ${r.level}`;
+    const badge = document.querySelector(".level-badge");
+    if (badge) {
+      badge.textContent = String(r.level);
+      badge.setAttribute("aria-label", `Lv. ${r.level}`);
+    }
+    const fill = document.querySelector(".xp-fill");
+    if (fill) {
+      fill.dataset.xp = String(percent(r));
+      fill.style.width = `${percent(r)}%`;
+    }
+    document.querySelector(".xp-bar")?.setAttribute("aria-label", `다음 단계까지 ${left}`);
+    const level = recordRow("레벨");
+    if (level) level.textContent = `Lv. ${r.level}`;
+    const next = recordRow("다음 레벨까지");
+    if (next) next.textContent = `${left} XP`;
+    const line = document.querySelector(".level-line");
+    if (line) {
+      line.classList.remove("is-growing");
+      void line.offsetWidth;
+      line.classList.add("is-growing");
+    }
+  }
+
+  function post(height) {
+    return fetch("/arcade", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, game: "gi", height }),
+      credentials: "same-origin",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((reply) => (reply?.ok ? reply : null))
+      .catch(() => null)
+      .then((reply) => {
+        if (reply) settle(reply);
+        return reply;
+      });
+  }
+
+  const api = {
+    win,
+    pet,
+    say: (text) => care.fx.say(text),
+    sfx(name, { rate, gain, at = 0 } = {}) {
+      if (at) window.setTimeout(() => playSfx(name, { rate, gain }), at);
+      else playSfx(name, { rate, gain });
+    },
+    buzz,
+    still: () => prefersReducedMotion(),
+    drone,
+    onLaunch: (height) => post(height),
+  };
+
+  // Each vendor script loads once per page; a failed one is dropped so the next open retries it.
+  function script(src) {
+    if (!scripts.has(src)) {
+      scripts.set(src, new Promise((resolve, reject) => {
+        const el = document.createElement("script");
+        el.src = src;
+        el.addEventListener("load", resolve, { once: true });
+        el.addEventListener("error", () => {
+          el.remove();
+          scripts.delete(src);
+          reject(new Error(src));
+        }, { once: true });
+        document.head.appendChild(el);
+      }));
+    }
+    return scripts.get(src);
+  }
+
+  function prepare() {
+    if (!game) {
+      const made = VENDOR.reduce((done, src) => done.then(() => script(src)), Promise.resolve())
+        // A failed import stays failed for its URL, so a retry asks for a new one.
+        .then(() => import(retry ? `/game/gimo.js?retry=${retry}` : "/game/gimo.js").catch((error) => {
+          retry += 1;
+          throw error;
+        }))
+        .then((m) => m.createGimo(api));
+      game = made;
+      made.then((g) => {
+        if (game === made) ready = g;
+        else g.destroy();
+      }, () => {
+        if (game === made) game = null;
+      });
+    }
+    return game;
+  }
+
+  function paintStart() {
+    start.textContent = "시작";
+    start.disabled = false;
+    blurb.textContent = BLURB;
+    if (careHold.asleep) {
+      blurb.textContent = "쿨쿨 자는 중이에요";
+      start.disabled = true;
+      return;
+    }
+    if (ready) return;
+    start.textContent = "준비 중…";
+    start.disabled = true;
+    const made = prepare();
+    made.then(() => {
+      if (game === made && !careHold.asleep) paintStart();
+    }, () => {
+      start.textContent = "시작";
+      blurb.textContent = FAILED;
+    });
+  }
+
+  function open() {
+    playSfx(`care-${kit()}-press`);
+    buzz(10);
+    const canon = pet.querySelector('[data-frame="canon"]');
+    if (canon) thumb.src = canon.getAttribute("src");
+    for (const name of SOUNDS) loadSfx(`game-${kit()}-${name}`);
+    if (kit() === "soft") loadSfx("game-soft-thump");
+    paintStart();
+  }
+
+  function onScreen(event) {
+    if (ready?.phase !== "charge" || event.target.closest?.("button")) return;
+    ready.tap("screen");
+  }
+
+  async function run(g) {
+    const mode = "screen";
+    closeSheet();
+    care.hold();
+    root.classList.add("g-on");
+    document.addEventListener("pointerdown", onScreen, true);
+    let out = "again";
+    try {
+      while (out === "again") out = await g.play(mode, Number(dock.dataset.giBest) || 0);
+    } finally {
+      document.removeEventListener("pointerdown", onScreen, true);
+      root.classList.remove("g-on");
+      care.release();
+      playing = false;
+    }
+    if (out === "quit") care.fx.say("재밌었어요! 또 놀아요!");
+  }
+
+  function begin() {
+    const g = ready;
+    if (playing || !g || careHold.asleep) return;
+    if (careHold.busy || waking || root.classList.contains("has-reveal")
+      || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump")) return;
+    playing = true;
+    playSfx(`care-${kit()}-press`);
+    buzz(12);
+    run(g);
+  }
+
+  function restyle() {
+    if (!game) return;
+    const old = game;
+    game = null;
+    ready = null;
+    old.then((g) => g.destroy(), () => {});
+  }
+
+  button.addEventListener("click", open);
+  start.addEventListener("click", begin);
+  giftRow.addEventListener("click", () => {
+    closeSheet();
+    window.setTimeout(() => openSheet("gifts", button), prefersReducedMotion() ? 0 : 300);
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && (ready?.phase === "ready" || ready?.phase === "charge")) ready.abort();
+  });
+  window.addEventListener("pagehide", () => {
+    ready?.destroy();
+    game = null;
+    ready = null;
+  });
+  return { restyle };
 })();
 
 const TIER_WORDS = { special: "특별한 선물", rare: "반짝 선물" };
