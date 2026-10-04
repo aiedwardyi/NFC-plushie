@@ -3327,6 +3327,7 @@ const arcade = (function arcadeRoom() {
       if (game === made && !careHold.asleep) paintStart();
     }, () => {
       start.textContent = "시작";
+      start.disabled = false;
       blurb.textContent = FAILED;
     });
   }
@@ -3378,7 +3379,12 @@ const arcade = (function arcadeRoom() {
 
   function begin() {
     const g = ready;
-    if (playing || !g || careHold.asleep) return;
+    if (playing || careHold.asleep) return;
+    // After a failed load, 시작 tries again.
+    if (!g) {
+      paintStart();
+      return;
+    }
     if (careHold.busy || waking || root.classList.contains("has-reveal")
       || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump")) return;
     playing = true;
