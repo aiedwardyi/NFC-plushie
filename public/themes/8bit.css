@@ -271,7 +271,6 @@ html[data-theme="8bit"] .dock-cap::before {
   background: center / contain no-repeat;
   image-rendering: pixelated;
 }
-html[data-theme="8bit"] [data-dock-pat] .dock-cap::before { background-image: url("/themes/px/pat.svg"); }
 html[data-theme="8bit"] [data-open="gifts"] .dock-cap::before { background-image: url("/themes/px/gift.svg"); }
 html[data-theme="8bit"] [data-open="record"] .dock-cap::before { background-image: url("/themes/px/record.svg"); }
 html[data-theme="8bit"] .dock-btn.has-new .dock-cap::after {
@@ -453,10 +452,55 @@ html[data-theme="8bit"] .demo-card::before {
 html[data-theme="8bit"] .demo-close { color: var(--cream); font-weight: 700; }
 html[data-theme="8bit"] .notice { font-weight: 700; }
 
+/* Care: pixel faces, crisp props, the blinking arrow */
+html[data-theme="8bit"][data-mascot="horse"] .pet-frame[data-frame="blink"] { content: url("/themes/px/horse-closed-px.png"); }
+html[data-theme="8bit"][data-mascot="horse"] .pet-frame[data-frame="react"] { content: url("/themes/px/horse-happy-px.png"); }
+html[data-theme="8bit"][data-mascot="horse"] .pet-frame[data-frame="munch"] { content: url("/themes/px/horse-munch-px.png"); }
+html[data-theme="8bit"][data-mascot="horse"] .pet-frame[data-frame="yawn"] { content: url("/themes/px/horse-yawn-px.png"); }
+html[data-theme="8bit"][data-mascot="horse"] .pet-frame[data-frame="away"] { content: url("/themes/px/horse-away-px.png"); }
+html[data-theme="8bit"][data-mascot="sheep"] .pet-frame[data-frame="blink"] { content: url("/themes/px/sheep-closed-px.png"); }
+html[data-theme="8bit"][data-mascot="sheep"] .pet-frame[data-frame="react"] { content: url("/themes/px/sheep-happy-px.png"); }
+html[data-theme="8bit"][data-mascot="sheep"] .pet-frame[data-frame="munch"] { content: url("/themes/px/sheep-munch-px.png"); }
+html[data-theme="8bit"][data-mascot="sheep"] .pet-frame[data-frame="yawn"] { content: url("/themes/px/sheep-yawn-px.png"); }
+html[data-theme="8bit"][data-mascot="sheep"] .pet-frame[data-frame="away"] { content: url("/themes/px/sheep-away-px.png"); }
+html[data-theme="8bit"] .window .pet[data-pet="alive"].is-care .pet-motion { animation: none; }
+html[data-theme="8bit"] .prop svg,
+html[data-theme="8bit"] .moon svg,
+html[data-theme="8bit"] .want-cloud svg { shape-rendering: crispEdges; }
+html[data-theme="8bit"] .want-cloud,
+html[data-theme="8bit"] .want i { border-radius: 0; box-shadow: 4px 4px 0 #1d1d2b; }
+html[data-theme="8bit"] .want-cloud { outline: 3px solid #1d1d2b; }
+html[data-theme="8bit"] .crumb { border-radius: 0; }
+html[data-theme="8bit"] .zzz { font-family: "Galmuri11", monospace; color: #fff1e8; text-shadow: 3px 3px 0 #1d1d2b; animation-timing-function: steps(8); }
+html[data-theme="8bit"] .sparkle { background: #ffec27; clip-path: polygon(40% 0, 60% 0, 60% 40%, 100% 40%, 100% 60%, 60% 60%, 60% 100%, 40% 100%, 40% 60%, 0 60%, 0 40%, 40% 40%); }
+html[data-theme="8bit"] .dock-btn.is-want .dock-cap::after {
+  inset: auto;
+  top: -20px;
+  left: 50%;
+  width: 14px;
+  height: 10px;
+  margin-left: -7px;
+  border: 0;
+  border-radius: 0;
+  background: #ffec27;
+  clip-path: polygon(0 0, 100% 0, 100% 40%, 70% 40%, 70% 70%, 50% 100%, 30% 70%, 30% 40%, 0 40%);
+  opacity: 1;
+  transform: none;
+  animation: px-blink .6s steps(1) infinite;
+}
+@keyframes px-blink { 50% { opacity: 0; } }
+html[data-theme="8bit"] [data-care="feed"] .dock-cap::before { background-image: url("/themes/px/feed.svg"); }
+html[data-theme="8bit"] [data-care="play"] .dock-cap::before { background-image: url("/themes/px/play.svg"); }
+html[data-theme="8bit"] [data-care="sleep"] .dock-cap::before { background-image: url("/themes/px/sleep.svg"); }
+html[data-theme="8bit"] .dock-btn.is-side .dock-cap::before { width: 24px; height: 24px; }
+html[data-theme="8bit"] .wake-tap { border-radius: 0; font-family: "Galmuri11", monospace; box-shadow: 4px 4px 0 #1d1d2b; outline: 3px solid #1d1d2b; }
+html[data-theme="8bit"] .sun-flash { background: #fff1e8; animation-timing-function: steps(4); }
+
 @media (prefers-reduced-motion: reduce) {
   html[data-theme="8bit"] .pet[data-pet="alive"]:not(.is-press) .pet-motion,
   html[data-theme="8bit"] .pet[data-pet="alive"].is-night:not(.is-press) .pet-motion,
   html[data-theme="8bit"] .pet[data-pet="alive"].is-lonely:not(.is-press) .pet-motion,
   html[data-theme="8bit"] .pet[data-pet="alive"].is-press .pet-motion,
-  html[data-theme="8bit"] .dialog-cursor.is-done { animation: none; }
+  html[data-theme="8bit"] .dialog-cursor.is-done,
+  html[data-theme="8bit"] .dock-btn.is-want .dock-cap::after { animation: none; }
 }

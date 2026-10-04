@@ -796,11 +796,15 @@ html[data-time="night"] .stars { opacity: 1; }
   to { transform: translateY(4px); }
 }
 
-/* Dock: three soft device buttons */
+/* Dock: gift box and records at the edges, the three care verbs between */
 .dock {
+  /* Narrow phones scale the caps so all five fit; 412px gets 64 and 46. */
+  --verb: min(64px, 15.6vw);
+  --side: min(46px, 11.6vw);
   display: flex;
+  align-items: start;
   justify-content: center;
-  gap: clamp(22px, 9vw, 40px);
+  gap: clamp(8px, 3.4vw, 16px);
   padding-top: 4px;
 }
 .dock-btn {
@@ -876,6 +880,18 @@ html[data-time="night"] .stars { opacity: 1; }
   outline: 3px solid var(--gold-light);
   outline-offset: 4px;
 }
+.dock-btn.is-side .dock-cap {
+  width: var(--side);
+  height: var(--side);
+  margin-top: calc((var(--verb) - var(--side)) / 2);
+}
+.dock-btn.is-side .dock-cap svg { width: 22px; height: 22px; }
+.dock-btn.is-verb .dock-cap {
+  width: var(--verb);
+  height: var(--verb);
+}
+.dock-btn.is-verb .dock-cap svg { width: 30px; height: 30px; }
+.dock-btn.is-verb .dock-label { color: var(--cream); }
 footer {
   order: 1;
   font-size: .6875rem;
@@ -1807,6 +1823,9 @@ body.is-still-celebrate main {
     position: relative;
     z-index: 1;
   }
+  .has-app body[data-morning]:not(.is-awake) .pet-frame { opacity: 0; }
+  .has-app body[data-morning]:not(.is-awake) .pet-frame[data-frame="blink"] { opacity: 1; }
+  .has-app body[data-morning]:not(.is-awake, .is-asleep-page) .sky::before { opacity: .8; }
 }
 @keyframes wake-glow {
   0%, 100% { transform: scale(.9); }
@@ -2064,4 +2083,205 @@ html.has-reveal body::after { visibility: hidden; }
 }
 @media (prefers-reduced-motion: reduce) {
   .reveal.is-loading::after { animation: reveal-wait .4s ease .5s both; }
+}
+
+/* Care: the want bubble, props, lights out and the morning wake */
+.dock-btn.is-want .dock-cap::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  border: 2.5px solid var(--gold-light);
+  opacity: 0;
+  animation: want-ring 1.8s ease-out infinite;
+}
+@keyframes want-ring {
+  0% { opacity: .9; transform: scale(.92); }
+  100% { opacity: 0; transform: scale(1.18); }
+}
+.is-asleep-page .dock-btn.is-verb { opacity: .45; }
+
+.want,
+.zzz { --pet: min(68cqw, 72cqh); }
+.want {
+  position: absolute;
+  left: calc(50cqw + var(--pet) * .3);
+  top: calc(90cqh - var(--pet) * .98 - 13.75cqmin);
+  z-index: 4;
+  width: 25cqmin;
+  height: 25cqmin;
+  pointer-events: none;
+  transform-origin: 0% 100%;
+  animation: want-in .5s cubic-bezier(.2, 1.4, .4, 1) both, want-float 3.2s ease-in-out .5s infinite;
+}
+.want.is-gone { animation: want-out .3s ease-in both; }
+.want-cloud {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .18), 0 8px 18px rgba(20, 27, 43, .28);
+}
+.want-cloud svg { width: 64%; height: 64%; }
+.want i {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .15);
+}
+.want i:nth-child(1) { left: -9%; bottom: -14%; width: 22%; height: 22%; }
+.want i:nth-child(2) { left: -26%; bottom: -30%; width: 12%; height: 12%; }
+@keyframes want-in {
+  from { opacity: 0; transform: scale(.2); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes want-out {
+  to { opacity: 0; transform: scale(.4); }
+}
+@keyframes want-float {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -5px; }
+}
+
+/* Reactions and sleep take over the pet's idle motion */
+.window .pet[data-pet="alive"].is-care .pet-motion { animation: none; }
+.pet[data-pet="alive"].is-sleeping:not(.is-care) .pet-motion { animation: sleep-breathe 3.6s ease-in-out infinite; }
+@keyframes sleep-breathe {
+  0%, 100% { transform: translateY(3%) scale(.985, .975); }
+  50% { transform: translateY(3%) scale(1.01, 1); }
+}
+.pet.is-sleeping .pet-frame { filter: brightness(.86) saturate(.92); }
+
+/* Props live in the window, in front of the pet, clipped to its glass */
+.prop-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.prop {
+  position: absolute;
+  pointer-events: none;
+  will-change: transform;
+}
+.prop svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.crumb {
+  position: absolute;
+  z-index: 3;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.sparkle {
+  position: absolute;
+  z-index: 4;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  background: var(--gold-light);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  animation: sparkle-pop .7s ease-out both;
+}
+@keyframes sparkle-pop {
+  0% { opacity: 0; transform: scale(.2) rotate(0); }
+  30% { opacity: 1; transform: scale(1.1) rotate(30deg); }
+  100% { opacity: 0; transform: scale(.4) rotate(90deg) translate(var(--sx, 0), var(--sy, -20px)); }
+}
+
+/* Lights out */
+.window.is-asleep .sky::before { opacity: .42; }
+.night-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  background: radial-gradient(80% 70% at 50% 40%, rgba(14, 19, 40, .55), rgba(6, 8, 20, .82));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1s ease;
+}
+.window.is-dimming .night-veil { opacity: 1; }
+.moon {
+  position: absolute;
+  z-index: 1;
+  top: 9%;
+  right: 12%;
+  width: 17cqmin;
+  height: 17cqmin;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(30%);
+  transition: opacity 1.2s ease, transform 1.6s cubic-bezier(.2, .8, .3, 1);
+}
+.window.is-asleep .moon { opacity: 1; transform: none; }
+.moon svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.zzz {
+  position: absolute;
+  left: calc(50cqw + var(--pet) * .16);
+  top: calc(90cqh - var(--pet) * .88);
+  z-index: 4;
+  font-family: "Pretendard Variable", sans-serif;
+  font-weight: 900;
+  color: var(--gold-light);
+  -webkit-text-stroke: 1px rgba(20, 27, 43, .35);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .35), 0 0 12px rgba(241, 214, 140, .45);
+  pointer-events: none;
+  animation: zzz-rise 2.6s ease-out both;
+}
+@keyframes zzz-rise {
+  0% { opacity: 0; transform: translate(0, 0) scale(.6) rotate(-8deg); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translate(34px, -70px) scale(1.25) rotate(10deg); }
+}
+
+/* Morning: the next plushie tap finds the pet asleep, one touch wakes it */
+.wake-tap {
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  z-index: 5;
+  margin: 0;
+  padding: 9px 16px;
+  white-space: nowrap;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--cocoa);
+  background: var(--paper);
+  border-radius: 16px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .3), 0 10px 24px rgba(0, 0, 0, .35);
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity .3s ease;
+  animation: wake-call-in .5s var(--ease-out) .2s both, wake-call-bob 2.4s ease-in-out .7s infinite;
+}
+.wake-tap.is-gone { opacity: 0; }
+.sun-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(75% 65% at 50% 32%, rgba(255, 251, 238, .97), rgba(255, 232, 186, .55));
+  animation: sun-flash .85s ease-out both;
+}
+@keyframes sun-flash {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .want,
+  .dock-btn.is-want .dock-cap::after,
+  .pet[data-pet="alive"].is-sleeping .pet-motion { animation: none; }
+  .want.is-gone { animation: none; opacity: 0; }
+  .dock-btn.is-want .dock-cap::after { opacity: .9; }
+  .sky::before,
+  .stars,
+  .night-veil,
+  .moon { transition: none; }
 }

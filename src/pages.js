@@ -50,7 +50,6 @@ function petMarkup({ waving = false, away = false, lonely = false, mascot = "hor
   const kind = mascotKind(mascot);
   const front = `/mascot-${kind}-512-v3.png`;
   const awaySrc = `/mascot-${kind}-away-512-v3.png`;
-  const face = (name, src) => `<img class="pet-frame" data-frame="${name}" src="${src}" width="220" height="220" alt="" aria-hidden="true" fetchpriority="low" decoding="async" draggable="false">`;
   if (away) {
     const awayAlt = "다정한 친구가 등을 보이고 있어요";
     return `<div class="pet pet-away" data-pet="away" role="img" aria-label="${awayAlt}">
@@ -62,18 +61,17 @@ function petMarkup({ waving = false, away = false, lonely = false, mascot = "hor
   const alt = "다정한 친구가 방긋 웃어요";
   const enterClass = waving ? " enter" : "";
   const lonelyClass = lonely ? " is-lonely" : "";
+  // Sync decoding: an async face paints a blank pet on its first swap.
+  const face = (name, src) => `<img class="pet-frame" data-frame="${name}" src="${src}" width="220" height="220" alt="" aria-hidden="true" fetchpriority="low" decoding="sync" draggable="false">`;
+  const frames = faces
+    ? [face("blink", `/mascot-${kind}-closed-512.webp`), face("react", `/mascot-${kind}-happy-512.webp`), face("sleepy", front),
+      face("munch", `/mascot-${kind}-munch-512.webp`), face("yawn", `/mascot-${kind}-yawn-512.webp`), face("away", awaySrc)]
+    : ["blink", "react", "sleepy"].map((name) => `<img class="pet-frame" data-frame="${name}" src="${front}" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">`);
   return `<div class="pet${enterClass}${lonelyClass}" data-pet="alive">
       <button type="button" class="pet-hit" aria-label="${alt}">
         <span class="pet-motion">
           <img class="pet-frame is-show" data-frame="canon" src="${front}" width="220" height="220" alt="${alt}" decoding="async" draggable="false">
-          ${faces ? `${face("blink", `/mascot-${kind}-closed-512.webp`)}
-          ${face("react", `/mascot-${kind}-happy-512.webp`)}
-          ${face("sleepy", front)}
-          ${face("munch", `/mascot-${kind}-munch-512.webp`)}
-          ${face("yawn", `/mascot-${kind}-yawn-512.webp`)}
-          ${face("away", awaySrc)}` : `<img class="pet-frame" data-frame="blink" src="${front}" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
-          <img class="pet-frame" data-frame="react" src="${front}" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
-          <img class="pet-frame" data-frame="sleepy" src="${front}" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">`}
+          ${frames.join("\n          ")}
         </span>
       </button>
     </div>`;
