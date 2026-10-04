@@ -1457,7 +1457,7 @@ if (themeSheet) {
   };
   const FONTS = { "8bit": '700 16px "Galmuri11"', milk: '16px "Cafe24Ssurround"', najeon: '700 16px "Gowun Batang"' };
   const ART = {
-    "8bit": (kind) => [`${kind}-px.png`, `${kind}-away-px.png`, "lock.svg", "cloud.svg", "heart-full.svg", "heart-half.svg", "heart-empty.svg", "feed.svg", "play.svg", "sleep.svg", `${kind}-closed-px.png`, `${kind}-happy-px.png`, "gift.svg", "record.svg", "close.svg", "star.svg", "lock-dim.svg"],
+    "8bit": (kind) => [`${kind}-px.png`, `${kind}-away-px.png`, "lock.svg", "cloud.svg", "heart-full.svg", "heart-half.svg", "heart-empty.svg", "feed.svg", "play.svg", "sleep.svg", `${kind}-closed-px.png`, `${kind}-happy-px.png`, "arcade.svg", "gift.svg", "record.svg", "close.svg", "star.svg", "lock-dim.svg"],
     milk: () => ["strawberry.svg"],
     najeon: () => ["najeon-scene.svg"],
   };
@@ -2958,6 +2958,7 @@ const combo = (function tapCombo() {
   let listening = null;
   let lastRead = -Infinity;
   let sinkFn = null;
+  let handoff = 0;
 
   function nfcState(on) {
     if (!nfcButton) return;
@@ -3036,6 +3037,7 @@ const combo = (function tapCombo() {
     closeSheet();
     if (demo && !demo.hidden) demo.querySelector("[data-demo-close]")?.click();
     const sent = performance.now();
+    const turn = handoff;
     fetch("/combo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -3045,6 +3047,8 @@ const combo = (function tapCombo() {
       .then((res) => (res.ok ? res.json() : null))
       .catch(() => null)
       .then((reply) => {
+        // A reply that lands after a game took the reader belongs to the page before it.
+        if (turn !== handoff) return;
         if (reply?.ok && (reply.same || (reply.combo > 1 && reply.combo <= asked))) return;
         if (!reply?.ok || !(reply.combo >= 2 && reply.combo <= 3)) {
           if (!secretOn) window.location.replace(`/t?uid=${raw}`);
@@ -3096,6 +3100,7 @@ const combo = (function tapCombo() {
   });
   function sink(fn) {
     sinkFn = fn || null;
+    if (fn) handoff += 1;
   }
 
   function end() {
@@ -3128,6 +3133,7 @@ const arcade = (function arcadeRoom() {
   const SOUNDS = ["count", "go", "note-c5", "note-c6", "note-c7", "tier", "rocket", "ding", "chime", "chime-low", "fall", "result", "best", "wind-2", "wind-3", "wind-4"];
   const scripts = new Map();
   let retry = 0;
+  let posted = 0;
   let game = null;
   let ready = null;
   let playing = false;
@@ -3235,6 +3241,7 @@ const arcade = (function arcadeRoom() {
   }
 
   function post(height) {
+    const run = ++posted;
     return fetch("/arcade", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -3245,7 +3252,8 @@ const arcade = (function arcadeRoom() {
       .then((reply) => (reply?.ok ? reply : null))
       .catch(() => null)
       .then((reply) => {
-        if (reply) settle(reply);
+        // A slow reply from an earlier run must not roll back a newer one.
+        if (reply && run === posted) settle(reply);
         return reply;
       });
   }
@@ -3343,6 +3351,11 @@ const arcade = (function arcadeRoom() {
     if (listening) {
       const reader = await Promise.race([listening, new Promise((resolve) => window.setTimeout(() => resolve(null), NFC_WAIT_MS))]);
       if (reader) mode = "nfc";
+      // The page can be hidden or rebuilt while the permission prompt is up.
+      if (document.hidden || ready !== g) {
+        playing = false;
+        return;
+      }
     }
     closeSheet();
     combo.end();
@@ -3840,6 +3853,8 @@ if (demoSheet && demoHold) {
   }
 
   demoHold.addEventListener("pointerdown", (event) => {
+    // The panel's replays would land on top of a game.
+    if (document.documentElement.classList.contains("g-on")) return;
     holdAt = [event.clientX, event.clientY];
     window.clearTimeout(holdTimer);
     holdTimer = window.setTimeout(() => {

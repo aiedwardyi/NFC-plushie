@@ -5,6 +5,7 @@ const NFC_STEP = 0.085;
 const SCREEN_STEP = 0.026;
 const SCREEN_GAP = 220;
 const MAX = 1.25;
+const CHUTE_TOP = 8;
 const TIERS = [{ id: "cloud", at: 0.25 }, { id: "moon", at: 0.5 }, { id: "star", at: 0.75 }, { id: "galaxy", at: 1 }];
 const PLACE = { sky: "하늘", cloud: "구름", moon: "달", star: "별", galaxy: "은하수", beyond: "은하수 너머" };
 const tierOf = (c) => (c >= 1.15 ? "beyond" : c >= 1 ? "galaxy" : c >= 0.75 ? "star" : c >= 0.5 ? "moon" : c >= 0.25 ? "cloud" : "sky");
@@ -1021,11 +1022,8 @@ export async function createGimo(api) {
     const target = Math.min(charge, MAX);
     const tier = tierOf(target);
     const height = meters(target);
-    // The reply races a 4 s cap from here, so it is settled by the time the result card shows.
-    reply = Promise.race([
-      Promise.resolve().then(() => api.onLaunch(height, tier)).catch(() => null),
-      new Promise((res) => later(() => res(null), 4000)),
-    ]);
+    // The save runs through the flight; the result card gives a slow one a moment more.
+    reply = Promise.resolve().then(() => api.onLaunch(height, tier)).catch(() => null);
     say(pick(LINES.launch));
     face("blink");
     // Inhale: aura sucks in, the pet coils.
@@ -1199,34 +1197,41 @@ export async function createGimo(api) {
     const low = 0.4 * H;
     const fallMs = 560 + Math.min(700, D / 6);
     const fy0 = S.petC.y;
+    const fs0 = S.petC.flyScale || 1;
+    // A short window can't hold the open canopy over the pet, so both shrink to fit and the pet grows back on touchdown.
+    const aspect = S.chute.texture.height / S.chute.texture.width;
+    const fit = Math.min(1, (fy0 + petSize * 0.1 - CHUTE_TOP) / (petSize * (0.8 + 0.86 * aspect)));
+    const cw = petSize * 0.86 * fit;
+    const room = (y) => (y - CHUTE_TOP - cw * aspect) / petSize;
     spring.tx = 0.9;
     spring.ty = 1.12;
     const streaks = () => {
       if (Math.random() < 0.6) emit(px ? T.pix : T.streak, { x: rnd(0, W), y: H + 40, vy: -900, life: 0.5, s0: 1, s1: 1, a0: px ? 0.8 : 0.45, a1: 0.1, layer: S.fxBack, update: (p, k, d) => { p.s.y += p.vy * d; p.s.scale.set(px ? 1 : 0.6, px ? 10 : 1.4); } });
     };
     tickers.add(streaks);
-    await hold(tween(fallMs, (k) => { alt = lerp(D, low, k); S.petC.y = lerp(fy0, fy0 + petSize * 0.1, k); S.pet.rotation = Math.sin(k * 12) * 0.08; }, E.in2));
+    await hold(tween(fallMs, (k) => { alt = lerp(D, low, k); S.petC.y = lerp(fy0, fy0 + petSize * 0.1, k); S.petC.flyScale = lerp(fs0, 0.8 * fit, k); S.pet.rotation = Math.sin(k * 12) * 0.08; }, E.in2));
     tickers.delete(streaks);
     // Parachute pops: spring in, sway, float home.
     face("react");
     sfx("boing", { rate: 1.35, gain: 0.8 });
     buzz(14);
     S.chute.visible = true;
-    const cw = petSize * 0.86;
-    tween(420, (k) => { const sc = E.back(k); S.chute.width = cw * sc; S.chute.height = cw * (S.chute.texture.height / S.chute.texture.width) * sc; S.chute.alpha = Math.min(1, k * 3); });
-    burst(S.petC.x, S.petC.y - petSize * 0.95, 10, { v0: 40, v1: 140, life: 0.6 });
+    tween(420, (k) => { const sc = E.back(k); S.chute.width = cw * sc; S.chute.height = cw * aspect * sc; S.chute.alpha = Math.min(1, k * 3); });
+    burst(S.petC.x, S.petC.y - petSize * 0.95 * fit, 10, { v0: 40, v1: 140, life: 0.6 });
     spring.tx = 1;
     spring.ty = 1;
     const fy1 = S.petC.y;
     const sway = (dt, t) => { S.petC.rotation = Math.sin(t * 3.4) * 0.07; };
     tickers.add(sway);
-    await hold(tween(1300, (k) => { alt = lerp(low, 0, k); S.petC.y = lerp(fy1, floorY, k); S.petC.flyScale = lerp(0.8, 1, k); S.pet.rotation *= 0.9; }, E.io));
+    await hold(tween(1300, (k) => { alt = lerp(low, 0, k); S.petC.y = lerp(fy1, floorY, k); S.petC.flyScale = Math.min(lerp(0.8, 1, k), room(S.petC.y)); S.pet.rotation *= 0.9; }, E.io));
     tickers.delete(sway);
     S.petC.rotation = 0;
     S.pet.rotation = 0;
     tween(260, (k) => { S.chute.alpha = 1 - k; S.chute.scale.y *= 0.92; }).then(() => (S.chute.visible = false));
     // Touchdown.
     S.pet.anchor.set(0.5, 1);
+    const fsLand = S.petC.flyScale;
+    if (fsLand < 1) tween(240, (k) => { S.petC.flyScale = lerp(fsLand, 1, k); }, E.out3);
     spring.vy -= 4;
     spring.vx += 3;
     shake = px ? 6 : 7;
@@ -1245,7 +1250,7 @@ export async function createGimo(api) {
   async function result(tier) {
     phase = "result";
     const h = meters(Math.min(charge, MAX));
-    const r = await hold(reply);
+    const r = await hold(Promise.race([reply, wait(1500)]));
     const isBest = Boolean(r?.isBest);
     say(pick(LINES.home));
     face("canon");
