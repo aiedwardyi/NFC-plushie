@@ -20,6 +20,11 @@ const petColumns = [
   "last_active_day TEXT",
   "last_counter INTEGER",
   "next_gift_tier TEXT",
+  "fed_at INTEGER",
+  "meals INTEGER",
+  "played_at INTEGER",
+  "plays INTEGER",
+  "slept_at INTEGER",
 ];
 
 export function migratePetColumns(db, migrationMs = Date.now()) {
