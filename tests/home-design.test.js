@@ -102,8 +102,8 @@ test("rewarded owner home carries the dock, both sheets and the found gift", asy
   const { request, jar } = await named(t);
   const home = await request(`/t?uid=${A}`, { jar });
   assert.match(home.html, /data-rewarded="1"/);
-  assert.match(home.html, /<button type="button" class="dock-btn" data-dock-pat>.*토닥<\/span><\/button>/);
-  assert.match(home.html, /class="dock-btn has-new" data-open="gifts" aria-haspopup="dialog">.*선물함<\/span>/);
+  assert.match(home.html, /<button type="button" class="dock-btn is-verb" data-care="feed">.*밥<\/span><\/button>/);
+  assert.match(home.html, /class="dock-btn is-side has-new" data-open="gifts" aria-haspopup="dialog">.*선물함<\/span>/);
   assert.match(home.html, /data-open="record" aria-haspopup="dialog">.*우리 기록<\/span>/);
   for (const id of ["gifts", "record"]) {
     assert.match(home.html, new RegExp(`<div class="sheet" data-sheet="${id}" role="dialog" aria-modal="true" aria-labelledby="sheet-${id}-title" hidden>`));
@@ -130,7 +130,7 @@ test("unrewarded tap keeps the collection from the database without a new mark",
 
 test("post-naming page is the full home with read-only stats and the first tap only", async (t) => {
   const { skip } = await named(t);
-  assert.match(skip.html, /data-dock-pat/);
+  assert.match(skip.html, /data-care="feed"/);
   assert.match(skip.html, /data-sheet="gifts"/);
   assert.match(skip.html, /선물 0\/30/);
   assert.match(skip.html, /함께한 지 1일/);
@@ -151,15 +151,56 @@ test("first meet has the live nameplate and key card hooks but no dock", async (
   assert.match(first.html, /<h1 class="nameplate is-placeholder" data-nameplate data-placeholder="새 친구">새 친구<\/h1>/);
   assert.match(first.html, /<input id="name" name="name" required maxlength="24"[^>]*data-name-input>/);
   assert.match(first.html, /<aside class="recovery">[\s\S]*<strong class="code">[A-Z2-9]{6}<\/strong><button type="button" class="copy" data-copy>/);
-  assert.doesNotMatch(first.html, /data-dock-pat|data-sheet=|data-tile=/);
+  assert.doesNotMatch(first.html, /data-care|class="dock"|data-sheet=|data-tile=/);
 });
 
 test("stranger page has no dock, sheets or collection", async (t) => {
   const { request } = await named(t);
   const stranger = await request(`/t?uid=${A}`);
   assert.match(stranger.html, /이미 주인이 있어요/);
-  assert.doesNotMatch(stranger.html, /data-dock-pat|data-sheet=|data-tile=|level-pin|gift-tally/);
+  assert.doesNotMatch(stranger.html, /data-care|class="dock"|data-sheet=|data-tile=|level-pin|gift-tally/);
 });
+
+test("the dock runs gift box, the three care verbs, then records", async (t) => {
+  const { request, jar } = await named(t);
+  const home = await request(`/t?uid=${A}`, { jar });
+  const dock = home.html.match(/<nav class="dock"[\s\S]*?<\/nav>/)[0];
+  assert.match(dock, /^<nav class="dock" aria-label="메뉴" data-want="feed" data-meals="0" data-care-uid="04AAAAAAAAAAA1">/);
+  const buttons = dock.match(/<button [^>]*>/g);
+  assert.deepEqual(buttons, [
+    '<button type="button" class="dock-btn is-side has-new" data-open="gifts" aria-haspopup="dialog">',
+    '<button type="button" class="dock-btn is-verb" data-care="feed">',
+    '<button type="button" class="dock-btn is-verb" data-care="play">',
+    '<button type="button" class="dock-btn is-verb" data-care="sleep">',
+    '<button type="button" class="dock-btn is-side" data-open="record" aria-haspopup="dialog">',
+  ]);
+  assert.deepEqual(dock.match(/<span class="dock-label">[^<]*<\/span>/g).map((s) => s.replace(/<[^>]+>/g, "")), ["선물함", "밥", "놀이", "잠", "우리 기록"]);
+  assert.equal(count(dock, /<svg viewBox="0 0 24 24" aria-hidden="true">/g), 5);
+  assert.doesNotMatch(home.html, /data-dock-pat|토닥<\/span>/);
+  const preview = await request("/dev/preview?kind=gift&count=10");
+  assert.match(preview.html, /data-care="feed"/);
+  assert.doesNotMatch(preview.html, /data-care-uid/);
+});
+
+for (const kind of ["horse", "sheep"]) {
+  test(`the ${kind} pet carries every face frame`, async (t) => {
+    const { request, jar } = await named(t);
+    const home = await request(`/t?uid=${A}`, { jar: { ...jar, mascot: kind } });
+    const frames = home.html.match(/<img class="pet-frame[^>]*>/g);
+    const srcOf = (img) => img.match(/ src="([^"]+)"/)[1];
+    assert.deepEqual(frames.map((img) => [img.match(/data-frame="(\w+)"/)[1], srcOf(img)]), [
+      ["canon", `/mascot-${kind}-512-v3.png`],
+      ["blink", `/mascot-${kind}-closed-512.webp`],
+      ["react", `/mascot-${kind}-happy-512.webp`],
+      ["sleepy", `/mascot-${kind}-512-v3.png`],
+      ["munch", `/mascot-${kind}-munch-512.webp`],
+      ["yawn", `/mascot-${kind}-yawn-512.webp`],
+      ["away", `/mascot-${kind}-away-512-v3.png`],
+    ]);
+    assert.doesNotMatch(frames[0], /fetchpriority/);
+    for (const img of frames.slice(1)) assert.match(img, / fetchpriority="low" /);
+  });
+}
 
 test("fonts are pinned and only the font CDN is allowed beyond self", async (t) => {
   const { request } = await setup(t);

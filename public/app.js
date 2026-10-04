@@ -38,9 +38,7 @@
   }
 
   function frameSrc(img, kind) {
-    const src = img.getAttribute("src") || "";
-    const away = src.includes("-away-") || Boolean(img.closest(".pet-away"));
-    return away ? `/mascot-${kind}-away-512-v3.png` : `/mascot-${kind}-512-v3.png`;
+    return (img.getAttribute("src") || "").replace(/mascot-(?:horse|sheep)-/, `mascot-${kind}-`);
   }
 
   function applyArt(kind) {

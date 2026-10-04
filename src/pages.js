@@ -18,7 +18,9 @@ export function milestoneLine(count) {
 }
 
 const ICONS = {
-  pat: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10A4 4 0 0 1 12 8.2a4 4 0 0 1 7.5 2.3c0 5.4-7.5 10-7.5 10z"/><path d="M7.6 3.2l.9 1.9M12 2.2v2.1M16.4 3.2l-.9 1.9"/></svg>`,
+  feed: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.5h17c-.4 4.7-3.9 8-8.5 8s-8.1-3.3-8.5-8z"/><path d="M8.5 19.3h7"/><path d="M6.6 11.4c.5-2.9 2.9-4.8 5.4-4.8s4.9 1.9 5.4 4.8"/><path d="M15.5 3.2l-3 7.8M18.8 4.6l-4.6 6.6"/></svg>`,
+  play: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M6.4 5.6c2.6 3.4 2.6 9.4 0 12.8M17.6 5.6c-2.6 3.4-2.6 9.4 0 12.8"/></svg>`,
+  sleep: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.6 4.4A8 8 0 1 0 19.6 16 6.4 6.4 0 0 1 15.6 4.4z"/><path d="M17.2 3.6h3.4l-3.4 4h3.4"/></svg>`,
   gift: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="9.5" rx="1.6"/><rect x="3.2" y="7" width="17.6" height="3.5" rx="1.2"/><path d="M12 7v13M12 7C10.6 4 7 3.6 7 5.8 7 7 9.6 7 12 7zm0 0c1.4-3 5-3.4 5-1.2C17 7 14.4 7 12 7z"/></svg>`,
   record: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h10.5A1.5 1.5 0 0 1 18 5v15.5H7.5A1.5 1.5 0 0 1 6 19V3.5z"/><path d="M6 17.5A1.5 1.5 0 0 1 7.5 16H18M9.5 7.5h5M9.5 11h5"/></svg>`,
   heart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7.5-4.6-7.5-10A4 4 0 0 1 12 7.7a4 4 0 0 1 7.5 2.3c0 5.4-7.5 10-7.5 10z"/></svg>`,
@@ -44,10 +46,11 @@ function mascotKind(mascot) {
   return mascot === "sheep" ? "sheep" : "horse";
 }
 
-function petMarkup({ waving = false, away = false, lonely = false, mascot = "horse" } = {}) {
+function petMarkup({ waving = false, away = false, lonely = false, mascot = "horse", faces = true } = {}) {
   const kind = mascotKind(mascot);
   const front = `/mascot-${kind}-512-v3.png`;
   const awaySrc = `/mascot-${kind}-away-512-v3.png`;
+  const face = (name, src) => `<img class="pet-frame" data-frame="${name}" src="${src}" width="220" height="220" alt="" aria-hidden="true" fetchpriority="low" decoding="async" draggable="false">`;
   if (away) {
     const awayAlt = "다정한 친구가 등을 보이고 있어요";
     return `<div class="pet pet-away" data-pet="away" role="img" aria-label="${awayAlt}">
@@ -63,9 +66,14 @@ function petMarkup({ waving = false, away = false, lonely = false, mascot = "hor
       <button type="button" class="pet-hit" aria-label="${alt}">
         <span class="pet-motion">
           <img class="pet-frame is-show" data-frame="canon" src="${front}" width="220" height="220" alt="${alt}" decoding="async" draggable="false">
-          <img class="pet-frame" data-frame="blink" src="${front}" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
+          ${faces ? `${face("blink", `/mascot-${kind}-closed-512.webp`)}
+          ${face("react", `/mascot-${kind}-happy-512.webp`)}
+          ${face("sleepy", front)}
+          ${face("munch", `/mascot-${kind}-munch-512.webp`)}
+          ${face("yawn", `/mascot-${kind}-yawn-512.webp`)}
+          ${face("away", awaySrc)}` : `<img class="pet-frame" data-frame="blink" src="${front}" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
           <img class="pet-frame" data-frame="react" src="${front}" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
-          <img class="pet-frame" data-frame="sleepy" src="${front}" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">
+          <img class="pet-frame" data-frame="sleepy" src="${front}" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">`}
         </span>
       </button>
     </div>`;
@@ -153,12 +161,14 @@ function petStats(pet) {
   </section>`;
 }
 
+const CARE_VERBS = [["feed", "밥"], ["play", "놀이"], ["sleep", "잠"]];
+
 function dockHtml({ gift = false, want = "", meals = 0, uid = "" } = {}) {
   const owner = uid ? ` data-care-uid="${escapeHtml(uid)}"` : "";
   return `<nav class="dock" aria-label="메뉴" data-want="${escapeHtml(want)}" data-meals="${Number(meals) || 0}"${owner}>
-      <button type="button" class="dock-btn" data-dock-pat><span class="dock-cap">${ICONS.pat}</span><span class="dock-label">토닥</span></button>
-      <button type="button" class="dock-btn${gift ? " has-new" : ""}" data-open="gifts" aria-haspopup="dialog"><span class="dock-cap">${ICONS.gift}</span><span class="dock-label">선물함</span></button>
-      <button type="button" class="dock-btn" data-open="record" aria-haspopup="dialog"><span class="dock-cap">${ICONS.record}</span><span class="dock-label">우리 기록</span></button>
+      <button type="button" class="dock-btn is-side${gift ? " has-new" : ""}" data-open="gifts" aria-haspopup="dialog"><span class="dock-cap">${ICONS.gift}</span><span class="dock-label">선물함</span></button>
+      ${CARE_VERBS.map(([id, label]) => `<button type="button" class="dock-btn is-verb" data-care="${id}"><span class="dock-cap">${ICONS[id]}</span><span class="dock-label">${label}</span></button>`).join("")}
+      <button type="button" class="dock-btn is-side" data-open="record" aria-haspopup="dialog"><span class="dock-cap">${ICONS.record}</span><span class="dock-label">우리 기록</span></button>
     </nav>`;
 }
 
@@ -330,7 +340,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
     </section>
     <div class="window${away ? " is-away" : ""}" data-window>
       ${SKY}
-      ${petMarkup({ waving, away, lonely, mascot: kind })}
+      ${petMarkup({ waving, away, lonely, mascot: kind, faces: Boolean(row) })}
     </div>
     ${dialogBox}
     ${stats}
