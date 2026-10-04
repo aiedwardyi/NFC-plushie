@@ -134,7 +134,8 @@ test("reload within 30 minutes is unrewarded and writes nothing but tap_count", 
   const reload = await ctx.request(`/t?uid=${A}`, { jar });
   assert.match(reload.html, /data-rewarded="0"/);
   assert.match(reload.html, /data-reason="cooldown"/);
-  assert.match(reload.html, /방금 토닥여 줘서 기분 좋아요! 조금 있다가 또 토닥여 주세요\./);
+  assert.match(reload.html, /data-combo="1"/);
+  assert.doesNotMatch(reload.html, /조금 있다가 또 토닥여 주세요/);
   assert.doesNotMatch(reload.html, /<p class="gift /);
   assert.doesNotMatch(reload.html, /행복이 가득/);
   const after = ctx.row();
@@ -157,7 +158,8 @@ test("the 7th eligible tap in a Seoul day hits the daily cap", async (t) => {
   const capped = await ctx.request(`/t?uid=${A}`, { jar });
   assert.match(capped.html, /data-rewarded="0"/);
   assert.match(capped.html, /data-reason="cap"/);
-  assert.match(capped.html, /오늘은 실컷 놀았어요! 내일 또 만나요!/);
+  assert.match(capped.html, /data-combo="1"/);
+  assert.doesNotMatch(capped.html, /오늘은 실컷 놀았어요!/);
 });
 
 test("uid-only and uid+counter map to the same plushie", async (t) => {

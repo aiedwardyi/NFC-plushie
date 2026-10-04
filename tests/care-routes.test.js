@@ -83,7 +83,7 @@ test("owner feeds: full, nibble, then a stash that writes nothing", async (t) =>
   const { jar } = await meet(ctx, A, "Mochi");
   ctx.db.prepare("UPDATE plushies SET mood_value = 10, mood_updated_at = ? WHERE uid = ?").run(T0, A);
   const home = await ctx.request(`/t?uid=${A}`, { jar });
-  assert.match(home.html, /<nav class="dock" aria-label="메뉴" data-want="feed" data-meals="0" data-care-uid="04AAAAAAAAAAA1">/);
+  assert.match(home.html, /<nav class="dock" aria-label="메뉴" data-want="feed" data-meals="0" data-care-uid="04AAAAAAAAAAA1" data-combo="0">/);
   ctx.db.prepare("UPDATE plushies SET mood_value = 10, mood_updated_at = ? WHERE uid = ?").run(T0, A);
   const one = await care(ctx, jar, "feed");
   assert.equal(one.status, 200);
@@ -174,7 +174,8 @@ test("a cooldown tap on a morning page drops the soft line", async (t) => {
   assert.match(morning.html, /data-morning/);
   assert.doesNotMatch(morning.html, /is-soft|조금 있다가 또 토닥여/);
   const cool = await ctx.request(`/t?uid=${A}`, { jar });
-  assert.match(cool.html, /조금 있다가 또 토닥여/);
+  assert.match(cool.html, /data-reason="cooldown"/);
+  assert.doesNotMatch(cool.html, /data-morning/);
 });
 
 test("care never grants XP", async (t) => {
