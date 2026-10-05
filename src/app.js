@@ -82,7 +82,18 @@ function petState(row, t) {
   };
 }
 
-export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now, rng = Math.random, demoUids = parseDemoUids(process.env.DEMO_UIDS), talk = null }) {
+export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now, rng = Math.random, demoUids = parseDemoUids(process.env.DEMO_UIDS), openUids = parseDemoUids(process.env.OPEN_UIDS), guestUids = parseDemoUids(process.env.GUEST_UIDS), talk = null }) {
+  const anyone = [...new Set([...openUids, ...guestUids])];
+  if (anyone.length) {
+    const base = decisions;
+    decisions = {
+      ...base,
+      resolveTap: (row, ...args) => row && anyone.includes(row.uid) ? "OWNER" : base.resolveTap(row, ...args),
+      canRename: (row, ...args) => row && anyone.includes(row.uid) ? true : base.canRename(row, ...args),
+    };
+    demoUids = [...new Set([...demoUids, ...openUids])];
+    if (talk) talk = { ...talk, uids: [...new Set([...talk.uids, ...anyone])] };
+  }
   const app = express();
   app.disable("x-powered-by");
   app.use((req, res, next) => {
@@ -283,15 +294,17 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const today = seoulDayKey(t);
       const stamp = new Date(t).toISOString();
       if (state === "NEW") {
+        // No browser ever holds a guest pet's token or code, so dropping it from GUEST_UIDS locks everyone out.
+        const guest = guestUids.includes(serial);
         const existing = req.cookies.owner_token;
-        const token = typeof existing === "string" && existing ? existing : ownerToken();
+        const token = !guest && typeof existing === "string" && existing ? existing : ownerToken();
         const code = recoveryCode();
         purgeTalk(db, serial);
         db.prepare(`INSERT INTO plushies (uid, owner_token_hash, recovery_code_hash, tap_count, created_at, last_tap_at,
           mood_value, mood_updated_at, xp, reward_day_count, gift_seen, gift_found, days_together, last_active_day, last_counter)
           VALUES (?, ?, ?, 1, ?, ?, 100, ?, 0, 0, ?, ?, 1, ?, ?)`)
-          .run(serial, hash(token), hash(code), stamp, stamp, t, EMPTY_SEEN, EMPTY_FOUND, today, counter);
-        return { html: petPage(getRow(serial), code, { celebrate: "claim", demo, theme }), token };
+          .run(serial, hash(token), guest ? null : hash(code), stamp, stamp, t, EMPTY_SEEN, EMPTY_FOUND, today, counter);
+        return { html: petPage(getRow(serial), code, { celebrate: "claim", demo, theme, guest }), token: guest ? null : token };
       }
       if (state === "OWNER") {
         // The skip cookie marks the redirect after /name or /claim, not a tap.
