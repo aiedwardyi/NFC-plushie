@@ -55,7 +55,8 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const STOP = Symbol("stop");
 
-// Pieces under /game/art/<world>/, drawn into canvas textures.
+// Pieces under /game/art/<world>/, drawn into canvas textures; bump ART_V when one changes.
+const ART_V = 2;
 const ART = {
   "8bit": ["cloud", "moon", "bird", "planet", "star-0", "star-1", "chute", "shower-0", "shower-1", "shower-2"],
   classic: ["cloud", "moon", "bird", "planet", "chute", "star-0", "star-1", "shower-0", "shower-1"],
@@ -146,7 +147,7 @@ export async function createGimo(api) {
     return t;
   }
   async function art(name, nearest) {
-    const i = await img(`/game/art/${name}.svg`);
+    const i = await img(`/game/art/${name}.svg?v=${ART_V}`);
     return canvasTex(i.naturalWidth, i.naturalHeight, (x, cw, ch) => x.drawImage(i, 0, 0, cw, ch), nearest);
   }
   function radial(size, stops) {

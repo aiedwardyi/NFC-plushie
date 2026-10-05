@@ -75,7 +75,7 @@ html[data-theme="najeon"] .window::after {
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 10px 24px rgba(0, 0, 0, 0.4);
 }
 html[data-theme="najeon"] .sky {
-  background: url("/themes/px/najeon-scene.svg") center bottom / cover no-repeat, #0c0c10;
+  background: url("/themes/px/najeon-scene.svg?v=2") center bottom / cover no-repeat, #0c0c10;
 }
 html[data-theme="najeon"] .sky::after,
 html[data-theme="najeon"] .stars { display: none; }
@@ -257,7 +257,7 @@ html[data-theme="najeon"] .moon { top: 6%; right: 6%; width: 30cqmin; height: 30
 html[data-theme="najeon"] .want-cloud,
 html[data-theme="najeon"] .want i { background: #121016; box-shadow: 0 0 0 1.5px rgba(223, 232, 255, .55), 0 8px 18px rgba(0, 0, 0, .5); }
 html[data-theme="najeon"] .wake-tap { background: #121016; color: #eef3ff; box-shadow: 0 0 0 1.5px rgba(223, 232, 255, .6), 0 10px 24px rgba(0, 0, 0, .5); }
-html[data-theme="najeon"] .sun-flash { background: radial-gradient(60% 50% at 22% 20%, rgba(255, 120, 100, .55), rgba(255, 245, 235, .4) 60%, rgba(0, 0, 0, 0)); }
+html[data-theme="najeon"] .sun-flash { background: radial-gradient(60% 50% at 22% 20%, rgba(255, 206, 110, .55), rgba(255, 245, 235, .4) 60%, rgba(0, 0, 0, 0)); }
 
 /* Tap combo: a mother-of-pearl key */
 html[data-theme="najeon"] {

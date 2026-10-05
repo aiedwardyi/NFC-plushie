@@ -1325,11 +1325,11 @@ button.tile:active { transform: translateY(2px); }
 [data-pick="classic"] .theme-thumb { background-image: url("/themes/thumbs/classic-horse.webp"); }
 [data-pick="8bit"] .theme-thumb { background-image: url("/themes/thumbs/8bit-horse.webp"); }
 [data-pick="milk"] .theme-thumb { background-image: url("/themes/thumbs/milk-horse.webp"); }
-[data-pick="najeon"] .theme-thumb { background-image: url("/themes/thumbs/najeon-horse.webp"); }
+[data-pick="najeon"] .theme-thumb { background-image: url("/themes/thumbs/najeon-horse.webp?v=2"); }
 html[data-mascot="sheep"] [data-pick="classic"] .theme-thumb { background-image: url("/themes/thumbs/classic-sheep.webp"); }
 html[data-mascot="sheep"] [data-pick="8bit"] .theme-thumb { background-image: url("/themes/thumbs/8bit-sheep.webp"); }
 html[data-mascot="sheep"] [data-pick="milk"] .theme-thumb { background-image: url("/themes/thumbs/milk-sheep.webp"); }
-html[data-mascot="sheep"] [data-pick="najeon"] .theme-thumb { background-image: url("/themes/thumbs/najeon-sheep.webp"); }
+html[data-mascot="sheep"] [data-pick="najeon"] .theme-thumb { background-image: url("/themes/thumbs/najeon-sheep.webp?v=2"); }
 .theme-name {
   position: absolute;
   left: 0;
