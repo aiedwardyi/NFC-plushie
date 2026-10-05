@@ -770,7 +770,7 @@ export async function createFarm(api) {
     const half = el.offsetWidth / 2;
     el.style.left = `${Math.max(half + 4, Math.min(W - half - 4, x))}px`;
   }
-  function plotTag(p, text, cls = "", ms = 1900) {
+  function plotTag(p, text, cls = "", ms = 3200) {
     const el = domAdd(`f-tag is-say ${cls}`, "", L.field);
     el.textContent = text;
     placeTag(el, p.cx);
@@ -1274,7 +1274,7 @@ export async function createFarm(api) {
     });
     p.data = { plot: i, crop: null };
     pending.add(i);
-    plotTag(p, LINES.plot, "is-plot", 2200);
+    plotTag(p, LINES.plot, "is-plot", 3000);
     say(LINES.plot);
     await hold(pause(1500));
   }
@@ -1446,7 +1446,11 @@ export async function createFarm(api) {
       await waterOne(plots[pl.plot], pl.crop, n + 2);
       settlePlot(r, pl.plot);
       const words = plantedWords(r, pl);
-      if (words) plotTag(plots[pl.plot], words, "is-taste", 1700);
+      // A first visit reads the wait before the pet moves on.
+      if (words) {
+        plotTag(plots[pl.plot], words, "is-taste", 3800);
+        await hold(pause(1100));
+      }
     }
     await hold(toolOut(S.can));
     await hold(home());
@@ -1640,7 +1644,7 @@ export async function createFarm(api) {
     });
     burst(p.cx, p.cy - p.w * 0.35, 3, { tex: T.art.leaf, a0: Math.PI * 1.1, a1: Math.PI * 1.9, v0: 30, v1: 70, ay: 200, s0: 0.4, s1: 0.6, l0: 0.4, l1: 0.6 });
     const words = d.ripeAt ? timeWords(d, serverNow()).left : "";
-    if (words) plotTag(p, words, "", 1600);
+    if (words) plotTag(p, words, "", 2600);
   }
 
   /* ---------- ripening on an open farm ---------- */
@@ -1890,6 +1894,8 @@ export async function createFarm(api) {
         gen += 1;
         entered = false;
         petEl.style.visibility = "";
+        // The slide-out's last frame (opacity 0) would keep the home pet invisible.
+        petEl.getAnimations().forEach((a) => a.cancel());
         return;
       }
       cut();

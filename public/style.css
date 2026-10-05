@@ -2672,11 +2672,19 @@ html.f-on .window { touch-action: manipulation; }
 .f-seed { --tile: clamp(38px, calc((86cqw - 50px) / 5), 50px); position: relative; display: grid; place-items: center; width: var(--tile); height: calc(var(--tile) * 1.24); border-radius: 12px; background: #fff; box-shadow: 0 2px 0 #e6d4b3, inset 0 0 0 2px #f1e3c8; }
 .f-seed img { width: calc(var(--tile) * .68); height: calc(var(--tile) * .68); margin-top: -10px; }
 .f-seed b { position: absolute; bottom: 3px; left: 0; right: 0; font-size: 10px; font-weight: 800; color: #9a7a55; white-space: nowrap; }
-.f-seed.is-gold { background: linear-gradient(160deg, #fff6cf, #f7d97a); box-shadow: 0 2px 0 #c9932e, inset 0 0 0 2px #f1c75a, 0 0 18px rgba(246, 201, 69, .75); }
+/* Never under 48px, so 황금 감자 clears its edges on small tiles. */
+.f-seed.is-gold { width: max(var(--tile), 48px); background: linear-gradient(160deg, #fff6cf, #f7d97a); box-shadow: 0 2px 0 #c9932e, inset 0 0 0 2px #f1c75a, 0 0 18px rgba(246, 201, 69, .75); }
+/* Five tiles fill the row exactly here, so the other four give up the gold tile's extra width. */
+@container (height > 300px) {
+  .f-seeds:has(.is-gold) .f-seed:not(.is-gold) { width: calc(var(--tile) - max(0px, 48px - var(--tile)) / 4); }
+}
 .f-seed.is-gold b { color: #8a5a10; }
 .f-seed.is-gold::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .85) 48%, transparent 66%); background-size: 220% 100%; animation: f-shine 1.4s ease-in-out infinite; }
 @keyframes f-shine { 0% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
-.f-gold-line { font-size: 14px !important; font-weight: 900 !important; color: #b07a12 !important; opacity: 0; transition: opacity .3s ease; }
+.f-gold-line { font-size: 14px !important; font-weight: 800 !important; color: #b07a12 !important; opacity: 0; transition: opacity .3s ease; }
+/* Padding, not margin: margins would fold into the seeds' and the button's. Two rows of seeds keep the tighter card. */
+.f-card .f-gold-line { padding: 3px 0; }
+.f-card:has(.f-seed:nth-child(7)) .f-gold-line { padding: 0; }
 .f-gold-line.is-on { opacity: 1; }
 .f-card .f-go {
   position: sticky; bottom: 0;
