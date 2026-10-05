@@ -1087,6 +1087,8 @@ export async function createFarm(api) {
     card.setAttribute("role", "dialog");
     card.setAttribute("aria-label", "씨앗 꾸러미");
     const go = card.querySelector(".f-go");
+    // A tap while the seeds deal still counts: the card closes once they are down.
+    const tapped = new Promise((res) => go.addEventListener("click", res, { once: true }));
     await hold(domAnim(card, [{ transform: "translate(-50%,-40%) scale(.5)", opacity: 0 }, { transform: "translate(-50%,-50%) scale(1.05)", opacity: 1, offset: 0.7 }, { transform: "translate(-50%,-50%) scale(1)", opacity: 1 }], { duration: calm ? 200 : 380, easing: "ease-out" }));
     const seeds = card.querySelector(".f-seeds");
     for (const [i, crop] of order.entries()) {
@@ -1104,7 +1106,7 @@ export async function createFarm(api) {
       await hold(pause(crop === "gold" ? 400 : 240));
     }
     go.focus({ preventScroll: true });
-    await hold(new Promise((res) => go.addEventListener("click", res, { once: true })));
+    await hold(tapped);
     sfx("press", { gain: 0.8 });
     domAnim(card, [{ transform: "translate(-50%,-50%) scale(1)", opacity: 1 }, { transform: "translate(-50%,-50%) scale(.6)", opacity: 0 }], { duration: 260 }).then(() => card.remove());
   }
@@ -1764,7 +1766,10 @@ export async function createFarm(api) {
   return {
     // Draws the field as it was before `r` and brings the farm in; "tutorial" plays the whole first open.
     async enter(r, how = "open") {
+      const g = gen;
       await ready();
+      // 집으로 while the stage was still loading: stay shut.
+      if (g !== gen) return undefined;
       cut();
       calm = Boolean(api.still());
       entered = true;
@@ -1836,9 +1841,12 @@ export async function createFarm(api) {
     plotAt(x, y) {
       if (!entered || showing) return null;
       const order = [3, 4, 5, 0, 1, 2];
+      // A front box starts where the back row's ends, so a tap on a back bed picks the back plot.
+      const floor = plots[0].cy + plots[0].w * 0.3;
       for (const i of order) {
         const p = plots[i];
-        if (x < p.cx - p.w * 0.55 || x > p.cx + p.w * 0.55 || y < p.cy - p.w * 0.95 || y > p.cy + p.w * 0.3) continue;
+        const top = i >= 3 ? Math.max(p.cy - p.w * 0.95, floor) : p.cy - p.w * 0.95;
+        if (x < p.cx - p.w * 0.55 || x > p.cx + p.w * 0.55 || y < top || y > p.cy + p.w * 0.3) continue;
         const d = p.data;
         if (pending.has(i) || !d) return { plot: i, kind: "busy" };
         if (d.locked) return { plot: i, kind: "locked" };
@@ -1861,7 +1869,9 @@ export async function createFarm(api) {
       if (!entered || showing || !changed()) return;
       cut();
       teardown();
+      const g = gen;
       await setupStage();
+      if (g !== gen) return;
       entered = true;
       calm = Boolean(api.still());
       paintSky();
@@ -1875,6 +1885,13 @@ export async function createFarm(api) {
       schedule();
     },
     async leave() {
+      // Mid-rebuild there is no stage to slide out; the bump keeps a pending enter or refit shut.
+      if (!built) {
+        gen += 1;
+        entered = false;
+        petEl.style.visibility = "";
+        return;
+      }
       cut();
       entered = false;
       clearTimeout(growTimer);

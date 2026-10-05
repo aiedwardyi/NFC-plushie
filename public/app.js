@@ -3514,6 +3514,8 @@ const farm = (function farmRoom() {
   let dotTimer = 0;
   let view = null;
   let visit = null;
+  // The first open's reply: the server planted the starter packet, so its show is kept until it plays to the end.
+  let first = null;
   let stale = false;
   let fitTimer = 0;
   const picking = new Set();
@@ -3777,8 +3779,14 @@ const farm = (function farmRoom() {
         care.fx.say(status === 409 ? ASLEEP : FAILED);
         return;
       }
+      if (reply.created) first = reply;
       if (isOpen || document.hidden || careHold.asleep || petBusy() || sheetOpen || st !== ready) return;
-      enter(st, reply, reply.created ? "tutorial" : "open").then(() => flush(reply), (error) => broken(error, reply));
+      const r = first ? { ...first, farm: reply.farm, hearts: reply.hearts } : reply;
+      enter(st, r, first ? "tutorial" : "open").then(() => {
+        // Still open means the tutorial played through; 집으로 mid-show keeps it for the next open.
+        if (isOpen) first = null;
+        flush(r);
+      }, (error) => broken(error, r));
     }), openFailed);
   }
 

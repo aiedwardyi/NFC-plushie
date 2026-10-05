@@ -2622,7 +2622,7 @@ html.f-on .window { touch-action: manipulation; }
 
 .f-stage { position: absolute; inset: 0; z-index: 2; border-radius: inherit; overflow: hidden; pointer-events: none; }
 .f-stage canvas { display: block; width: 100% !important; height: 100% !important; }
-.f-layer { position: absolute; inset: 0; z-index: 4; border-radius: inherit; overflow: hidden; pointer-events: none; color: #4a2c20; font-family: "Pretendard Variable", Pretendard, system-ui, sans-serif; }
+.f-layer { position: absolute; inset: 0; z-index: 4; border-radius: inherit; overflow: hidden; pointer-events: none; color: #4a2c20; font-family: "Pretendard Variable", Pretendard, system-ui, sans-serif; container-type: size; }
 .f-field { position: absolute; inset: 0; }
 
 .f-cta {
@@ -2667,9 +2667,10 @@ html.f-on .window { touch-action: manipulation; }
 }
 .f-card h3 { margin: 0 0 2px; font-size: 19px; font-weight: 900; letter-spacing: -.02em; }
 .f-card p { margin: 0; font-size: 13px; font-weight: 700; line-height: 1.4; color: #8a6a4a; }
-.f-seeds { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin: 10px 0 8px; }
-.f-seed { position: relative; display: grid; place-items: center; width: 50px; height: 62px; border-radius: 12px; background: #fff; box-shadow: 0 2px 0 #e6d4b3, inset 0 0 0 2px #f1e3c8; }
-.f-seed img { width: 34px; height: 34px; margin-top: -10px; }
+.f-seeds { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px 5px; margin: 10px 0 8px; }
+/* Five tiles keep one row on narrow windows (small phones, big display zoom). */
+.f-seed { --tile: clamp(38px, calc((86cqw - 50px) / 5), 50px); position: relative; display: grid; place-items: center; width: var(--tile); height: calc(var(--tile) * 1.24); border-radius: 12px; background: #fff; box-shadow: 0 2px 0 #e6d4b3, inset 0 0 0 2px #f1e3c8; }
+.f-seed img { width: calc(var(--tile) * .68); height: calc(var(--tile) * .68); margin-top: -10px; }
 .f-seed b { position: absolute; bottom: 3px; left: 0; right: 0; font-size: 10px; font-weight: 800; color: #9a7a55; white-space: nowrap; }
 .f-seed.is-gold { background: linear-gradient(160deg, #fff6cf, #f7d97a); box-shadow: 0 2px 0 #c9932e, inset 0 0 0 2px #f1c75a, 0 0 18px rgba(246, 201, 69, .75); }
 .f-seed.is-gold b { color: #8a5a10; }
@@ -2678,9 +2679,36 @@ html.f-on .window { touch-action: manipulation; }
 .f-gold-line { font-size: 14px !important; font-weight: 900 !important; color: #b07a12 !important; opacity: 0; transition: opacity .3s ease; }
 .f-gold-line.is-on { opacity: 1; }
 .f-card .f-go {
+  position: sticky; bottom: 0;
   margin-top: 10px; min-height: 46px; border-radius: 14px; font-family: inherit; font-size: 1rem; font-weight: 800; color: #141b2b;
   background: linear-gradient(180deg, #f1d68c 0%, #d6a546 55%);
   box-shadow: 0 4px 0 #9a7228, 0 8px 18px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+/* Short windows: a tighter card, so the seeds and the button show without scrolling. */
+@container (max-height: 300px) {
+  .f-card { padding: 9px 10px; }
+  .f-card h3 { font-size: 17px; }
+  .f-card p { font-size: 12px; line-height: 1.3; }
+  .f-seeds { gap: 5px; margin: 6px 0 5px; }
+  .f-seed { --tile: clamp(34px, calc((86cqw - 51px) / 6), 42px); }
+  .f-seed img { margin-top: -8px; }
+  .f-seed b { bottom: 2px; font-size: 9px; }
+  .f-gold-line { font-size: 13px !important; }
+  .f-card .f-go { margin-top: 6px; min-height: 40px; }
+}
+@container (max-height: 250px) {
+  .f-card { padding: 6px 9px; }
+  .f-card h3 { margin: 0; font-size: 16px; }
+  .f-card p { font-size: 11px; }
+  .f-seeds { gap: 4px 5px; margin: 3px 0; }
+  .f-seed { --tile: clamp(32px, calc((86cqw - 49px) / 6), 38px); }
+  .f-gold-line { font-size: 12px !important; }
+  .f-card .f-go { margin-top: 4px; min-height: 34px; }
+}
+@container (max-height: 210px) {
+  .f-card h3 + p { display: none; }
+  .f-seed { --tile: clamp(30px, calc((86cqw - 49px) / 6), 34px); }
+  .f-card .f-go { min-height: 32px; }
 }
 
 .f-prompt {
