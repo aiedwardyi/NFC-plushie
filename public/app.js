@@ -4713,10 +4713,21 @@ if (demoSheet && demoHold) {
   let holdTimer = 0;
   let holdAt = null;
 
+  // Pinch zoom would leave this fixed sheet half off screen: pin it to the visible part.
+  function pinDemo() {
+    const vv = window.visualViewport;
+    const pin = Boolean(vv) && (Math.abs(vv.scale - 1) > 0.01 || vv.offsetLeft !== 0 || vv.offsetTop !== 0 || vv.height < window.innerHeight - 1);
+    demoSheet.style.transformOrigin = pin ? "0 0" : "";
+    demoSheet.style.width = pin ? `${vv.width * vv.scale}px` : "";
+    demoSheet.style.height = pin ? `${vv.height * vv.scale}px` : "";
+    demoSheet.style.transform = pin ? `translate(${vv.offsetLeft}px, ${vv.offsetTop}px) scale(${1 / vv.scale})` : "";
+  }
+
   function openDemo() {
     tryVibrate(15);
     loadSfx(cryName());
     if (replayReveal) reveal.prepare(revealKind());
+    pinDemo();
     demoSheet.hidden = false;
     void demoSheet.offsetWidth;
     demoSheet.classList.add("is-open");
@@ -4749,6 +4760,11 @@ if (demoSheet && demoHold) {
   demoHold.addEventListener("pointerup", cancelHold);
   demoHold.addEventListener("pointercancel", cancelHold);
   demoHold.addEventListener("contextmenu", (event) => event.preventDefault());
+  for (const type of ["resize", "scroll"]) {
+    window.visualViewport?.addEventListener(type, () => {
+      if (!demoSheet.hidden) pinDemo();
+    });
+  }
 
   demoSheet.addEventListener("click", (event) => {
     if (event.target === demoSheet) closeDemo();
