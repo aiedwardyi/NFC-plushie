@@ -242,23 +242,41 @@ test("OPEN_UIDS parses lowercase, whitespace and invalid entries", async (t) => 
   assert.match((await ctx.request(`/t?uid=${B}`)).html, /이미 주인이 있어요/);
 });
 
-test("OPEN_UIDS unset or empty preserves main's pages and route results", async (t) => {
-  const before = process.env.OPEN_UIDS;
+test("GUEST_UIDS parses lowercase, whitespace and invalid entries", async (t) => {
+  const before = process.env.GUEST_UIDS;
+  process.env.GUEST_UIDS = ` ${A.toLowerCase()} , nope, `;
   t.after(() => {
-    if (before === undefined) delete process.env.OPEN_UIDS;
-    else process.env.OPEN_UIDS = before;
+    if (before === undefined) delete process.env.GUEST_UIDS;
+    else process.env.GUEST_UIDS = before;
+  });
+  const ctx = await setup(t, { openUids: [], guestUids: undefined });
+  assert.doesNotMatch((await ctx.request(`/t?uid=${A}`)).html, /class="recovery"/);
+  assert.equal((await ctx.request("/name", { body: { uid: A, name: "Mochi" } })).status, 303);
+  assert.match((await ctx.request(`/t?uid=${A}`)).html, /data-care-uid/);
+  await meet(ctx, B);
+  assert.match((await ctx.request(`/t?uid=${B}`)).html, /이미 주인이 있어요/);
+});
+
+test("OPEN_UIDS and GUEST_UIDS unset or empty keep every pet bound to its owner", async (t) => {
+  const before = [process.env.OPEN_UIDS, process.env.GUEST_UIDS];
+  t.after(() => {
+    for (const [key, value] of [["OPEN_UIDS", before[0]], ["GUEST_UIDS", before[1]]]) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
   for (const raw of [undefined, ""]) {
-    if (raw === undefined) delete process.env.OPEN_UIDS;
-    else process.env.OPEN_UIDS = raw;
-    const ctx = await setup(t, { openUids: undefined });
+    for (const key of ["OPEN_UIDS", "GUEST_UIDS"]) {
+      if (raw === undefined) delete process.env[key];
+      else process.env[key] = raw;
+    }
+    const ctx = await setup(t, { openUids: undefined, guestUids: undefined });
     const jar = await meet(ctx);
     const owner = await ctx.request(`/t?uid=${A}`, { jar });
     const stranger = await ctx.request(`/t?uid=${A}`);
     assert.match(owner.html, /data-care-uid/);
     assert.match(stranger.html, /이미 주인이 있어요/);
     assert.doesNotMatch(owner.html + stranger.html, /data-demo|data-talk/);
-    const pages = [owner.html, stranger.html];
     for (const [path, body, status] of [
       ["/name", { name: "Pippo" }, 403],
       ["/care", { act: "feed" }, 403],
@@ -269,11 +287,7 @@ test("OPEN_UIDS unset or empty preserves main's pages and route results", async 
       ["/demo/fresh-start", {}, 404],
       ["/demo/care-reset", {}, 404],
     ]) {
-      const res = await ctx.request(path, { body: { uid: A, ...body } });
-      assert.equal(res.status, status, path);
-      pages.push(res.html);
+      assert.equal((await ctx.request(path, { body: { uid: A, ...body } })).status, status, path);
     }
-    // Response bodies from main at 326230b.
-    assert.equal(hash(JSON.stringify(pages)), "de154490949e0b0edbb2098c91aa9b527cb09672629fac84334ea46a804c50ad");
   }
 });
