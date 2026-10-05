@@ -152,6 +152,8 @@ let facePet = () => {};
 let syncPet = () => {};
 // Care owns the pet's face and sky while it acts or sleeps, and may take a touch first.
 const careHold = { busy: false, asleep: false, touch: null };
+// Set only while talk is on: anything else taking the speech line drops the pet's pending answer.
+let talkHook = null;
 const pet = document.querySelector('[data-pet="alive"]');
 if (pet) {
   const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -1396,6 +1398,7 @@ let sheetOpener = null;
 function openSheet(id, opener) {
   const sheet = document.querySelector(`[data-sheet="${id}"]`);
   if (!sheet || sheetOpen) return;
+  talkHook?.close(true);
   sheetOpen = sheet;
   sheetOpener = opener || null;
   sheet.hidden = false;
@@ -1967,6 +1970,7 @@ const care = (function careLoop() {
   }
 
   function hush() {
+    talkHook?.taken();
     sayToken += 1;
     window.clearTimeout(lineTimer);
     lineReady = false;
@@ -2472,7 +2476,7 @@ const care = (function careLoop() {
     if (id) press(id);
   });
   if (owner) window.addEventListener("load", () => preload(world()), { once: true });
-  return { morning, opened: open, restyle, hold, release, hearts: tweenHearts, fx: { say, sparkles, cheer, box, move, sound, voice } };
+  return { morning, opened: open, restyle, hold, release, busy: screenBusy, hearts: tweenHearts, fx: { say, sparkles, cheer, box, move, sound, voice } };
 })();
 
 function percent(r) {
@@ -2983,6 +2987,7 @@ const combo = (function tapCombo() {
 
   // A stage asked for mid-stage plays right after it.
   function play(n, start) {
+    talkHook?.taken();
     asked = n;
     if (n === 3) secretOn = true;
     queue = queue.catch(() => {}).then(() => run(n, start));
@@ -3071,6 +3076,7 @@ const combo = (function tapCombo() {
     }
     const raw = tag.raw || uid;
     if (raw.includes("x") && raw === pageTag) return;
+    talkHook?.close(true);
     if (!ready || away || secretOn || waking || root.classList.contains("has-reveal")
       || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump")) return;
     if (careHold.asleep) {
@@ -3460,6 +3466,429 @@ const arcade = (function arcadeRoom() {
     ready = null;
   });
   return { restyle };
+})();
+
+/* Talk: a small mic at the speech line opens a slim bar; the pet answers in its own line. */
+(function talkBar() {
+  const mic = dialogBox?.querySelector("[data-talk-mic]");
+  const bar = document.querySelector("[data-talk-bar]");
+  const dock = document.querySelector(".dock[data-care-uid]");
+  const intro = dialogBox?.querySelector(".intro");
+  if (!mic || !bar || !dock || !intro || !care) return;
+  const input = bar.querySelector("[data-talk-input]");
+  const voiceBtn = bar.querySelector("[data-talk-voice]");
+  const sendBtn = bar.querySelector("[data-talk-send]");
+  const hint = bar.querySelector("[data-talk-hint]");
+  const uid = dock.dataset.careUid;
+  const MAX = 200;
+  const BUBBLE = 60;
+  const GIVE_UP_MS = 25000;
+  const ERROR_LINE = "음… 머리가 빙글빙글해요. 조금 있다 다시 말해 줄래요?";
+  const REFUSAL_LINE = "음… 그건 잘 모르겠어요. 다른 얘기 해 줄래요?";
+  const KEYBOARD_HINT = "키보드의 마이크 버튼으로 말해도 돼요";
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const count = (text) => Array.from(text.trim()).length;
+  let open = false;
+  let inflight = false;
+  // The answer still owed to the speech line; anything else speaking clears it.
+  let pending = null;
+  let bubbles = [];
+  let bubble = 0;
+  let ready = false;
+  let seq = 0;
+  let sources = null;
+  let cited = null;
+  let rec = null;
+
+  function setHint(text, tap = false) {
+    hint.textContent = text;
+    hint.hidden = !text;
+    hint.classList.toggle("is-tap", tap);
+  }
+
+  function checkLength() {
+    const n = count(input.value);
+    if (n > MAX) setHint(`${MAX}자까지 보낼 수 있어요 (${n}/${MAX})`);
+    else if (!hint.classList.contains("is-tap")) setHint("");
+    sendBtn.disabled = inflight || n > MAX;
+  }
+
+  // Keeps the bar above the phone keyboard and the speech line in view above the bar.
+  function place() {
+    if (!open) return;
+    const vv = window.visualViewport;
+    const lift = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+    bar.style.bottom = `${lift}px`;
+    bar.classList.toggle("is-lifted", lift > 0);
+    document.body.style.paddingBottom = `${bar.offsetHeight + lift}px`;
+    const top = vv ? vv.offsetTop : 0;
+    const bottom = top + (vv ? vv.height : window.innerHeight) - bar.offsetHeight - 8;
+    const box = dialogBox.getBoundingClientRect();
+    if (box.bottom > bottom) window.scrollBy(0, Math.min(box.bottom - bottom, box.top - top - 8));
+    else if (box.top < top + 8) window.scrollBy(0, box.top - top - 8);
+  }
+
+  function watch(on) {
+    const vv = window.visualViewport;
+    const fn = on ? "addEventListener" : "removeEventListener";
+    vv?.[fn]("resize", place);
+    vv?.[fn]("scroll", place);
+    window[fn]("resize", place);
+    document[fn]("pointerdown", outside, true);
+    document[fn]("keydown", escape, true);
+  }
+
+  function outside(event) {
+    if (bar.contains(event.target) || dialogBox.contains(event.target)) return;
+    close();
+  }
+
+  function escape(event) {
+    if (event.key === "Escape") close();
+  }
+
+  function openBar() {
+    if (open) return;
+    open = true;
+    bar.hidden = false;
+    void bar.offsetWidth;
+    bar.classList.add("is-open");
+    mic.setAttribute("aria-expanded", "true");
+    watch(true);
+    place();
+    checkLength();
+  }
+
+  // The draft stays until reload; a reply already sent still lands unless drop is set.
+  function close(drop = false) {
+    if (drop) taken();
+    stopVoice(true);
+    if (!open) return;
+    open = false;
+    watch(false);
+    bar.classList.remove("is-open");
+    bar.style.bottom = "";
+    document.body.style.paddingBottom = "";
+    mic.setAttribute("aria-expanded", "false");
+    if (bar.contains(document.activeElement)) document.activeElement.blur();
+    window.setTimeout(() => {
+      if (!open) bar.hidden = true;
+    }, prefersReducedMotion() ? 0 : 220);
+  }
+
+  function clearSources() {
+    sources?.remove();
+    sources = null;
+  }
+
+  // Someone else has the speech line now.
+  function taken() {
+    seq += 1;
+    ready = false;
+    bubbles = [];
+    clearSources();
+    if (pending?.thinking) {
+      intro.classList.remove("is-thinking");
+      intro.textContent = pending.before;
+    }
+    pending = null;
+  }
+
+  function takeLine() {
+    seq += 1;
+    sayToken += 1;
+    window.clearTimeout(lineTimer);
+    lineReady = false;
+    ready = false;
+    bubbles = [];
+    clearSources();
+    dialogBox.classList.add("is-seq");
+    dialogBox.classList.remove("is-end");
+    showLine(0);
+  }
+
+  function split(text) {
+    const parts = text.match(/[^.!?]+(?:[.!?]+["'”’)]*|$)|[.!?]+/g) || [text];
+    const sentences = [];
+    for (const raw of parts) {
+      const part = raw.trim();
+      if (!part) continue;
+      // A trailing emoji rides with its sentence.
+      if (sentences.length && !/[\p{L}\p{N}]/u.test(part)) sentences[sentences.length - 1] += ` ${part}`;
+      else sentences.push(part);
+    }
+    const pieces = [];
+    for (const s of sentences) {
+      if (count(s) <= BUBBLE) {
+        pieces.push(s);
+        continue;
+      }
+      let line = "";
+      for (const word of s.split(/\s+/)) {
+        const next = line ? `${line} ${word}` : word;
+        if (count(next) <= BUBBLE) {
+          line = next;
+          continue;
+        }
+        if (line) pieces.push(line);
+        let rest = Array.from(word);
+        while (rest.length > BUBBLE) {
+          pieces.push(rest.slice(0, BUBBLE).join(""));
+          rest = rest.slice(BUBBLE);
+        }
+        line = rest.join("");
+      }
+      if (line) pieces.push(line);
+    }
+    const out = [];
+    let cur = [];
+    for (const p of pieces) {
+      if (cur.length && (cur.length >= 2 || count([...cur, p].join(" ")) > BUBBLE)) {
+        out.push(cur.join(" "));
+        cur = [];
+      }
+      cur.push(p);
+    }
+    if (cur.length) out.push(cur.join(" "));
+    return out;
+  }
+
+  function stillLine(text) {
+    const shown = document.createElement("span");
+    const cursor = document.createElement("span");
+    const spoken = document.createElement("span");
+    shown.setAttribute("aria-hidden", "true");
+    shown.textContent = text;
+    cursor.className = "dialog-cursor is-done";
+    cursor.setAttribute("aria-hidden", "true");
+    spoken.className = "visually-hidden";
+    spoken.textContent = text;
+    intro.replaceChildren(shown, cursor, spoken);
+    intro.classList.add("is-dialog");
+  }
+
+  function showSources(list) {
+    const links = (list || []).map((s) => {
+      try {
+        const url = new URL(s.url);
+        return url.protocol === "https:" || url.protocol === "http:" ? url : null;
+      } catch {
+        return null;
+      }
+    }).filter(Boolean).slice(0, 2);
+    if (!links.length) return;
+    sources = document.createElement("p");
+    sources.className = "talk-src";
+    const label = document.createElement("span");
+    label.textContent = "출처";
+    sources.append(label);
+    for (const url of links) {
+      const a = document.createElement("a");
+      a.href = url.href;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = url.hostname.replace(/^www\./, "");
+      sources.append(a);
+    }
+    mic.before(sources);
+  }
+
+  function say(i, list) {
+    const mine = seq;
+    bubble = i;
+    ready = false;
+    const last = i >= bubbles.length - 1;
+    dialogBox.classList.remove("is-end");
+    const done = () => {
+      if (mine !== seq) return;
+      if (last) {
+        dialogBox.classList.add("is-end");
+        showSources(list);
+      }
+      // Ready on the next task, so the tap that finished the typing can't also advance.
+      window.setTimeout(() => {
+        if (mine === seq) ready = true;
+      }, 0);
+    };
+    if (prefersReducedMotion()) {
+      stillLine(bubbles[i]);
+      done();
+    } else {
+      typeLine(intro, bubbles[i], done, i === 0 ? 120 : 60);
+    }
+  }
+
+  function answer(text, list) {
+    intro.classList.remove("is-thinking");
+    bubbles = split(text);
+    cited = list;
+    say(0, list);
+  }
+
+  function send(text) {
+    const said = text.trim();
+    if (!said || inflight) return;
+    if (count(said) > MAX) {
+      checkLength();
+      return;
+    }
+    ensureAudio();
+    stopVoice(true);
+    inflight = true;
+    input.value = "";
+    setHint("");
+    checkLength();
+    const before = intro.querySelector(".visually-hidden")?.textContent ?? intro.textContent;
+    takeLine();
+    const mine = { thinking: true, before };
+    pending = mine;
+    const line = sayToken;
+    intro.classList.add("is-thinking");
+    const dots = document.createElement("span");
+    dots.className = "talk-dots";
+    dots.textContent = "…";
+    dots.setAttribute("aria-label", "생각하는 중");
+    intro.replaceChildren(dots);
+    const quit = new AbortController();
+    const timer = window.setTimeout(() => quit.abort(), GIVE_UP_MS);
+    fetch("/talk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, text: said }),
+      credentials: "same-origin",
+      signal: quit.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .catch(() => null)
+      .then((reply) => {
+        window.clearTimeout(timer);
+        inflight = false;
+        checkLength();
+        const failed = !reply || (!reply.ok && reply.line !== REFUSAL_LINE);
+        // A failed send gives the words back, unless new ones were typed meanwhile.
+        if (failed && !input.value.trim()) {
+          input.value = said;
+          checkLength();
+        }
+        if (pending !== mine || sayToken !== line) return;
+        pending = null;
+        if (reply?.ok && typeof reply.text === "string" && reply.text) answer(reply.text, reply.sources);
+        else answer(typeof reply?.line === "string" ? reply.line : ERROR_LINE, null);
+      });
+  }
+
+  function stopVoice(abort) {
+    if (!rec) return;
+    const r = rec;
+    rec = null;
+    voiceBtn.classList.remove("is-listening");
+    voiceBtn.setAttribute("aria-pressed", "false");
+    try {
+      if (abort) r.abort();
+      else r.stop();
+    } catch {
+      /* already ended */
+    }
+  }
+
+  function listen() {
+    ensureAudio();
+    if (rec) {
+      // A second press ends the utterance; its final result still sends.
+      const r = rec;
+      try {
+        r.stop();
+      } catch {
+        /* already ended */
+      }
+      return;
+    }
+    if (!Recognition || inflight) {
+      if (!Recognition) setHint(KEYBOARD_HINT, true);
+      return;
+    }
+    const r = new Recognition();
+    r.lang = "ko-KR";
+    r.continuous = false;
+    r.interimResults = true;
+    let heard = false;
+    let failed = false;
+    const mine = () => rec === r;
+    r.onresult = (event) => {
+      if (!mine() || heard) return;
+      let text = "";
+      let final = false;
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        text += event.results[i][0].transcript;
+        if (event.results[i].isFinal) final = true;
+      }
+      input.value = text;
+      checkLength();
+      if (!final) return;
+      heard = true;
+      stopVoice(false);
+      if (count(text) <= MAX) send(text);
+    };
+    r.onerror = () => {
+      if (mine()) failed = true;
+    };
+    r.onend = () => {
+      if (!mine()) return;
+      stopVoice(true);
+      if (failed || !heard) setHint(KEYBOARD_HINT, true);
+    };
+    rec = r;
+    setHint("");
+    voiceBtn.classList.add("is-listening");
+    voiceBtn.setAttribute("aria-pressed", "true");
+    try {
+      r.start();
+    } catch {
+      stopVoice(true);
+      setHint(KEYBOARD_HINT, true);
+    }
+  }
+
+  function busy() {
+    return Boolean(careHold.busy || careHold.asleep || waking || care.busy());
+  }
+
+  function sync() {
+    const hide = busy();
+    if (mic.hidden !== hide) mic.hidden = hide;
+  }
+
+  mic.addEventListener("pointerdown", (event) => event.stopPropagation());
+  mic.addEventListener("click", () => {
+    ensureAudio();
+    if (open) close();
+    else openBar();
+  });
+  dialogBox.addEventListener("pointerdown", (event) => {
+    if (!ready || !bubbles.length || bubble >= bubbles.length - 1 || event.target.closest?.("a")) return;
+    say(bubble + 1, cited);
+  });
+  bar.addEventListener("submit", (event) => event.preventDefault());
+  sendBtn.addEventListener("click", () => send(input.value));
+  voiceBtn.addEventListener("click", listen);
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.isComposing || event.keyCode === 229) return;
+    event.preventDefault();
+    send(input.value);
+  });
+  input.addEventListener("input", () => {
+    if (hint.classList.contains("is-tap")) setHint("");
+    checkLength();
+  });
+  input.addEventListener("focus", () => window.setTimeout(place, 300));
+  hint.addEventListener("click", () => {
+    if (hint.classList.contains("is-tap")) input.focus();
+  });
+  window.addEventListener("pagehide", () => close(true));
+  window.setInterval(sync, 250);
+  // After the startup at the end of this file, so a celebration it begins keeps the mic hidden.
+  window.setTimeout(sync, 0);
+  talkHook = { taken, close };
 })();
 
 const TIER_WORDS = { special: "특별한 선물", rare: "반짝 선물" };

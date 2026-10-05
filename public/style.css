@@ -2603,3 +2603,192 @@ svg[data-icon="beyond"] .i-b { stroke: #f6d8a8; }
 @media (prefers-reduced-motion: reduce) {
   .g-thumb-aura, .g-best, .g-hint .h-wave { animation: none; }
 }
+
+/* Talk: a small mic in the speech line, a slim bar over the dock */
+.dialog .talk-mic {
+  all: unset;
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: inherit;
+  opacity: .9;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.dialog .talk-mic[hidden] { display: none; }
+.dialog .talk-mic svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dialog .talk-mic:active,
+.dialog .talk-mic[aria-expanded="true"] { opacity: 1; }
+.dialog .talk-mic:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; }
+.dialog .intro.is-thinking .talk-dots {
+  display: inline-block;
+  letter-spacing: .1em;
+  animation: talk-think 1s ease-in-out infinite alternate;
+}
+@keyframes talk-think {
+  from { opacity: .35; }
+  to { opacity: 1; }
+}
+.dialog .talk-src {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-top: 6px;
+  font-family: "Pretendard Variable", Pretendard, system-ui, sans-serif;
+  font-size: .6875rem;
+  line-height: 1.5;
+  opacity: .78;
+}
+.dialog .talk-src span { font-weight: 800; }
+.dialog .talk-src a {
+  max-width: 11em;
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.talk-bar {
+  --tb-bg: rgba(20, 27, 43, 0.94);
+  --tb-field: var(--paper);
+  --tb-ink: var(--cocoa);
+  --tb-hint: var(--cream);
+  --tb-ring: rgba(241, 214, 140, 0.45);
+  --tb-key: linear-gradient(180deg, var(--gold-light), var(--gold));
+  --tb-key-ink: var(--navy);
+  --tb-round: 999px;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  background: var(--tb-bg);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.28);
+  transform: translateY(110%);
+  transition: transform .22s var(--ease-out);
+}
+.talk-bar.is-open { transform: none; }
+.talk-bar.is-lifted { padding-bottom: 8px; }
+.talk-bar .talk-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.talk-bar .talk-input {
+  all: unset;
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: var(--tb-round);
+  background: var(--tb-field);
+  color: var(--tb-ink);
+  box-shadow: inset 0 0 0 1.5px var(--tb-ring);
+  font-family: "Pretendard Variable", Pretendard, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 40px;
+}
+.talk-bar .talk-input::placeholder { color: var(--tb-ink); opacity: .5; }
+.talk-bar .talk-input:focus-visible { box-shadow: inset 0 0 0 2px var(--tb-ring), 0 0 0 3px rgba(255, 255, 255, 0.12); }
+.talk-bar .talk-voice,
+.talk-bar .talk-send {
+  all: unset;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--tb-round);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.talk-bar .talk-voice { background: var(--tb-key); color: var(--tb-key-ink); }
+.talk-bar .talk-send { color: var(--tb-hint); }
+.talk-bar .talk-send:disabled { opacity: .45; cursor: default; }
+.talk-bar .talk-voice:focus-visible,
+.talk-bar .talk-send:focus-visible { outline: 2px solid var(--tb-hint); outline-offset: 1px; }
+.talk-bar .talk-voice svg,
+.talk-bar .talk-send svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.talk-bar .talk-voice.is-listening {
+  background: var(--coral);
+  color: #fff;
+  animation: talk-listen 1s ease-in-out infinite alternate;
+}
+@keyframes talk-listen {
+  from { box-shadow: 0 0 0 0 rgba(232, 128, 107, 0.55); }
+  to { box-shadow: 0 0 0 6px rgba(232, 128, 107, 0); }
+}
+.talk-bar .talk-hint {
+  margin: 0 4px 6px;
+  color: var(--tb-hint);
+  font-family: "Pretendard Variable", Pretendard, system-ui, sans-serif;
+  font-size: .75rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: left;
+}
+.talk-bar .talk-hint.is-tap { text-decoration: underline; cursor: pointer; }
+html[data-theme="8bit"] .talk-bar {
+  --tb-bg: #1d2b53;
+  --tb-field: #fff1e8;
+  --tb-ink: #0b0d1a;
+  --tb-hint: #fff1e8;
+  --tb-ring: #0b0d1a;
+  --tb-key: #ffec27;
+  --tb-key-ink: #0b0d1a;
+  --tb-round: 0;
+  font-family: "Galmuri11", monospace;
+}
+html[data-theme="8bit"] .talk-bar .talk-input,
+html[data-theme="8bit"] .talk-bar .talk-hint { font-family: "Galmuri11", monospace; }
+html[data-theme="milk"] .talk-bar {
+  --tb-bg: rgba(255, 248, 243, 0.96);
+  --tb-field: #fff;
+  --tb-ink: #7a2e45;
+  --tb-hint: #7a2e45;
+  --tb-ring: #ff8fab;
+  --tb-key: linear-gradient(180deg, #ff9db6, #f2577f);
+  --tb-key-ink: #fff;
+  box-shadow: 0 -6px 20px rgba(242, 87, 127, 0.2);
+}
+html[data-theme="najeon"] .talk-bar {
+  --tb-bg: rgba(12, 12, 16, 0.96);
+  --tb-field: #050507;
+  --tb-ink: #ece9f2;
+  --tb-hint: #ece9f2;
+  --tb-ring: rgba(233, 231, 239, 0.55);
+  --tb-key: linear-gradient(180deg, #d0393f, #b8282f 60%, #8e1c22);
+  --tb-key-ink: #fff4ec;
+  border-top: 1px solid rgba(233, 231, 239, 0.3);
+}
+@media (prefers-reduced-motion: reduce) {
+  .talk-bar { transition: none; }
+  .dialog .intro.is-thinking .talk-dots,
+  .talk-bar .talk-voice.is-listening { animation: none; }
+}
