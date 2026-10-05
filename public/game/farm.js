@@ -1890,6 +1890,8 @@ export async function createFarm(api) {
         gen += 1;
         entered = false;
         petEl.style.visibility = "";
+        // The slide-out's last frame (opacity 0) would keep the home pet invisible.
+        petEl.getAnimations().forEach((a) => a.cancel());
         return;
       }
       cut();
