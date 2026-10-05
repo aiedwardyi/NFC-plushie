@@ -2496,8 +2496,9 @@ function paintLevel(r) {
   }
   const fill = document.querySelector(".xp-fill");
   if (fill) {
-    fill.dataset.xp = String(percent(r));
-    fill.style.width = `${percent(r)}%`;
+    const pct = percent(r);
+    fill.dataset.xp = String(pct);
+    fill.style.width = `${pct}%`;
   }
   document.querySelector(".xp-bar")?.setAttribute("aria-label", `다음 단계까지 ${left}`);
   const level = recordRow("레벨");
@@ -2620,6 +2621,8 @@ const combo = (function tapCombo() {
   let leaving = null;
   let lit = 0;
   let from = 0;
+  // The step the server last accepted; its key can wait behind another stage.
+  let accepted = null;
   let ring = null;
   let tickTimer = 0;
   let endTimer = 0;
@@ -2994,7 +2997,9 @@ const combo = (function tapCombo() {
   let ready = false;
   let listening = null;
   let lastRead = -Infinity;
-  let starting = false;
+  let sending = Promise.resolve();
+  let settled = -Infinity;
+  let away = false;
   let sinkFn = null;
   let handoff = 0;
 
@@ -3066,50 +3071,62 @@ const combo = (function tapCombo() {
     }
     const raw = tag.raw || uid;
     if (raw.includes("x") && raw === pageTag) return;
-    if (!ready || secretOn || waking || root.classList.contains("has-reveal")
+    if (!ready || away || secretOn || waking || root.classList.contains("has-reveal")
       || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump")) return;
     if (careHold.asleep) {
       window.location.replace(`/t?uid=${raw}`);
       return;
     }
-    // A reload would drop the page's touch, and Chrome lets only a touched page play sound and buzz.
-    // While a start's reply is on its way, the next tap continues that chain.
-    const fresh = (!key || lit >= 3) && !starting;
-    if (fresh) starting = true;
     closeSheet();
     if (demo && !demo.hidden) demo.querySelector("[data-demo-close]")?.click();
-    const sent = performance.now();
+    // Taps go out one at a time, so each one sees the chain the reply before it opened.
     const turn = handoff;
-    fetch("/combo", {
+    sending = sending.catch(() => {}).then(() => send(raw, turn));
+  }
+
+  const chained = () => (key ? lit < 3 : Boolean(accepted) && accepted.n < 3 && performance.now() - accepted.at < WINDOW_MS);
+
+  async function send(raw, turn) {
+    // The server takes a tap within SAME_TAP_MS of the last as the same tap, so a tap queued behind a slow reply keeps that gap.
+    const gap = settled + SAME_TAP_MS - performance.now();
+    if (gap > 0) await wait(gap);
+    // A tap queued behind a reload, the secret or a game that took the reader is dropped.
+    if (away || secretOn || turn !== handoff) return;
+    // A reload would drop the page's touch, and Chrome lets only a touched page play sound and buzz.
+    const fresh = !chained();
+    const sent = performance.now();
+    const reply = await fetch("/combo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(fresh ? { uid: raw, start: true } : { uid: raw }),
       credentials: "same-origin",
     })
       .then((res) => (res.ok ? res.json() : null))
-      .catch(() => null)
-      .then((reply) => {
-        if (fresh) starting = false;
-        // A reply that lands after a game took the reader belongs to the page before it.
-        if (turn !== handoff) return;
-        if (reply?.ok && (reply.same || (reply.combo > 1 && reply.combo <= asked))) return;
-        if (!reply?.ok || (fresh ? reply.combo !== 1 : !(reply.combo >= 2 && reply.combo <= 3))) {
-          if (!secretOn) window.location.replace(`/t?uid=${raw}`);
-          return;
-        }
-        const count = document.querySelector("[data-tap-count]");
-        if (count) {
-          count.dataset.tapCount = String(reply.tapCount);
-          enhanceRollingCounter({ duration: 400 });
-        }
-        if (fresh) {
-          care.hearts(reply.hearts);
-          if (reply.rewarded) paintLevel(reply);
-          if (reply.later) dock.dataset.comboLater = reply.later;
-          else delete dock.dataset.comboLater;
-        }
-        play(reply.combo, sent);
-      });
+      .catch(() => null);
+    settled = performance.now();
+    // A reply that lands after a game took the reader belongs to the page before it.
+    if (turn !== handoff) return;
+    if (reply?.ok && (reply.same || (reply.combo > 1 && reply.combo <= asked))) return;
+    if (!reply?.ok || (fresh ? reply.combo !== 1 : !(reply.combo >= 2 && reply.combo <= 3))) {
+      if (!secretOn) {
+        away = true;
+        window.location.replace(`/t?uid=${raw}`);
+      }
+      return;
+    }
+    accepted = { n: reply.combo, at: sent };
+    const count = document.querySelector("[data-tap-count]");
+    if (count) {
+      count.dataset.tapCount = String(reply.tapCount);
+      enhanceRollingCounter({ duration: 400 });
+    }
+    if (fresh) {
+      care.hearts(reply.hearts);
+      if (reply.rewarded) paintLevel(reply);
+      if (reply.later) dock.dataset.comboLater = reply.later;
+      else delete dock.dataset.comboLater;
+    }
+    play(reply.combo, sent);
   }
 
   if (nfcButton && "NDEFReader" in window) {
@@ -3126,6 +3143,7 @@ const combo = (function tapCombo() {
     const n = Number(dock.dataset.combo) || 0;
     if (n < 1 || n > 3) return;
     const at = loaded || performance.now();
+    accepted = { n, at };
     window.requestAnimationFrame(() => play(n, at));
   }
 
@@ -3153,6 +3171,7 @@ const combo = (function tapCombo() {
   }
 
   function end() {
+    accepted = null;
     if (key) expire();
   }
 
