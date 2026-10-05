@@ -3137,6 +3137,7 @@ const arcade = (function arcadeRoom() {
   let game = null;
   let ready = null;
   let playing = false;
+  let held = null;
 
   function buzz(pattern) {
     if (navigator.userActivation?.hasBeenActive === false) return;
@@ -3319,16 +3320,9 @@ const arcade = (function arcadeRoom() {
       start.disabled = true;
       return;
     }
-    if (ready) return;
-    start.textContent = "준비 중…";
-    start.disabled = true;
-    const made = prepare();
-    made.then(() => {
-      if (game === made && !careHold.asleep) paintStart();
-    }, () => {
-      start.textContent = "시작";
-      start.disabled = false;
-      blurb.textContent = FAILED;
+    // The engine loads behind a live 시작; a tap meanwhile waits for it.
+    if (!ready) prepare().catch(() => {
+      if (!held && sheetOpen === sheet) blurb.textContent = FAILED;
     });
   }
 
@@ -3339,6 +3333,7 @@ const arcade = (function arcadeRoom() {
     if (canon) thumb.src = canon.getAttribute("src");
     for (const name of SOUNDS) loadSfx(`game-${kit()}-${name}`);
     if (kit() === "soft") loadSfx("game-soft-thump");
+    held = null;
     paintStart();
   }
 
@@ -3347,17 +3342,7 @@ const arcade = (function arcadeRoom() {
     ready.tap("screen");
   }
 
-  async function run(g, listening) {
-    let mode = "screen";
-    if (listening) {
-      const reader = await Promise.race([listening, new Promise((resolve) => window.setTimeout(() => resolve(null), NFC_WAIT_MS))]);
-      if (reader) mode = "nfc";
-      // The page can be hidden or rebuilt while the permission prompt is up.
-      if (document.hidden || ready !== g) {
-        playing = false;
-        return;
-      }
-    }
+  async function run(g, mode) {
     closeSheet();
     combo.end();
     care.hold();
@@ -3377,21 +3362,39 @@ const arcade = (function arcadeRoom() {
     if (out === "quit") care.fx.say("재밌었어요! 또 놀아요!");
   }
 
+  function petBusy() {
+    return Boolean(careHold.busy || waking || root.classList.contains("has-reveal")
+      || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump"));
+  }
+
+  // A tap is held until the engine and the NFC reader are up; closing the sheet first drops it.
   function begin() {
-    const g = ready;
-    if (playing || careHold.asleep) return;
-    // After a failed load, 시작 tries again.
-    if (!g) {
-      paintStart();
-      return;
-    }
-    if (careHold.busy || waking || root.classList.contains("has-reveal")
-      || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump")) return;
-    playing = true;
+    if (playing || held || careHold.asleep || petBusy()) return;
+    const tap = {};
+    held = tap;
+    start.textContent = "준비 중…";
+    start.disabled = true;
     playSfx(`care-${kit()}-press`);
     buzz(12);
     // scan() must run inside the click: that is what shows Chrome's permission prompt.
-    run(g, "NDEFReader" in window ? combo.listen() : null);
+    const listening = "NDEFReader" in window ? combo.listen() : null;
+    const reader = listening && Promise.race([listening, new Promise((resolve) => window.setTimeout(() => resolve(null), NFC_WAIT_MS))]);
+    // After a failed load, this tap tries again.
+    Promise.all([prepare(), reader]).then(([g, nfc]) => {
+      if (held !== tap) return;
+      held = null;
+      paintStart();
+      // While it waited, the sheet may have closed, the page hidden, the stage been rebuilt or a combo begun.
+      if (sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) return;
+      playing = true;
+      run(g, nfc ? "nfc" : "screen");
+    }, () => {
+      if (held !== tap) return;
+      held = null;
+      start.textContent = "시작";
+      start.disabled = false;
+      blurb.textContent = FAILED;
+    });
   }
 
   function restyle() {
