@@ -3362,11 +3362,14 @@ const arcade = (function arcadeRoom() {
     if (out === "quit") care.fx.say("재밌었어요! 또 놀아요!");
   }
 
+  function petBusy() {
+    return Boolean(careHold.busy || waking || root.classList.contains("has-reveal")
+      || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump"));
+  }
+
   // A tap is held until the engine and the NFC reader are up; closing the sheet first drops it.
   function begin() {
-    if (playing || held || careHold.asleep) return;
-    if (careHold.busy || waking || root.classList.contains("has-reveal")
-      || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump")) return;
+    if (playing || held || careHold.asleep || petBusy()) return;
     const tap = {};
     held = tap;
     start.textContent = "준비 중…";
@@ -3381,8 +3384,8 @@ const arcade = (function arcadeRoom() {
       if (held !== tap) return;
       held = null;
       paintStart();
-      // While it waited, the sheet may have closed, the page hidden or the stage been rebuilt.
-      if (sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep) return;
+      // While it waited, the sheet may have closed, the page hidden, the stage been rebuilt or a combo begun.
+      if (sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) return;
       playing = true;
       run(g, nfc ? "nfc" : "screen");
     }, () => {
