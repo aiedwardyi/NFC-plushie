@@ -3106,7 +3106,11 @@ const combo = (function tapCombo() {
     settled = performance.now();
     // A reply that lands after a game took the reader belongs to the page before it.
     if (turn !== handoff) return;
-    if (reply?.ok && (reply.same || (reply.combo > 1 && reply.combo <= asked))) return;
+    if (reply?.ok && (reply.same || (reply.combo > 1 && reply.combo <= asked))) {
+      // A start the server took as the same tap as a step it already holds (another tab's) continues from that step.
+      if (fresh && reply.same) accepted = { n: reply.combo, at: sent };
+      return;
+    }
     if (!reply?.ok || (fresh ? reply.combo !== 1 : !(reply.combo >= 2 && reply.combo <= 3))) {
       if (!secretOn) {
         away = true;
