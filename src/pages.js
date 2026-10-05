@@ -413,7 +413,7 @@ function homeExtras(row, pet, found, mascot, talk) {
   };
 }
 
-export function petPage(row, code = null, { celebrate = "", pet = null, mascot = "horse", demo = "", found = [], theme = "classic", talk = false, ask = "" } = {}) {
+export function petPage(row, code = null, { celebrate = "", pet = null, mascot = "horse", demo = "", found = [], theme = "classic", talk = false, ask = "", guest = false } = {}) {
   const firstMeet = celebrate === "claim" || celebrate === "named";
   let greeting = row.pet_name
     ? (firstMeet
@@ -422,7 +422,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
     : "안녕하세요! 찾아와 줘서 정말 기뻐요.";
   if (pet?.morning) greeting = "쿨쿨… 쿨쿨…";
   else if (ask) greeting = escapeHtml(ask);
-  const recovery = code ? keyCard(code) : "";
+  const recovery = code && !guest ? keyCard(code) : "";
   const prompt = row.pet_name ? "" : `<form action="/name" method="post" class="name-form" data-met="${metDay(row)}">
     <input type="hidden" name="uid" value="${escapeHtml(row.uid)}">
     <label for="name">제 이름을 뭐라고 지어 줄래요?</label>
