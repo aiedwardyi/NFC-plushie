@@ -5,7 +5,8 @@ import test from "node:test";
 import Database from "better-sqlite3";
 import { createApp } from "../src/app.js";
 import { openDatabase } from "../src/db.js";
-import { fakeUids } from "../src/pages.js";
+import { fakeUids, heartHalves } from "../src/pages.js";
+import { currentMood, xpProgress } from "../src/pet.js";
 
 const [A, B] = fakeUids;
 const T0 = Date.parse("2026-05-01T10:00:00+09:00");
@@ -84,6 +85,14 @@ async function combo(ctx, jar, uid = A) {
   const res = await ctx.request("/combo", { jar, body: { uid } });
   return { status: res.status, body: JSON.parse(res.html) };
 }
+
+async function start(ctx, jar, uid = A) {
+  const res = await ctx.request("/combo", { jar, body: { uid, start: true } });
+  return { status: res.status, body: JSON.parse(res.html) };
+}
+
+const REWARD_COLS = ["xp", "mood_value", "mood_updated_at", "last_rewarded_at", "reward_day", "reward_day_count", "last_gift_day", "gift_seen", "gift_found", "days_together", "last_active_day", "next_gift_tier"];
+const rewardOf = (row) => REWARD_COLS.map((k) => row[k]);
 
 test("owner taps 4 s apart climb 1, 2, 3, then start over", async (t) => {
   const ctx = await setup(t);
@@ -276,6 +285,97 @@ test("POST /combo is the owner's alone, for a named pet and a valid uid", async 
     const bad = await ctx.request("/combo", { jar, body });
     assert.deepEqual([bad.status, JSON.parse(bad.html)], [400, { ok: false }]);
   }
+  assert.deepEqual(ctx.row(), before);
+});
+
+test("POST /combo start: a plain tap starts the chain in place with /t's reward", async (t) => {
+  const ctx = await setup(t);
+  const a = await meet(ctx, A, "Mochi");
+  const b = await meet(ctx, B, "Momo");
+  await tap(ctx, a.jar);
+  await tap(ctx, b.jar, B);
+  ctx.advance(31 * 60 * SEC);
+  const before = ctx.row();
+  const res = await start(ctx, a.jar);
+  await tap(ctx, b.jar, B);
+  const after = ctx.row();
+  assert.deepEqual(rewardOf(after), rewardOf(ctx.row(B)));
+  assert.equal(after.xp, before.xp + 10);
+  assert.deepEqual([after.tap_count, after.last_tap_at, ...chainOf(after)], [before.tap_count + 1, new Date(ctx.now()).toISOString(), 1, ctx.now()]);
+  const xp = xpProgress(after.xp);
+  assert.deepEqual(res, { status: 200, body: { ok: true, combo: 1, same: false, tapCount: after.tap_count, rewarded: true, hearts: heartHalves(after.mood_value), level: xp.level, xpInto: xp.into, xpSpan: xp.span, later: "" } });
+  ctx.advance(500);
+  assert.deepEqual((await start(ctx, a.jar)).body, { ok: true, combo: 1, same: true, tapCount: after.tap_count });
+  assert.deepEqual(ctx.row(), after);
+  ctx.advance(3 * SEC);
+  assert.equal((await combo(ctx, a.jar)).body.combo, 2);
+});
+
+test("POST /combo start on cooldown counts the tap and holds the cooldown line for after the key", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await tap(ctx, jar);
+  ctx.advance(4 * SEC);
+  assert.equal((await combo(ctx, jar)).body.combo, 2);
+  // The page's key ran out at 10 s; the server's window still has 2 s.
+  ctx.advance(10.5 * SEC);
+  const before = ctx.row();
+  const res = await start(ctx, jar);
+  const after = ctx.row();
+  assert.deepEqual(rewardOf(after), rewardOf(before));
+  assert.deepEqual([after.tap_count, ...chainOf(after)], [before.tap_count + 1, 1, ctx.now()]);
+  const xp = xpProgress(after.xp);
+  const mood = currentMood({ moodValue: after.mood_value, moodUpdatedAt: after.mood_updated_at }, ctx.now());
+  assert.deepEqual(res.body, { ok: true, combo: 1, same: false, tapCount: after.tap_count, rewarded: false, hearts: heartHalves(mood), level: xp.level, xpInto: xp.into, xpSpan: xp.span, later: "방금 토닥여 줘서 기분 좋아요! 조금 있다가 또 토닥여 주세요." });
+});
+
+test("POST /combo start leaves /t's big moments to a full load and writes nothing", async (t) => {
+  const cases = {
+    "first tap of the day": (ctx) => ctx.advance(24 * 60 * 60 * SEC),
+    "level-up": (ctx) => {
+      ctx.advance(31 * 60 * SEC);
+      ctx.db.prepare("UPDATE plushies SET xp = 90 WHERE uid = ?").run(A);
+    },
+    milestone: (ctx) => ctx.db.prepare("UPDATE plushies SET tap_count = 9 WHERE uid = ?").run(A),
+    reunion: (ctx) => {
+      ctx.db.prepare("UPDATE plushies SET mood_value = 20, mood_updated_at = ? WHERE uid = ?").run(ctx.now(), A);
+      ctx.advance(31 * 60 * SEC);
+    },
+    "lonely on cooldown": (ctx) => ctx.db.prepare("UPDATE plushies SET mood_value = 20, mood_updated_at = ? WHERE uid = ?").run(ctx.now(), A),
+    asleep: (ctx, jar) => ctx.request("/care", { jar, body: { uid: A, act: "sleep" } }),
+  };
+  for (const [name, arrange] of Object.entries(cases)) {
+    const ctx = await setup(t);
+    const { jar } = await meet(ctx, A, "Mochi");
+    await tap(ctx, jar);
+    await arrange(ctx, jar);
+    ctx.advance(20 * SEC);
+    const before = ctx.row();
+    assert.deepEqual(await start(ctx, jar), { status: 200, body: { ok: true, combo: 0 } }, name);
+    assert.deepEqual(ctx.row(), before, name);
+  }
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await tap(ctx, jar, `${A}x000005`);
+  ctx.advance(20 * SEC);
+  const before = ctx.row();
+  for (const uid of [`${A}x000005`, A]) {
+    assert.deepEqual(await start(ctx, jar, uid), { status: 200, body: { ok: true, combo: 0 } }, uid);
+    assert.deepEqual(ctx.row(), before, uid);
+  }
+  assert.equal((await start(ctx, jar, `${A}x000006`)).body.combo, 1);
+  assert.equal(ctx.row().last_counter, 6);
+});
+
+test("POST /combo start is the owner's alone, for a named pet", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await tap(ctx, jar);
+  ctx.advance(20 * SEC);
+  const before = ctx.row();
+  assert.deepEqual(await start(ctx, {}), { status: 403, body: { ok: false } });
+  const unnamed = await meet(ctx, B);
+  assert.deepEqual(await start(ctx, unnamed.jar, B), { status: 403, body: { ok: false } });
   assert.deepEqual(ctx.row(), before);
 });
 

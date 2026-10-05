@@ -358,6 +358,39 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     res.json(reply);
   });
 
+  // The open page's tap with no key up starts its chain in place, scored as /t would; anything /t celebrates gives 0.
+  function startChain(uid, row, st, counter, t) {
+    const again = comboTap(st, t);
+    if (again.same) return { ok: true, combo: again.combo, same: true, tapCount: row.tap_count };
+    if (row.slept_at !== null || milestoneLine(row.tap_count + 1)) return { ok: true, combo: 0 };
+    const out = applyTap(st, t, { counter: { present: counter !== null, missing: counter === null, value: counter }, rng });
+    const mood = out.rewarded ? out.moodAfter : currentMood(st, t);
+    const big = out.rewarded
+      ? out.leveledUp || out.reunion || out.gift || out.newActiveDay
+      : out.reason === "stale" || mood <= PET.moodLonelyAt;
+    if (big) return { ok: true, combo: 0 };
+    db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ?, combo_count = 1, combo_at = ? WHERE uid = ?")
+      .run(new Date(t).toISOString(), t, uid);
+    if (counter !== null && (st.lastCounter === null || counter > st.lastCounter)) {
+      db.prepare("UPDATE plushies SET last_counter = ? WHERE uid = ?").run(counter, uid);
+    }
+    if (out.rewarded) writePetReward(uid, st, out, getRow(uid), t, seoulDayKey(t));
+    const fresh = getRow(uid);
+    const xp = xpProgress(fresh.xp);
+    return {
+      ok: true,
+      combo: 1,
+      same: false,
+      tapCount: fresh.tap_count,
+      rewarded: out.rewarded,
+      hearts: heartHalves(mood),
+      level: xp.level,
+      xpInto: xp.into,
+      xpSpan: xp.span,
+      later: out.rewarded ? "" : UNREWARDED_LINES[out.reason] || "",
+    };
+  }
+
   app.post("/combo", (req, res) => {
     const parsed = parseTapUid(req.body?.uid);
     if (!parsed) return res.status(400).json({ ok: false });
@@ -367,6 +400,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row.pet_name) return null;
       const t = now();
       const st = petState(row, t);
+      if (req.body.start === true) return startChain(uid, row, st, counter, t);
       const stale = counter === null ? st.lastCounter !== null : st.lastCounter !== null && !(counter > st.lastCounter);
       const c = row.slept_at === null && !stale ? comboNext(st, t) : null;
       // A milestone needs /t's celebration, so the page loads that tap in full.
