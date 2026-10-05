@@ -3608,7 +3608,8 @@ const arcade = (function arcadeRoom() {
   }
 
   function split(text) {
-    const parts = text.match(/[^.!?]+(?:[.!?]+["'”’)]*|$)|[.!?]+/g) || [text];
+    // Only punctuation before a space ends a sentence, so 3.5°C stays whole.
+    const parts = text.split(/(?<=[.!?]["'”’)]*)\s+/);
     const sentences = [];
     for (const raw of parts) {
       const part = raw.trim();
