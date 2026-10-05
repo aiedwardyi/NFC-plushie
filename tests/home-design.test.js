@@ -105,7 +105,7 @@ test("rewarded owner home carries the dock, both sheets and the found gift", asy
   assert.match(home.html, /data-rewarded="1"/);
   assert.match(home.html, /<button type="button" class="dock-btn is-verb" data-care="feed">.*밥<\/span><\/button>/);
   assert.match(home.html, /class="dock-btn is-side has-new" data-open="arcade" aria-haspopup="dialog">.*오락실<\/span>/);
-  assert.match(home.html, /data-open="record" aria-haspopup="dialog">.*우리 기록<\/span>/);
+  assert.match(home.html, /<button type="button" class="dock-btn is-side has-new" data-farm>.*텃밭<\/span><\/button>/);
   for (const id of ["arcade", "gifts", "record"]) {
     assert.match(home.html, new RegExp(`<div class="sheet" data-sheet="${id}" role="dialog" aria-modal="true" aria-labelledby="sheet-${id}-title" hidden>`));
     assert.match(home.html, new RegExp(`<h2 id="sheet-${id}-title">`));
@@ -113,7 +113,7 @@ test("rewarded owner home carries the dock, both sheets and the found gift", asy
   assert.equal(count(home.html, /data-tile="/g), GIFT_COUNT);
   assert.match(home.html, /class="tile is-common is-new" data-tile="c01" data-tier="common" data-line="오늘도 와줘서 고마워요!"/);
   assert.match(home.html, /선물 1\/30/);
-  assert.match(home.html, /<span class="level-pin">Lv\. 1<\/span>/);
+  assert.match(home.html, /<button type="button" class="level-pin" data-open="record" aria-haspopup="dialog" aria-label="우리 기록, Lv\. 1">Lv\. 1<\/button>/);
   assert.match(home.html, /함께한 지 1일/);
   assert.match(home.html, /<dt>다음 레벨까지<\/dt><dd>\d+ XP<\/dd>/);
   assert.match(home.html, /class="xp-fill" data-xp="\d+"/);
@@ -138,7 +138,7 @@ test("post-naming page is the full home with read-only stats and the first tap o
   assert.match(skip.html, /<p class="count" data-tap-count="1">/);
   assert.match(skip.html, /<dt>토닥인 횟수<\/dt><dd>1번<\/dd>/);
   assert.match(skip.html, /<section class="pet-stats"[\s\S]*class="hearts"[\s\S]*class="xp-fill" data-xp="\d+"/);
-  assert.match(skip.html, /<span class="level-pin">Lv\. 1<\/span>/);
+  assert.match(skip.html, /<button type="button" class="level-pin" data-open="record"[^>]*>Lv\. 1<\/button>/);
   assert.match(skip.html, /<dt>레벨<\/dt><dd>Lv\. 1<\/dd>/);
   assert.match(skip.html, /<dt>다음 레벨까지<\/dt><dd>\d+ XP<\/dd>/);
   assert.match(skip.html, /<dt>기분<\/dt>/);
@@ -162,7 +162,7 @@ test("stranger page has no dock, sheets or collection", async (t) => {
   assert.doesNotMatch(stranger.html, /data-care|class="dock"|data-sheet=|data-tile=|level-pin|gift-tally/);
 });
 
-test("the dock runs the arcade, the three care verbs, then records", async (t) => {
+test("the dock runs the arcade, the three care verbs, then the farm", async (t) => {
   const { request, jar } = await named(t);
   const home = await request(`/t?uid=${A}`, { jar });
   const dock = home.html.match(/<nav class="dock"[\s\S]*?<\/nav>/)[0];
@@ -173,15 +173,33 @@ test("the dock runs the arcade, the three care verbs, then records", async (t) =
     '<button type="button" class="dock-btn is-verb" data-care="feed">',
     '<button type="button" class="dock-btn is-verb" data-care="play">',
     '<button type="button" class="dock-btn is-verb" data-care="sleep">',
-    '<button type="button" class="dock-btn is-side" data-open="record" aria-haspopup="dialog">',
+    '<button type="button" class="dock-btn is-side has-new" data-farm>',
   ]);
-  assert.deepEqual(dock.match(/<span class="dock-label">[^<]*<\/span>/g).map((s) => s.replace(/<[^>]+>/g, "")), ["오락실", "밥", "놀이", "잠", "우리 기록"]);
+  assert.deepEqual(dock.match(/<span class="dock-label">[^<]*<\/span>/g).map((s) => s.replace(/<[^>]+>/g, "")), ["오락실", "밥", "놀이", "잠", "텃밭"]);
   assert.equal(count(dock, /<svg viewBox="0 0 24 24" aria-hidden="true">/g), 5);
   assert.doesNotMatch(home.html, /data-dock-pat|토닥<\/span>/);
   const preview = await request("/dev/preview?kind=gift&count=10");
   assert.match(preview.html, /data-care="feed"/);
   assert.doesNotMatch(preview.html, /data-care-uid/);
   assert.match(preview.html, /<nav class="dock"[^>]* data-combo="0">/);
+  assert.match(preview.html, /<button type="button" class="dock-btn is-side" data-farm>/);
+});
+
+test("the level pin opens 우리 기록 and the dock keeps no record button", async (t) => {
+  const { request, jar } = await named(t);
+  const home = await request(`/t?uid=${A}`, { jar });
+  assert.match(home.html, /<span class="topbar-end"><button type="button" class="theme-btn"[^>]*>[\s\S]*?<\/button><button type="button" class="level-pin" data-open="record" aria-haspopup="dialog" aria-label="우리 기록, Lv\. 1">Lv\. 1<\/button><\/span>/);
+  assert.match(home.html, /<div class="sheet" data-sheet="record" role="dialog"/);
+  assert.doesNotMatch(home.html.match(/<nav class="dock"[\s\S]*?<\/nav>/)[0], /data-open="record"|우리 기록/);
+});
+
+test("the 텃밭 dot goes out once the farm is open and growing", async (t) => {
+  const { request, jar } = await named(t);
+  await request(`/t?uid=${A}`, { jar });
+  assert.equal((await request("/farm", { jar, body: { uid: A, act: "open" } })).status, 200);
+  const home = await request(`/t?uid=${A}`, { jar });
+  assert.match(home.html, /<button type="button" class="dock-btn is-side" data-farm>/);
+  assert.match(home.html, /<body class="is-home" data-farm-dot="0"/);
 });
 
 for (const kind of ["horse", "sheep"]) {

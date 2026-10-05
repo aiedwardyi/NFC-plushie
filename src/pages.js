@@ -22,7 +22,7 @@ const ICONS = {
   play: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M6.4 5.6c2.6 3.4 2.6 9.4 0 12.8M17.6 5.6c-2.6 3.4-2.6 9.4 0 12.8"/></svg>`,
   sleep: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.6 4.4A8 8 0 1 0 19.6 16 6.4 6.4 0 0 1 15.6 4.4z"/><path d="M17.2 3.6h3.4l-3.4 4h3.4"/></svg>`,
   gift: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="9.5" rx="1.6"/><rect x="3.2" y="7" width="17.6" height="3.5" rx="1.2"/><path d="M12 7v13M12 7C10.6 4 7 3.6 7 5.8 7 7 9.6 7 12 7zm0 0c1.4-3 5-3.4 5-1.2C17 7 14.4 7 12 7z"/></svg>`,
-  record: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h10.5A1.5 1.5 0 0 1 18 5v15.5H7.5A1.5 1.5 0 0 1 6 19V3.5z"/><path d="M6 17.5A1.5 1.5 0 0 1 7.5 16H18M9.5 7.5h5M9.5 11h5"/></svg>`,
+  farm: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20v-7"/><path d="M12 13c0-4-3-6-7-6 0 4 3 6 7 6z"/><path d="M12 11c0-3 2-5 6-5 0 3-2 5-6 5z"/><path d="M7 20h10"/></svg>`,
   heart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7.5-4.6-7.5-10A4 4 0 0 1 12 7.7a4 4 0 0 1 7.5 2.3c0 5.4-7.5 10-7.5 10z"/></svg>`,
   star: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6-4.4-4.2 6-.8z"/></svg>`,
   keyhole: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9.6" r="3.4"/><path d="M10.4 11.8 9.2 18.4h5.6l-1.2-6.6z"/></svg>`,
@@ -165,14 +165,14 @@ function petStats(pet) {
 
 const CARE_VERBS = [["feed", "밥"], ["play", "놀이"], ["sleep", "잠"]];
 
-function dockHtml({ gift = false, want = "", meals = 0, plays = 0, uid = "", combo = 0, later = "", arcadeLeft = 0, giBest = 0 } = {}) {
+function dockHtml({ gift = false, want = "", meals = 0, plays = 0, uid = "", combo = 0, later = "", arcadeLeft = 0, giBest = 0, farmDot = false } = {}) {
   const owner = uid ? ` data-care-uid="${escapeHtml(uid)}"` : "";
   const after = later ? ` data-combo-later="${escapeHtml(later)}"` : "";
   const left = Number(arcadeLeft) || 0;
   return `<nav class="dock" aria-label="메뉴" data-want="${escapeHtml(want)}" data-meals="${Number(meals) || 0}" data-plays="${Number(plays) || 0}"${owner}${after} data-arcade-left="${left}" data-gi-best="${Number(giBest) || 0}" data-combo="${Number(combo) || 0}">
       <button type="button" class="dock-btn is-side${gift || left > 0 ? " has-new" : ""}" data-open="arcade" aria-haspopup="dialog"><span class="dock-cap">${ICONS.arcade}</span><span class="dock-label">오락실</span></button>
       ${CARE_VERBS.map(([id, label]) => `<button type="button" class="dock-btn is-verb" data-care="${id}"><span class="dock-cap">${ICONS[id]}</span><span class="dock-label">${label}</span></button>`).join("")}
-      <button type="button" class="dock-btn is-side" data-open="record" aria-haspopup="dialog"><span class="dock-cap">${ICONS.record}</span><span class="dock-label">우리 기록</span></button>
+      <button type="button" class="dock-btn is-side${farmDot ? " has-new" : ""}" data-farm><span class="dock-cap">${ICONS.farm}</span><span class="dock-label">텃밭</span></button>
     </nav>`;
 }
 
@@ -298,7 +298,14 @@ function nameSize(name) {
   return "";
 }
 
-export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = "horse", wake = false, morning = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, meet = false, theme = "classic" } = {}) {
+function farmAttrs(farm) {
+  if (!farm) return "";
+  const next = farm.next ? ` data-farm-next="${farm.next}"` : "";
+  const visit = farm.visit ? ` data-farm-visit="${escapeHtml(JSON.stringify(farm.visit))}"` : "";
+  return ` data-farm-dot="${farm.dot ? 1 : 0}" data-farm-now="${farm.now}"${next}${visit}`;
+}
+
+export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = "horse", wake = false, morning = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, meet = false, theme = "classic", farm = null } = {}) {
   const look = themeOf(theme);
   const title = escapeHtml(row?.pet_name || "새 친구");
   const timeEl = timeLine ? `<p class="time-line" data-time-line></p>` : "";
@@ -320,7 +327,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
   </aside>`;
   const pin = level ? `<span class="level-pin">Lv. ${level}</span>` : "";
   const topEnd = dock
-    ? `<span class="topbar-end"><button type="button" class="theme-btn" data-open="theme" aria-haspopup="dialog" aria-label="꾸미기"><span class="swatch" aria-hidden="true"></span></button>${pin}</span>`
+    ? `<span class="topbar-end"><button type="button" class="theme-btn" data-open="theme" aria-haspopup="dialog" aria-label="꾸미기"><span class="swatch" aria-hidden="true"></span></button>${level ? `<button type="button" class="level-pin" data-open="record" aria-haspopup="dialog" aria-label="우리 기록, Lv. ${level}">Lv. ${level}</button>` : ""}</span>`
     : pin;
   const themed = look.id !== "classic";
   const unnamed = meet && !row?.pet_name;
@@ -347,7 +354,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
   <script src="/mascot-boot.js"></script>
   <script src="/app.js" defer></script>
 </head>
-<body${bodyClass ? ` class="${bodyClass}"` : ""}${celebrateAttr}${wake ? " data-wake" : ""}${morning ? " data-morning" : ""}>
+<body${bodyClass ? ` class="${bodyClass}"` : ""}${farmAttrs(farm)}${celebrateAttr}${wake ? " data-wake" : ""}${morning ? " data-morning" : ""}>
   <main>
     <header class="topbar">
       <span class="wordmark">POKKEY</span>
@@ -398,7 +405,7 @@ function talkBar(name) {
 
 function homeExtras(row, pet, found, mascot, talk) {
   return {
-    dock: dockHtml({ gift: Boolean(pet?.gift), want: pet?.want, meals: pet?.meals, plays: pet?.plays, uid: row.uid, combo: pet?.combo, later: pet?.comboLaterLine, arcadeLeft: pet?.arcadeLeft, giBest: pet?.giBest }),
+    dock: dockHtml({ gift: Boolean(pet?.gift), want: pet?.want, meals: pet?.meals, plays: pet?.plays, uid: row.uid, combo: pet?.combo, later: pet?.comboLaterLine, arcadeLeft: pet?.arcadeLeft, giBest: pet?.giBest, farmDot: Boolean(pet?.farm?.dot) }),
     sheets: arcadeSheet(pet, found, mascot)
       + sheetHtml("gifts", "선물함", giftCollection(found, pet?.gift || null))
       + sheetHtml("record", "우리 기록", recordSheet(row, pet))
@@ -444,7 +451,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
     `${recovery}${prompt}`,
     {
       waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet, mascot, wake: Boolean(code), morning: Boolean(pet?.morning), demo,
-      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, meet: !row.pet_name, theme, ...extras,
+      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, meet: !row.pet_name, theme, farm: row.pet_name ? pet?.farm : null, ...extras,
     },
   );
 }
