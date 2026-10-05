@@ -2720,8 +2720,10 @@ svg[data-icon="beyond"] .i-b { stroke: #f6d8a8; }
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-.talk-bar .talk-voice { background: var(--tb-key); color: var(--tb-key-ink); }
-.talk-bar .talk-send { color: var(--tb-hint); }
+.talk-bar .talk-voice,
+.talk-bar .talk-send { background: var(--tb-key); color: var(--tb-key-ink); }
+.talk-bar .talk-voice[hidden],
+.talk-bar .talk-send[hidden] { display: none; }
 .talk-bar .talk-send:disabled { opacity: .45; cursor: default; }
 .talk-bar .talk-voice:focus-visible,
 .talk-bar .talk-send:focus-visible { outline: 2px solid var(--tb-hint); outline-offset: 1px; }

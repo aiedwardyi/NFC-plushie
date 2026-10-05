@@ -3504,6 +3504,8 @@ const arcade = (function arcadeRoom() {
     hint.textContent = text;
     hint.hidden = !text;
     hint.classList.toggle("is-tap", tap);
+    // The hint changes the bar's height, so the speech line is placed again.
+    place();
   }
 
   function checkLength() {
@@ -3511,6 +3513,10 @@ const arcade = (function arcadeRoom() {
     if (n > MAX) setHint(`${MAX}자까지 보낼 수 있어요 (${n}/${MAX})`);
     else if (!hint.classList.contains("is-tap")) setHint("");
     sendBtn.disabled = inflight || n > MAX;
+    // One key ends the bar: the mic while the box is empty or listening, send once there are words.
+    const words = n > 0 && !rec;
+    sendBtn.hidden = !words;
+    voiceBtn.hidden = words;
   }
 
   // Keeps the bar above the phone keyboard and the speech line in view above the bar.
@@ -3784,6 +3790,7 @@ const arcade = (function arcadeRoom() {
     rec = null;
     voiceBtn.classList.remove("is-listening");
     voiceBtn.setAttribute("aria-pressed", "false");
+    checkLength();
     try {
       if (abort) r.abort();
       else r.stop();
@@ -3842,6 +3849,7 @@ const arcade = (function arcadeRoom() {
     setHint("");
     voiceBtn.classList.add("is-listening");
     voiceBtn.setAttribute("aria-pressed", "true");
+    checkLength();
     try {
       r.start();
     } catch {
@@ -3862,8 +3870,12 @@ const arcade = (function arcadeRoom() {
   mic.addEventListener("pointerdown", (event) => event.stopPropagation());
   mic.addEventListener("click", () => {
     ensureAudio();
-    if (open) close();
-    else openBar();
+    if (open) {
+      close();
+      return;
+    }
+    openBar();
+    listen();
   });
   dialogBox.addEventListener("pointerdown", (event) => {
     if (!ready || !bubbles.length || bubble >= bubbles.length - 1 || event.target.closest?.("a")) return;
@@ -3879,6 +3891,8 @@ const arcade = (function arcadeRoom() {
   });
   input.addEventListener("input", () => {
     if (hint.classList.contains("is-tap")) setHint("");
+    // Typing takes over from listening.
+    stopVoice(true);
     checkLength();
   });
   input.addEventListener("focus", () => window.setTimeout(place, 300));
