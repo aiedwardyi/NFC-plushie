@@ -12,7 +12,6 @@ import { fakeTalk } from "../src/talk.js";
 const A = "04AAAAAAAAAAA1";
 const B = "04BBBBBBBBBBB2";
 const T0 = Date.parse("2026-05-01T10:00:00+09:00");
-const ports = new Set();
 
 function updateJar(jar, setCookies) {
   for (const sc of setCookies || []) {
@@ -29,18 +28,15 @@ async function setup(t, options = {}) {
   const dir = mkdtempSync(join(tmpdir(), "open-pets-"));
   const db = openDatabase(dir);
   const app = createApp({ db, now: () => T0, rng: () => 0, production: false, demoUids: [], openUids: [A], ...options });
-  const port = Array.from({ length: 10 }, (_, i) => 4570 + i).find((p) => !ports.has(p));
-  assert.ok(port);
-  ports.add(port);
-  const server = app.listen(port, "localhost");
+  const server = app.listen(0, "localhost");
   await new Promise((resolve, reject) => {
     server.once("listening", resolve);
     server.once("error", reject);
   });
+  const { port } = server.address();
   t.after(async () => {
     await app.locals.talkIdle?.();
     await new Promise((resolve) => server.close(resolve));
-    ports.delete(port);
     db.close();
     assert.equal(dirname(dir), tmpdir());
     rmSync(dir, { recursive: true, force: true });
