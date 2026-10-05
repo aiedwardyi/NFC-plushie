@@ -2472,8 +2472,46 @@ const care = (function careLoop() {
     if (id) press(id);
   });
   if (owner) window.addEventListener("load", () => preload(world()), { once: true });
-  return { morning, opened: open, restyle, hold, release, fx: { say, sparkles, cheer, box, move, sound, voice } };
+  return { morning, opened: open, restyle, hold, release, hearts: tweenHearts, fx: { say, sparkles, cheer, box, move, sound, voice } };
 })();
+
+function percent(r) {
+  return r.xpSpan > 0 ? Math.max(0, Math.min(100, Math.round((r.xpInto / r.xpSpan) * 100))) : 100;
+}
+
+function recordRow(label) {
+  const dt = Array.from(document.querySelectorAll('[data-sheet="record"] dt')).find((el) => el.textContent === label);
+  return dt?.nextElementSibling || null;
+}
+
+// Level, XP bar and record sheet as a reload would draw them, with the bar's grow pulse.
+function paintLevel(r) {
+  const left = r.xpSpan - r.xpInto;
+  const pin = document.querySelector(".level-pin");
+  if (pin) pin.textContent = `Lv. ${r.level}`;
+  const badge = document.querySelector(".level-badge");
+  if (badge) {
+    badge.textContent = String(r.level);
+    badge.setAttribute("aria-label", `Lv. ${r.level}`);
+  }
+  const fill = document.querySelector(".xp-fill");
+  if (fill) {
+    const pct = percent(r);
+    fill.dataset.xp = String(pct);
+    fill.style.width = `${pct}%`;
+  }
+  document.querySelector(".xp-bar")?.setAttribute("aria-label", `다음 단계까지 ${left}`);
+  const level = recordRow("레벨");
+  if (level) level.textContent = `Lv. ${r.level}`;
+  const next = recordRow("다음 레벨까지");
+  if (next) next.textContent = `${left} XP`;
+  const line = document.querySelector(".level-line");
+  if (line) {
+    line.classList.remove("is-growing");
+    void line.offsetWidth;
+    line.classList.add("is-growing");
+  }
+}
 
 /* Tap combo: plushie taps in a row play a hello, the world's trick, then the secret move; the key counts them. */
 const combo = (function tapCombo() {
@@ -2583,6 +2621,8 @@ const combo = (function tapCombo() {
   let leaving = null;
   let lit = 0;
   let from = 0;
+  // The step the server last accepted; its key can wait behind another stage.
+  let accepted = null;
   let ring = null;
   let tickTimer = 0;
   let endTimer = 0;
@@ -2957,6 +2997,9 @@ const combo = (function tapCombo() {
   let ready = false;
   let listening = null;
   let lastRead = -Infinity;
+  let sending = Promise.resolve();
+  let settled = -Infinity;
+  let away = false;
   let sinkFn = null;
   let handoff = 0;
 
@@ -3028,39 +3071,66 @@ const combo = (function tapCombo() {
     }
     const raw = tag.raw || uid;
     if (raw.includes("x") && raw === pageTag) return;
-    if (!ready || secretOn || waking || root.classList.contains("has-reveal")
+    if (!ready || away || secretOn || waking || root.classList.contains("has-reveal")
       || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump")) return;
-    if (careHold.asleep || !key || lit >= 3) {
+    if (careHold.asleep) {
       window.location.replace(`/t?uid=${raw}`);
       return;
     }
     closeSheet();
     if (demo && !demo.hidden) demo.querySelector("[data-demo-close]")?.click();
-    const sent = performance.now();
+    // Taps go out one at a time, so each one sees the chain the reply before it opened.
     const turn = handoff;
-    fetch("/combo", {
+    sending = sending.catch(() => {}).then(() => send(raw, turn));
+  }
+
+  const chained = () => (key ? lit < 3 : Boolean(accepted) && accepted.n < 3 && performance.now() - accepted.at < WINDOW_MS);
+
+  async function send(raw, turn) {
+    // The server takes a tap within SAME_TAP_MS of the last as the same tap, so a tap queued behind a slow reply keeps that gap.
+    const gap = settled + SAME_TAP_MS - performance.now();
+    if (gap > 0) await wait(gap);
+    // A tap queued behind a reload, the secret or a game that took the reader is dropped.
+    if (away || secretOn || turn !== handoff) return;
+    // A reload would drop the page's touch, and Chrome lets only a touched page play sound and buzz.
+    const fresh = !chained();
+    const sent = performance.now();
+    const reply = await fetch("/combo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid: raw }),
+      body: JSON.stringify(fresh ? { uid: raw, start: true } : { uid: raw }),
       credentials: "same-origin",
     })
       .then((res) => (res.ok ? res.json() : null))
-      .catch(() => null)
-      .then((reply) => {
-        // A reply that lands after a game took the reader belongs to the page before it.
-        if (turn !== handoff) return;
-        if (reply?.ok && (reply.same || (reply.combo > 1 && reply.combo <= asked))) return;
-        if (!reply?.ok || !(reply.combo >= 2 && reply.combo <= 3)) {
-          if (!secretOn) window.location.replace(`/t?uid=${raw}`);
-          return;
-        }
-        const count = document.querySelector("[data-tap-count]");
-        if (count) {
-          count.dataset.tapCount = String(reply.tapCount);
-          enhanceRollingCounter({ duration: 400 });
-        }
-        play(reply.combo, sent);
-      });
+      .catch(() => null);
+    settled = performance.now();
+    // A reply that lands after a game took the reader belongs to the page before it.
+    if (turn !== handoff) return;
+    if (reply?.ok && (reply.same || (reply.combo > 1 && reply.combo <= asked))) {
+      // A start the server took as the same tap as a step it already holds (another tab's) continues from that step.
+      if (fresh && reply.same) accepted = { n: reply.combo, at: sent };
+      return;
+    }
+    if (!reply?.ok || (fresh ? reply.combo !== 1 : !(reply.combo >= 2 && reply.combo <= 3))) {
+      if (!secretOn) {
+        away = true;
+        window.location.replace(`/t?uid=${raw}`);
+      }
+      return;
+    }
+    accepted = { n: reply.combo, at: sent };
+    const count = document.querySelector("[data-tap-count]");
+    if (count) {
+      count.dataset.tapCount = String(reply.tapCount);
+      enhanceRollingCounter({ duration: 400 });
+    }
+    if (fresh) {
+      care.hearts(reply.hearts);
+      if (reply.rewarded) paintLevel(reply);
+      if (reply.later) dock.dataset.comboLater = reply.later;
+      else delete dock.dataset.comboLater;
+    }
+    play(reply.combo, sent);
   }
 
   if (nfcButton && "NDEFReader" in window) {
@@ -3077,6 +3147,7 @@ const combo = (function tapCombo() {
     const n = Number(dock.dataset.combo) || 0;
     if (n < 1 || n > 3) return;
     const at = loaded || performance.now();
+    accepted = { n, at };
     window.requestAnimationFrame(() => play(n, at));
   }
 
@@ -3104,6 +3175,7 @@ const combo = (function tapCombo() {
   }
 
   function end() {
+    accepted = null;
     if (key) expire();
   }
 
@@ -3195,15 +3267,6 @@ const arcade = (function arcadeRoom() {
     };
   })();
 
-  function percent(r) {
-    return r.xpSpan > 0 ? Math.max(0, Math.min(100, Math.round((r.xpInto / r.xpSpan) * 100))) : 100;
-  }
-
-  function recordRow(label) {
-    const dt = Array.from(document.querySelectorAll('[data-sheet="record"] dt')).find((el) => el.textContent === label);
-    return dt?.nextElementSibling || null;
-  }
-
   function paintLeft(left) {
     dock.dataset.arcadeLeft = String(left);
     sheet.querySelectorAll(".g-pip").forEach((pip, i) => pip.classList.toggle("is-used", i < 3 - left));
@@ -3215,30 +3278,7 @@ const arcade = (function arcadeRoom() {
   function settle(r) {
     paintLeft(r.xpLeft);
     dock.dataset.giBest = String(r.best);
-    const left = r.xpSpan - r.xpInto;
-    const pin = document.querySelector(".level-pin");
-    if (pin) pin.textContent = `Lv. ${r.level}`;
-    const badge = document.querySelector(".level-badge");
-    if (badge) {
-      badge.textContent = String(r.level);
-      badge.setAttribute("aria-label", `Lv. ${r.level}`);
-    }
-    const fill = document.querySelector(".xp-fill");
-    if (fill) {
-      fill.dataset.xp = String(percent(r));
-      fill.style.width = `${percent(r)}%`;
-    }
-    document.querySelector(".xp-bar")?.setAttribute("aria-label", `다음 단계까지 ${left}`);
-    const level = recordRow("레벨");
-    if (level) level.textContent = `Lv. ${r.level}`;
-    const next = recordRow("다음 레벨까지");
-    if (next) next.textContent = `${left} XP`;
-    const line = document.querySelector(".level-line");
-    if (line) {
-      line.classList.remove("is-growing");
-      void line.offsetWidth;
-      line.classList.add("is-growing");
-    }
+    paintLevel(r);
   }
 
   function post(height) {
