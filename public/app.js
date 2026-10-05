@@ -1460,7 +1460,7 @@ if (themeSheet) {
   };
   const FONTS = { "8bit": '700 16px "Galmuri11"', milk: '16px "Cafe24Ssurround"', najeon: '700 16px "Gowun Batang"' };
   const ART = {
-    "8bit": (kind) => [`${kind}-px.png`, `${kind}-away-px.png`, "lock.svg", "cloud.svg", "heart-full.svg", "heart-half.svg", "heart-empty.svg", "feed.svg", "play.svg", "sleep.svg", `${kind}-closed-px.png`, `${kind}-happy-px.png`, "arcade.svg", "gift.svg", "record.svg", "close.svg", "star.svg", "lock-dim.svg"],
+    "8bit": (kind) => [`${kind}-px.png`, `${kind}-away-px.png`, "lock.svg", "cloud.svg", "heart-full.svg", "heart-half.svg", "heart-empty.svg", "feed.svg", "play.svg", "sleep.svg", `${kind}-closed-px.png`, `${kind}-happy-px.png`, "arcade.svg", "gift.svg", "farm.svg", "home.svg", "close.svg", "star.svg", "lock-dim.svg"],
     milk: () => ["strawberry.svg"],
     najeon: () => ["najeon-scene.svg"],
   };
@@ -1593,6 +1593,7 @@ if (themeSheet) {
     care?.restyle();
     combo?.restyle();
     arcade?.restyle();
+    farm?.restyle();
   }
 
   function flip(id, color) {
@@ -2492,7 +2493,10 @@ function recordRow(label) {
 function paintLevel(r) {
   const left = r.xpSpan - r.xpInto;
   const pin = document.querySelector(".level-pin");
-  if (pin) pin.textContent = `Lv. ${r.level}`;
+  if (pin) {
+    pin.textContent = `Lv. ${r.level}`;
+    pin.setAttribute("aria-label", `우리 기록, Lv. ${r.level}`);
+  }
   const badge = document.querySelector(".level-badge");
   if (badge) {
     badge.textContent = String(r.level);
@@ -3189,6 +3193,37 @@ const combo = (function tapCombo() {
   return { start, restyle, listen, sink, end };
 })();
 
+const VENDOR = ["/vendor/pixi-8.22.0.min.js", "/vendor/pixi-unsafe-eval-8.22.0.min.js", "/vendor/pixi-filters-6.1.5.js"];
+const vendorScripts = new Map();
+
+// Each vendor script loads once per page, whichever room asks first; a second copy would swap window.PIXI under a live stage.
+// A failed one is dropped so the next ask retries it.
+function vendorScript(src) {
+  if (!vendorScripts.has(src)) {
+    vendorScripts.set(src, new Promise((resolve, reject) => {
+      const el = document.createElement("script");
+      el.src = src;
+      el.addEventListener("load", resolve, { once: true });
+      el.addEventListener("error", () => {
+        el.remove();
+        vendorScripts.delete(src);
+        reject(new Error(src));
+      }, { once: true });
+      document.head.appendChild(el);
+    }));
+  }
+  return vendorScripts.get(src);
+}
+
+function loadPixi() {
+  return VENDOR.reduce((done, src) => done.then(() => vendorScript(src)), Promise.resolve());
+}
+
+function petBusy() {
+  return Boolean(careHold.busy || waking || document.documentElement.classList.contains("has-reveal")
+    || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump"));
+}
+
 /* 오락실: 기 모으기 on a WebGL stage, loaded when the room first opens; the first 3 plays a day give XP. */
 const arcade = (function arcadeRoom() {
   const dock = document.querySelector(".dock[data-care-uid]");
@@ -3206,10 +3241,8 @@ const arcade = (function arcadeRoom() {
   const kit = () => (world() === "8bit" ? "chip" : "soft");
   const BLURB = blurb.textContent;
   const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
-  const VENDOR = ["/vendor/pixi-8.22.0.min.js", "/vendor/pixi-unsafe-eval-8.22.0.min.js", "/vendor/pixi-filters-6.1.5.js"];
   const NFC_WAIT_MS = 15000;
   const SOUNDS = ["count", "go", "note-c5", "note-c6", "note-c7", "tier", "rocket", "ding", "chime", "chime-low", "fall", "result", "best", "wind-2", "wind-3", "wind-4"];
-  const scripts = new Map();
   let retry = 0;
   let posted = 0;
   let game = null;
@@ -3319,27 +3352,9 @@ const arcade = (function arcadeRoom() {
     onLaunch: (height) => post(height),
   };
 
-  // Each vendor script loads once per page; a failed one is dropped so the next open retries it.
-  function script(src) {
-    if (!scripts.has(src)) {
-      scripts.set(src, new Promise((resolve, reject) => {
-        const el = document.createElement("script");
-        el.src = src;
-        el.addEventListener("load", resolve, { once: true });
-        el.addEventListener("error", () => {
-          el.remove();
-          scripts.delete(src);
-          reject(new Error(src));
-        }, { once: true });
-        document.head.appendChild(el);
-      }));
-    }
-    return scripts.get(src);
-  }
-
   function prepare() {
     if (!game) {
-      const made = VENDOR.reduce((done, src) => done.then(() => script(src)), Promise.resolve())
+      const made = loadPixi()
         // A failed import stays failed for its URL, so a retry asks for a new one.
         .then(() => import(retry ? `/game/gimo.js?retry=${retry}` : "/game/gimo.js").catch((error) => {
           retry += 1;
@@ -3408,11 +3423,6 @@ const arcade = (function arcadeRoom() {
     if (out === "quit") care.fx.say("재밌었어요! 또 놀아요!");
   }
 
-  function petBusy() {
-    return Boolean(careHold.busy || waking || root.classList.contains("has-reveal")
-      || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump"));
-  }
-
   // A tap is held until the engine and the NFC reader are up; closing the sheet first drops it.
   function begin() {
     if (playing || held || careHold.asleep || petBusy()) return;
@@ -3466,6 +3476,376 @@ const arcade = (function arcadeRoom() {
     ready = null;
   });
   return { restyle };
+})();
+
+/* 텃밭: the pet's farm on a WebGL stage; one plushie tap harvests every ripe crop, a tap on a plot picks that one. */
+const farm = (function farmRoom() {
+  const dock = document.querySelector(".dock[data-care-uid]");
+  const button = dock?.querySelector("[data-farm]");
+  const win = document.querySelector("[data-window]");
+  if (!dock || !button || !care || !combo || !win) return null;
+  const root = document.documentElement;
+  const body = document.body;
+  const uid = dock.dataset.careUid;
+  const label = button.querySelector(".dock-label");
+  const cap = button.querySelector(".dock-cap");
+  const FARM_ICON = cap.innerHTML;
+  const HOME_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>';
+  const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
+  const ASLEEP = "쿨쿨 자는 중이에요. 인형을 톡 해서 깨워 주세요";
+  const COOKIE_MS = 60 * 1000;
+  const CALM_MS = 400;
+  const SOUNDS = {
+    care: ["press", "sparkle", "drop", "land", "bonk", "sip", "whoosh", "want", "whistle-up", "chomp-0", "chomp-1", "chomp-2", "gulp"],
+    game: ["ding", "result", "best", "note-c6"],
+    tap: ["unlock", "fanfare"],
+    farm: ["pop", "ripple", "honk", "patter", "splash", "twinkle", "fanfare"],
+  };
+  const world = () => root.dataset.theme || "classic";
+  const kit = () => (world() === "8bit" ? "chip" : "soft");
+  let game = null;
+  let ready = null;
+  let retry = 0;
+  let opening = false;
+  let isOpen = false;
+  let harvesting = false;
+  let acting = Promise.resolve();
+  let cookieTimer = 0;
+  let dotTimer = 0;
+  let view = null;
+  let visit = null;
+  let stale = false;
+  let fitTimer = 0;
+  const picking = new Set();
+  // The server clock: count from its last word, never from the phone's clock alone.
+  let clock = { server: Number(body.dataset.farmNow) || Date.now(), at: performance.getEntriesByType?.("navigation")[0]?.responseStart || performance.now() };
+  const serverNow = () => clock.server + (performance.now() - clock.at);
+
+  function buzz(pattern) {
+    if (navigator.userActivation?.hasBeenActive === false) return;
+    tryVibrate(pattern);
+  }
+
+  const api = {
+    win,
+    pet,
+    say: (text) => care.fx.say(text),
+    sfx: (name, { rate, gain } = {}) => playSfx(name, { rate, gain }),
+    buzz,
+    still: () => prefersReducedMotion(),
+    level(r) {
+      if (r.painted) return;
+      r.painted = true;
+      paintLevel(r);
+    },
+    hearts: (n) => care.hearts(n),
+    levelPop() {
+      if (prefersReducedMotion()) return;
+      for (const el of document.querySelectorAll(".level-badge, .level-pin")) {
+        el.animate([{ transform: "scale(1)" }, { transform: "scale(1.45)" }, { transform: "scale(1)" }], { duration: 480, easing: "cubic-bezier(.3,1.4,.5,1)" });
+      }
+    },
+  };
+
+  function prepare() {
+    if (!game) {
+      const made = loadPixi()
+        // A failed import stays failed for its URL, so a retry asks for a new one.
+        .then(() => import(retry ? `/game/farm.js?retry=${retry}` : "/game/farm.js").catch((error) => {
+          retry += 1;
+          throw error;
+        }))
+        .then((m) => m.createFarm(api));
+      game = made;
+      made.then((g) => {
+        if (game === made) ready = g;
+        else g.destroy();
+      }, () => {
+        if (game === made) game = null;
+      });
+    }
+    return game;
+  }
+
+  function preload() {
+    for (const [set, names] of Object.entries(SOUNDS)) for (const name of names) loadSfx(`${set}-${kit()}-${name}`);
+    if (kit() === "soft") loadSfx("game-soft-thump");
+    for (const mood of ["happy", "excited", "ask", "munch"]) loadSfx(cryName(mood, world()));
+  }
+
+  function post(act, plot) {
+    return fetch("/farm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(plot === undefined ? { uid, act } : { uid, act, plot }),
+      credentials: "same-origin",
+    })
+      .then((res) => res.json().catch(() => null).then((reply) => ({ status: res.status, reply: reply?.ok ? reply : null })))
+      .catch(() => ({ status: 0, reply: null }))
+      .then((out) => {
+        if (out.reply) {
+          view = out.reply.farm;
+          clock = { server: view.now, at: performance.now() };
+        }
+        return out;
+      });
+  }
+
+  // The page-load harvest finds this cookie on the next plushie tap; every /t clears it.
+  function setCookie(on) {
+    const secure = window.location.protocol === "https:" ? ";secure" : "";
+    document.cookie = on ? `farm_at=${uid};path=/;max-age=600;samesite=lax${secure}` : `farm_at=;path=/;max-age=0;samesite=lax${secure}`;
+  }
+
+  function paintButton(open) {
+    label.textContent = open ? "집으로" : "텃밭";
+    cap.innerHTML = open ? HOME_ICON : FARM_ICON;
+    if (open) button.classList.remove("has-new");
+  }
+
+  // Lights the dot when the next crop ripens on a page left open.
+  function scheduleDot(next) {
+    window.clearTimeout(dotTimer);
+    if (!next) return;
+    dotTimer = window.setTimeout(() => {
+      if (!isOpen) button.classList.add("has-new");
+    }, Math.max(0, next - serverNow()) + 500);
+  }
+
+  function paintDot() {
+    if (!view || isOpen) return;
+    const now = serverNow();
+    const grown = view.plots.filter((p) => p.crop && p.ripeAt);
+    button.classList.toggle("has-new", grown.some((p) => p.ripeAt <= now));
+    scheduleDot(grown.map((p) => p.ripeAt).filter((t) => t > now).sort((a, b) => a - b)[0]);
+  }
+
+  function flush(r) {
+    if (r.xpGain > 0) api.level(r);
+    care.hearts(r.hearts);
+  }
+
+  // A stage that throws mid-show closes the farm; the server already holds the truth, so the page paints it.
+  function broken(error, r) {
+    console.error(error);
+    if (r) flush(r);
+    close();
+    care.fx.say(FAILED);
+  }
+
+  function failed(status) {
+    if (status === 409) {
+      close();
+      care.fx.say(ASLEEP);
+      return;
+    }
+    care.fx.say(FAILED);
+    if (view && isOpen) ready?.redraw(view);
+  }
+
+  function onScreen(event) {
+    if (!ready || !isOpen || event.target.closest?.("button, .f-card")) return;
+    const box = win.getBoundingClientRect();
+    const hit = ready.plotAt(event.clientX - box.left, event.clientY - box.top);
+    if (!hit) return;
+    if (hit.kind === "ripe") pick(hit.plot);
+    else if (hit.kind === "growing" || hit.kind === "locked") ready.wiggle(hit.plot);
+  }
+
+  // Only ripe plots come here: a growing one just wiggles on the stage.
+  function pick(plot) {
+    if (picking.has(plot) || harvesting) return;
+    picking.add(plot);
+    acting = acting.then(() => post("pick", plot)).then(({ status, reply }) => {
+      picking.delete(plot);
+      if (!isOpen || !ready) return;
+      if (!reply) {
+        failed(status);
+        return;
+      }
+      ready.picked(reply);
+    }).catch((error) => broken(error));
+  }
+
+  function onPlushie() {
+    if (!isOpen || !ready || ready.busy || harvesting) return;
+    harvesting = true;
+    ready.knock();
+    acting = acting.then(() => post("harvest")).then(({ status, reply }) => {
+      harvesting = false;
+      if (!isOpen || !ready) return;
+      if (!reply) {
+        failed(status);
+        return;
+      }
+      ready.harvest(reply, { knocked: true }).then(() => flush(reply), (error) => broken(error, reply));
+    }).catch((error) => broken(error));
+  }
+
+  function enter(st, reply, how) {
+    isOpen = true;
+    talkHook?.close(true);
+    combo.end();
+    care.hold();
+    root.classList.add("f-on");
+    combo.sink(onPlushie);
+    setCookie(true);
+    window.clearInterval(cookieTimer);
+    cookieTimer = window.setInterval(() => setCookie(true), COOKIE_MS);
+    window.clearTimeout(dotTimer);
+    paintButton(true);
+    win.addEventListener("pointerdown", onScreen);
+    return st.enter(reply, how);
+  }
+
+  function close() {
+    if (!isOpen) return;
+    isOpen = false;
+    combo.sink(null);
+    setCookie(false);
+    window.clearInterval(cookieTimer);
+    win.removeEventListener("pointerdown", onScreen);
+    root.classList.remove("f-on");
+    paintButton(false);
+    playSfx(`care-${kit()}-press`);
+    buzz(10);
+    const st = ready;
+    (st ? st.leave() : Promise.resolve()).catch(() => {}).then(() => {
+      if (isOpen) return;
+      care.release();
+      if (stale) restyle();
+    });
+    paintDot();
+  }
+
+  function openFailed() {
+    opening = false;
+    button.classList.remove("is-loading");
+    care.fx.say(FAILED);
+  }
+
+  function openVisit(r) {
+    opening = true;
+    preload();
+    prepare().then((st) => {
+      opening = false;
+      if (isOpen || careHold.asleep || st !== ready) return undefined;
+      return enter(st, r, "visit").then(() => {
+        if (!r.picked.length || !isOpen || st !== ready) return undefined;
+        // A page opened by a plushie tap stays silent until it is touched, so the show waits for that touch.
+        return st.promptTouch().then(() => {
+          if (!isOpen || st !== ready) return undefined;
+          return st.harvest(r).then(() => flush(r));
+        });
+      }).catch((error) => broken(error, r));
+    }, () => {
+      // The visit already harvested, so its XP and hearts show even without the farm.
+      openFailed();
+      flush(r);
+    });
+  }
+
+  function open() {
+    if (isOpen) {
+      close();
+      return;
+    }
+    if (opening) return;
+    if (visit) {
+      const r = visit;
+      visit = null;
+      openVisit(r);
+      return;
+    }
+    if (careHold.asleep) {
+      care.fx.say(ASLEEP);
+      return;
+    }
+    if (petBusy() || sheetOpen) return;
+    playSfx(`care-${kit()}-press`);
+    buzz(10);
+    // scan() must run inside the click: that is what shows Chrome's permission prompt, and the reader is the path with sound.
+    if ("NDEFReader" in window) combo.listen();
+    preload();
+    opening = true;
+    button.classList.add("is-loading");
+    // The engine first: a farm made for an engine that never loaded would lose its first-open show.
+    prepare().then((st) => post("open").then(({ status, reply }) => {
+      opening = false;
+      button.classList.remove("is-loading");
+      if (!reply) {
+        care.fx.say(status === 409 ? ASLEEP : FAILED);
+        return;
+      }
+      if (isOpen || document.hidden || careHold.asleep || petBusy() || sheetOpen || st !== ready) return;
+      enter(st, reply, reply.created ? "tutorial" : "open").then(() => flush(reply), (error) => broken(error, reply));
+    }), openFailed);
+  }
+
+  // The visit's own celebration plays first; the farm takes the window once the screen has been quiet a moment.
+  function whenCalm(fn) {
+    let calm = 0;
+    (function check() {
+      calm = petBusy() || document.querySelector(".gift.is-glow") ? 0 : calm + 100;
+      if (calm >= CALM_MS) fn();
+      else window.setTimeout(check, 100);
+    })();
+  }
+
+  function start() {
+    if (body.dataset.farmNext) scheduleDot(Number(body.dataset.farmNext));
+    const raw = body.dataset.farmVisit;
+    if (!raw) return;
+    delete body.dataset.farmVisit;
+    try {
+      visit = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    prepare().catch(() => {});
+    whenCalm(() => {
+      if (!visit || isOpen || opening) return;
+      const r = visit;
+      visit = null;
+      openVisit(r);
+    });
+  }
+
+  // A world picked while the farm is open rebuilds it once it closes.
+  function restyle() {
+    stale = isOpen;
+    if (isOpen || !game) return;
+    const old = game;
+    game = null;
+    ready = null;
+    old.then((g) => g.destroy(), () => {});
+  }
+
+  button.addEventListener("click", open);
+  window.addEventListener("resize", () => {
+    window.clearTimeout(fitTimer);
+    fitTimer = window.setTimeout(function fit() {
+      if (!isOpen || !ready) return;
+      if (ready.busy) fitTimer = window.setTimeout(fit, 500);
+      else ready.refit().catch((error) => {
+        console.error(error);
+        close();
+      });
+    }, 300);
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    if (isOpen) setCookie(true);
+    else paintDot();
+  });
+  window.addEventListener("pagehide", () => {
+    window.clearInterval(cookieTimer);
+    window.clearTimeout(dotTimer);
+    ready?.destroy();
+    game = null;
+    ready = null;
+  });
+  return { start, restyle };
 })();
 
 /* Talk: a small mic at the speech line opens a slim bar; the pet answers in its own line. */
@@ -4333,7 +4713,7 @@ if (demoSheet && demoHold) {
 
   demoHold.addEventListener("pointerdown", (event) => {
     // The panel's replays would land on top of a game.
-    if (document.documentElement.classList.contains("g-on")) return;
+    if (document.documentElement.classList.contains("g-on") || document.documentElement.classList.contains("f-on")) return;
     holdAt = [event.clientX, event.clientY];
     window.clearTimeout(holdTimer);
     holdTimer = window.setTimeout(() => {
@@ -4391,11 +4771,13 @@ if (document.body.hasAttribute("data-wake")) {
     runCelebrate();
     armReveal();
     combo?.start();
+    farm?.start();
   });
 } else {
   runCelebrate();
   startDialog(() => care?.opened());
   combo?.start();
+  farm?.start();
   armReveal();
 }
 document.documentElement.setAttribute("data-app", "");

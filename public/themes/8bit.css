@@ -272,7 +272,8 @@ html[data-theme="8bit"] .dock-cap::before {
   image-rendering: pixelated;
 }
 html[data-theme="8bit"] [data-open="arcade"] .dock-cap::before { background-image: url("/themes/px/arcade.svg"); }
-html[data-theme="8bit"] [data-open="record"] .dock-cap::before { background-image: url("/themes/px/record.svg"); }
+html[data-theme="8bit"] [data-farm] .dock-cap::before { background-image: url("/themes/px/farm.svg"); }
+html.f-on[data-theme="8bit"] [data-farm] .dock-cap::before { background-image: url("/themes/px/home.svg"); }
 html[data-theme="8bit"] .dock-btn.has-new .dock-cap::after {
   top: -6px;
   right: -6px;

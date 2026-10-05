@@ -190,7 +190,7 @@ test("the owner home shows the 오락실 and its sheet", async (t) => {
   ctx.advance(MIN);
   for (let i = 0; i < 3; i++) await play(ctx, jar, { height: 4200 });
   const done = await visit(ctx, jar);
-  assert.doesNotMatch(done.html, /has-new/);
+  assert.doesNotMatch(done.html, /has-new" data-open="arcade"|g-gifts has-new/);
   assert.match(done.html, / data-arcade-left="0" data-gi-best="4200" /);
   assert.match(done.html, /<i class="g-pip is-used"><\/i><i class="g-pip is-used"><\/i><i class="g-pip is-used"><\/i><b>다 했어요!<\/b>/);
   const sheep = await ctx.request(`/t?uid=${A}`, { jar: { ...jar, pet_skip: A, mascot: "sheep" } });

@@ -9,6 +9,7 @@ import { PET, applyTap, currentMood, levelForXp, parseTapUid, seoulDayKey, xpPro
 import { applyCare, careWant, mealsNow, playsNow } from "./care.js";
 import { comboNext, comboTap } from "./combo.js";
 import { ARCADE, applyPlay, xpPlaysLeft } from "./arcade.js";
+import { FARM, addGiftSeeds, farmDot, farmView, giftSeeds, harvestFarm, nextRipeAt, openFarm, parseFarm, pickPlot, ripenFarm } from "./farm.js";
 import { devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
 import { mountTalk, purgeTalk, takeQuestion } from "./chat.js";
 
@@ -18,6 +19,8 @@ const skipAge = 2 * 60 * 1000;
 const validUid = (uid) => typeof uid === "string" && /^[0-9A-F]{14}$/.test(uid);
 const CARE_ACTS = ["feed", "play", "sleep"];
 const validHeight = (h) => Number.isInteger(h) && h % 10 === 0 && h >= 0 && h <= ARCADE.maxHeight;
+const FARM_ACTS = ["open", "pick", "harvest"];
+const validPlot = (p) => Number.isInteger(p) && p >= 0 && p < FARM.plots;
 const parseDemoUids = (raw) => String(raw || "").split(",").map((s) => s.trim().toUpperCase()).filter(validUid);
 
 const STALE_LINE = "폰을 진짜 저한테 톡 대 주세요!";
@@ -184,6 +187,11 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       out.newActiveDay ? (row.days_together ?? 1) + 1 : (row.days_together ?? 1),
       out.newActiveDay ? today : st.lastActiveDay, serial,
     );
+    const farm = out.gift ? parseFarm(row.farm) : null;
+    if (farm) {
+      const seeds = giftSeeds(out.gift.tier, levelForXp(out.xpAfter), rng);
+      db.prepare("UPDATE plushies SET farm = ? WHERE uid = ?").run(JSON.stringify(addGiftSeeds(farm, seeds)), serial);
+    }
     return { after, foundCount: found.length };
   }
 
@@ -194,6 +202,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     const leveledUp = Boolean(out.rewarded && out.leveledUp);
     const level = out.rewarded ? extra.after.level : xpNow.level;
     const care = petState(fresh, t);
+    const farmRow = extra.farmRow || fresh;
+    const farm = parseFarm(farmRow.farm);
     return {
       rewarded: out.rewarded,
       reason: out.reason || "",
@@ -210,7 +220,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       giftFound: out.rewarded ? extra.foundCount : parseFound(fresh.gift_found).length,
       giftTotal: GIFT_TOTAL,
       days: fresh.days_together ?? 1,
-      unrewardedLine: out.rewarded || extra.morning || extra.combo > 0 ? "" : (UNREWARDED_LINES[out.reason] || ""),
+      unrewardedLine: out.rewarded || extra.morning || extra.combo > 0 || extra.visit ? "" : (UNREWARDED_LINES[out.reason] || ""),
       // The key says 한 번 더 톡!, so a combo page saves the line for after the key runs out.
       comboLaterLine: out.rewarded || extra.morning || !(extra.combo > 0) ? "" : (UNREWARDED_LINES[out.reason] || ""),
       lonelyLine: !out.rewarded && moodAfter <= PET.moodLonelyAt ? LONELY_LINE : "",
@@ -222,11 +232,44 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       combo: extra.combo || 0,
       arcadeLeft: xpPlaysLeft(care, t),
       giBest: care.giBest,
+      farm: { dot: farmDot(farm, levelForXp(farmRow.xp ?? 0), t), next: farm ? nextRipeAt(farm, t) : null, now: t, visit: extra.visit || null },
+    };
+  }
+
+  // One farm action on a named, awake pet; null when there is no farm to pick from.
+  function tendFarm(uid, row, act, plot, t) {
+    const farm = parseFarm(row.farm);
+    if (!farm && act !== "open") return null;
+    const xp = row.xp ?? 0;
+    const out = act === "open" ? openFarm(farm, xp, t) : act === "pick" ? pickPlot(farm, xp, t, plot) : harvestFarm(farm, xp, t);
+    db.prepare("UPDATE plushies SET farm = ?, xp = ? WHERE uid = ?").run(JSON.stringify(out.farm), out.xpAfter, uid);
+    if (out.picked.some((p) => p.crop === "gold")) {
+      db.prepare("UPDATE plushies SET mood_value = ?, mood_updated_at = ? WHERE uid = ?").run(PET.moodMax, t, uid);
+    }
+    const after = xpProgress(out.xpAfter);
+    return {
+      ok: true,
+      act,
+      created: out.created,
+      picked: out.picked,
+      planted: out.planted,
+      opened: out.opened,
+      seeds: out.seeds,
+      xpGain: out.xpGain,
+      level: after.level,
+      leveledUp: levelForXp(out.xpAfter) > levelForXp(xp),
+      xpInto: after.into,
+      xpSpan: after.span,
+      hearts: heartHalves(currentMood(petState(getRow(uid), t), t)),
+      farm: farmView(out.farm, after.level, t),
     };
   }
 
   app.get("/health", (req, res) => res.type("text").send("ok"));
   app.get("/t", (req, res) => {
+    // The open farm page sets farm_at; any tap spends it.
+    const farmAt = req.cookies.farm_at;
+    if (farmAt !== undefined) res.clearCookie("farm_at", { sameSite: "lax", secure: production, path: "/" });
     const parsed = parseTapUid(req.query.uid);
     if (!parsed) return invalidUid(req, res);
     const serial = parsed.serial;
@@ -291,9 +334,10 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         else if (!visual && mile) visual = "milestone";
         else if (!visual && out.rewarded && out.gift && out.gift.tier === "rare") visual = "rare";
         else if (!visual && out.rewarded && out.gift && out.gift.tier === "special") visual = "special";
-        // A celebration or a morning takes the whole visit; a stale reload is not a tap.
+        const visit = farmAt === serial && !morning && parseFarm(fresh.farm) ? tendFarm(serial, fresh, "harvest", null, t) : null;
+        // A celebration, a morning or a farm visit takes the whole visit; a stale reload is not a tap.
         let combo = 0;
-        if (morning || visual) {
+        if (morning || visual || visit) {
           db.prepare("UPDATE plushies SET combo_count = 0, combo_at = NULL WHERE uid = ?").run(serial);
         } else if (out.reason !== "stale") {
           // The page saw this chain's key run out, so the tap starts over though the server's window has 2 s left.
@@ -304,8 +348,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           combo = c.combo;
         }
         // A follow-up waits for a visit with nothing to celebrate.
-        const ask = talks(serial) && !visual && !morning && combo <= 1 ? takeQuestion(db, serial, today) : "";
-        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo }), demo, found: parseFound(fresh.gift_found), theme, talk: talks(serial), ask }) };
+        const ask = talks(serial) && !visual && !morning && !visit && combo <= 1 ? takeQuestion(db, serial, today) : "";
+        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo, visit, farmRow: visit ? getRow(serial) : fresh }), demo, found: parseFound(fresh.gift_found), theme, talk: talks(serial), ask }) };
       }
       if (state === "STRANGER") return { html: strangerPage(row, "", { demo, theme }) };
       throw new Error("Invalid binding result");
@@ -453,6 +497,19 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     res.json(reply);
   });
 
+  app.post("/farm", (req, res) => {
+    const { uid, act, plot } = req.body || {};
+    if (!validUid(uid) || !FARM_ACTS.includes(act) || (act === "pick" && !validPlot(plot))) return res.status(400).json({ ok: false });
+    const reply = db.transaction(() => {
+      const row = getRow(uid);
+      if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row.pet_name) return 403;
+      if (row.slept_at !== null) return 409;
+      return tendFarm(uid, row, act, plot, now()) || 409;
+    })();
+    if (typeof reply === "number") return res.status(reply).json({ ok: false });
+    res.json(reply);
+  });
+
   app.post("/claim", (req, res) => {
     const { uid, code } = req.body || {};
     if (!validUid(uid)) return invalidUid(req, res);
@@ -541,6 +598,14 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         return res.status(400).send(page(null, "<p>잘 알아듣지 못했어요. 다시 한 번 해보세요.</p>", { theme: req.theme }));
       }
       res.redirect(303, "/dev");
+    });
+    app.post("/dev/farm-ripen", (req, res) => {
+      const uid = req.body?.uid;
+      if (!validUid(uid)) return res.status(400).json({ ok: false });
+      const farm = parseFarm(getRow(uid)?.farm);
+      if (!farm) return res.status(409).json({ ok: false });
+      db.prepare("UPDATE plushies SET farm = ? WHERE uid = ?").run(JSON.stringify(ripenFarm(farm, now())), uid);
+      res.json({ ok: true });
     });
     app.post("/dev/reset", (req, res) => {
       db.prepare("DELETE FROM plushies").run();

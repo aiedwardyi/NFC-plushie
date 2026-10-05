@@ -439,6 +439,20 @@ test("a follow-up is never taken by a celebration, a morning, a combo stage or a
   assert.equal(introOf((await ctx.request(`/t?uid=${A}`, { jar })).html), "시험 잘 봤어요?");
 });
 
+test("a farm visit leaves a follow-up for the next quiet visit", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  assert.equal((await ctx.request("/farm", { jar, body: { uid: A, act: "open" } })).status, 200);
+  plan(ctx, A, "2026-05-01", "시험 잘 봤어요?");
+  ctx.advance(61 * SEC);
+  const visit = await ctx.request(`/t?uid=${A}`, { jar: { ...jar, farm_at: A } });
+  assert.match(visit.html, /data-farm-visit="/);
+  assert.doesNotMatch(visit.html, /시험 잘 봤어요/);
+  assert.equal(ctx.db.prepare("SELECT asked_on FROM talk_plans").get().asked_on, null);
+  ctx.advance(13 * SEC);
+  assert.equal(introOf((await ctx.request(`/t?uid=${A}`, { jar })).html), "시험 잘 봤어요?");
+});
+
 test("a follow-up escapes and waits for talk to be on", async (t) => {
   const ctx = await setup(t, { uids: [C] });
   const jar = await meet(ctx, A, "Mochi");
