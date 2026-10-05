@@ -10,6 +10,7 @@ import { applyCare, careWant, mealsNow, playsNow } from "./care.js";
 import { comboNext, comboTap } from "./combo.js";
 import { ARCADE, applyPlay, xpPlaysLeft } from "./arcade.js";
 import { devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
+import { mountTalk, purgeTalk, takeQuestion } from "./chat.js";
 
 const cookieAge = 400 * 24 * 60 * 60 * 1000;
 const cooldown = 15 * 60 * 1000;
@@ -78,7 +79,7 @@ function petState(row, t) {
   };
 }
 
-export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now, rng = Math.random, demoUids = parseDemoUids(process.env.DEMO_UIDS) }) {
+export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now, rng = Math.random, demoUids = parseDemoUids(process.env.DEMO_UIDS), talk = null }) {
   const app = express();
   app.disable("x-powered-by");
   app.use((req, res, next) => {
@@ -160,6 +161,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   const clearSkip = (res) => res.clearCookie("pet_skip", {
     httpOnly: true, sameSite: "lax", secure: production, path: "/",
   });
+  const talks = (uid) => Boolean(talk?.uids.includes(uid));
   const invalidUid = (req, res) => res.status(400).send(page(null, "<p>어? 링크가 이상해요. 인형에 폰을 다시 톡 대 주세요.</p>", { theme: req.theme }));
 
   function writePetReward(serial, st, out, row, t, today) {
@@ -241,6 +243,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         const existing = req.cookies.owner_token;
         const token = typeof existing === "string" && existing ? existing : ownerToken();
         const code = recoveryCode();
+        purgeTalk(db, serial);
         db.prepare(`INSERT INTO plushies (uid, owner_token_hash, recovery_code_hash, tap_count, created_at, last_tap_at,
           mood_value, mood_updated_at, xp, reward_day_count, gift_seen, gift_found, days_together, last_active_day, last_counter)
           VALUES (?, ?, ?, 1, ?, ?, 100, ?, 0, 0, ?, ?, 1, ?, ?)`)
@@ -266,7 +269,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           raiseMirror();
           const skipped = getRow(serial);
           const pet = petView(skipped, petState(skipped, t), { rewarded: false }, t, { morning });
-          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found), theme }) };
+          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found), theme, talk: talks(serial) }) };
         }
         if (!afterTap.pet_name) {
           raiseMirror();
@@ -300,7 +303,9 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           if (!c.same) db.prepare("UPDATE plushies SET combo_count = ?, combo_at = ? WHERE uid = ?").run(c.comboCount, c.comboAt, serial);
           combo = c.combo;
         }
-        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo }), demo, found: parseFound(fresh.gift_found), theme }) };
+        // A follow-up waits for a visit with nothing to celebrate.
+        const ask = talks(serial) && !visual && !morning && combo <= 1 ? takeQuestion(db, serial, today) : "";
+        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo }), demo, found: parseFound(fresh.gift_found), theme, talk: talks(serial), ask }) };
       }
       if (state === "STRANGER") return { html: strangerPage(row, "", { demo, theme }) };
       throw new Error("Invalid binding result");
@@ -486,6 +491,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const uid = req.body?.uid;
       if (!demoUids.includes(uid)) return res.status(403).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>", { theme: req.theme }));
       db.prepare("DELETE FROM plushies WHERE uid = ?").run(uid);
+      purgeTalk(db, uid);
       clearCelebrate(res);
       clearSkip(res);
       res.redirect(303, `/t?uid=${uid}`);
@@ -538,12 +544,14 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     });
     app.post("/dev/reset", (req, res) => {
       db.prepare("DELETE FROM plushies").run();
+      purgeTalk(db);
       res.clearCookie("owner_token", { path: "/", httpOnly: true, sameSite: "lax" });
       clearCelebrate(res);
       clearSkip(res);
       res.redirect(303, "/dev");
     });
   }
+  if (talk) mountTalk(app, { db, talk, now, getRow, owns: (row, req) => decisions.canRename(row, req.cookies.owner_token || null, hash) });
   app.use((req, res) => res.status(404).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>", { theme: req.theme })));
   app.use((error, req, res, next) => {
     const status = error.status >= 400 && error.status < 500 ? error.status : 500;

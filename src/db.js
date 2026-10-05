@@ -68,6 +68,44 @@ export function openDatabase(dataDir = process.env.DATA_DIR || "./data") {
       attempts INTEGER NOT NULL,
       window_start INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS talk_turns (
+      id INTEGER PRIMARY KEY,
+      uid TEXT NOT NULL,
+      said TEXT NOT NULL,
+      reply TEXT NOT NULL,
+      at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS talk_notes (
+      id INTEGER PRIMARY KEY,
+      uid TEXT NOT NULL,
+      fact TEXT NOT NULL,
+      at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS talk_plans (
+      id INTEGER PRIMARY KEY,
+      uid TEXT NOT NULL,
+      ask_on TEXT NOT NULL,
+      question TEXT NOT NULL,
+      at INTEGER NOT NULL,
+      asked_on TEXT NULL
+    );
+    CREATE TABLE IF NOT EXISTS talk_log (
+      id INTEGER PRIMARY KEY,
+      uid TEXT NOT NULL,
+      at INTEGER NOT NULL,
+      day TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      model TEXT NOT NULL,
+      status TEXT NOT NULL,
+      ms INTEGER NULL,
+      tokens_in INTEGER NULL,
+      tokens_out INTEGER NULL,
+      searches INTEGER NULL,
+      cost REAL NOT NULL,
+      said TEXT NULL,
+      reply TEXT NULL
+    );
+    CREATE INDEX IF NOT EXISTS talk_log_day ON talk_log(day, uid);
   `);
   db.pragma("foreign_keys = ON");
   migratePetColumns(db);

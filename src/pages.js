@@ -29,6 +29,8 @@ const ICONS = {
   close: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>`,
   copy: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="2.2"/><path d="M15.5 8.5V6.7a2.2 2.2 0 0 0-2.2-2.2H6.7a2.2 2.2 0 0 0-2.2 2.2v6.6a2.2 2.2 0 0 0 2.2 2.2h1.8"/></svg>`,
   arcade: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.6 8.5h8.8a4.6 4.6 0 0 1 4.4 5.9l-.8 2.9a2.3 2.3 0 0 1-3.9 1L14.4 16H9.6l-1.7 2.3a2.3 2.3 0 0 1-3.9-1l-.8-2.9a4.6 4.6 0 0 1 4.4-5.9z"/><path d="M8 10.9v3.4M6.3 12.6h3.4M15.4 11.6h.01M17.4 13.6h.01"/></svg>`,
+  mic: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5"/></svg>`,
+  send: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19.5V5M6 10.5 12 4.5l6 6"/></svg>`,
   lock: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
 };
 
@@ -382,16 +384,29 @@ function keyCard(code) {
   </aside>`;
 }
 
-function homeExtras(row, pet, found, mascot) {
+function talkBar(name) {
+  const label = `${escapeHtml(name)}에게 말 걸기`;
+  return `<form class="talk-bar" data-talk-bar hidden>
+    <p class="talk-hint" data-talk-hint aria-live="polite" hidden></p>
+    <div class="talk-row">
+      <input class="talk-input" data-talk-input type="text" enterkeyhint="send" autocomplete="off" placeholder="${label}" aria-label="${label}">
+      <button type="button" class="talk-send" data-talk-send aria-label="보내기">${ICONS.send}</button>
+      <button type="button" class="talk-voice" data-talk-voice aria-label="목소리로 말하기" aria-pressed="false">${ICONS.mic}</button>
+    </div>
+  </form>`;
+}
+
+function homeExtras(row, pet, found, mascot, talk) {
   return {
     dock: dockHtml({ gift: Boolean(pet?.gift), want: pet?.want, meals: pet?.meals, plays: pet?.plays, uid: row.uid, combo: pet?.combo, later: pet?.comboLaterLine, arcadeLeft: pet?.arcadeLeft, giBest: pet?.giBest }),
     sheets: arcadeSheet(pet, found, mascot)
       + sheetHtml("gifts", "선물함", giftCollection(found, pet?.gift || null))
-      + sheetHtml("record", "우리 기록", recordSheet(row, pet)),
+      + sheetHtml("record", "우리 기록", recordSheet(row, pet))
+      + (talk ? talkBar(row.pet_name) : ""),
   };
 }
 
-export function petPage(row, code = null, { celebrate = "", pet = null, mascot = "horse", demo = "", found = [], theme = "classic" } = {}) {
+export function petPage(row, code = null, { celebrate = "", pet = null, mascot = "horse", demo = "", found = [], theme = "classic", talk = false, ask = "" } = {}) {
   const firstMeet = celebrate === "claim" || celebrate === "named";
   let greeting = row.pet_name
     ? (firstMeet
@@ -399,6 +414,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
       : `다시 만나서 반가워요, ${escapeHtml(row.pet_name)}!`)
     : "안녕하세요! 찾아와 줘서 정말 기뻐요.";
   if (pet?.morning) greeting = "쿨쿨… 쿨쿨…";
+  else if (ask) greeting = escapeHtml(ask);
   const recovery = code ? keyCard(code) : "";
   const prompt = row.pet_name ? "" : `<form action="/name" method="post" class="name-form" data-met="${metDay(row)}">
     <input type="hidden" name="uid" value="${escapeHtml(row.uid)}">
@@ -419,8 +435,10 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
   const stats = returning && pet ? petStats(pet) : "";
   let kind = celebrate;
   if (!kind && mile) kind = "milestone";
-  const dialog = `<p class="intro"${pet ? petAttr : ""}>${greeting}</p>${moments}${giftHtml}`;
-  const extras = row.pet_name ? homeExtras(row, pet, found, mascot) : { dock: "", sheets: "" };
+  const talking = talk && Boolean(row.pet_name);
+  const mic = talking ? `<button type="button" class="talk-mic" data-talk-mic aria-label="말 걸기" aria-expanded="false" hidden>${ICONS.mic}</button>` : "";
+  const dialog = `<p class="intro"${pet ? petAttr : ""}>${greeting}</p>${moments}${giftHtml}${mic}`;
+  const extras = row.pet_name ? homeExtras(row, pet, found, mascot, talking) : { dock: "", sheets: "" };
   return page(
     row,
     `${recovery}${prompt}`,
