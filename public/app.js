@@ -4358,6 +4358,7 @@ const reveal = (function legendaryReveal() {
   let nameEl = null;
   let nameEdge = null;
   let nameGold = null;
+  let nameGlow = null;
   let dateEl = null;
   let skip = null;
   let kind = "";
@@ -4390,7 +4391,10 @@ const reveal = (function legendaryReveal() {
     nameEdge.setAttribute("aria-hidden", "true");
     nameGold = document.createElement("span");
     nameGold.className = "reveal-name-gold";
-    nameEl.append(nameEdge, nameGold);
+    nameGlow = document.createElement("span");
+    nameGlow.className = "reveal-name-glow";
+    nameGlow.setAttribute("aria-hidden", "true");
+    nameEl.append(nameGlow, nameEdge, nameGold);
     owner.appendChild(nameEl);
     dateEl = document.createElement("div");
     dateEl.className = "reveal-date";
@@ -4430,9 +4434,10 @@ const reveal = (function legendaryReveal() {
     load();
   }
 
+  // The overlay's own box: iOS shrinks innerHeight under the keyboard without a resize event.
   function layout() {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const vw = overlay.clientWidth || window.innerWidth;
+    const vh = overlay.clientHeight || window.innerHeight;
     const s = Math.min(Math.max(vw / W, vh / H), vw / (SAFE.right - SAFE.left), vh / (SAFE.bottom - SAFE.top));
     const place = (view, size, center) => (size > view
       ? Math.min(0, Math.max(view - size, view / 2 - center * s))
@@ -4460,6 +4465,7 @@ const reveal = (function legendaryReveal() {
   }
 
   function setName(text) {
+    nameGlow.textContent = text;
     nameEdge.textContent = text;
     nameGold.textContent = text;
   }
@@ -4491,7 +4497,8 @@ const reveal = (function legendaryReveal() {
       const glow = hitAt(f, NAME_AT, 4);
       const scale = lerp(1.9, 1, inQuad(drop));
       nameGold.style.backgroundImage = `linear-gradient(105deg, transparent ${sweep - 12}%, rgba(255,255,255,0.95) ${sweep}%, transparent ${sweep + 12}%), ${GOLD}`;
-      nameEl.style.filter = `blur(${lerp(14, 0, inQuad(drop))}px) drop-shadow(0 10px 0 #070A16) drop-shadow(0 0 ${34 + 50 * glow}px rgba(255,206,110,${0.4 + 0.5 * glow}))`;
+      // Opacity only: a per-frame filter re-rasterizes the whole name at full size every frame.
+      nameGlow.style.opacity = String(glow);
       nameEl.style.transform = `scale(${scale * (1 + 0.1 * land)}, ${scale * (1 - 0.15 * land)})`;
       nameEl.style.opacity = String(Math.min(1, drop * 2.5));
     }
@@ -4576,6 +4583,7 @@ const reveal = (function legendaryReveal() {
       if (video.cancelVideoFrameCallback) video.cancelVideoFrameCallback(frame);
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", layout);
+      window.visualViewport?.removeEventListener("resize", layout);
       document.removeEventListener("fullscreenchange", layout);
       if (fired.size && navigator.vibrate) tryVibrate(0);
     }
@@ -4627,6 +4635,7 @@ const reveal = (function legendaryReveal() {
     run = self;
 
     window.addEventListener("resize", layout);
+    window.visualViewport?.addEventListener("resize", layout);
     document.addEventListener("fullscreenchange", layout);
     document.fonts?.load(`900 ${NAME_PX}px "Pretendard Variable"`, name).then(() => {
       if (!done) fitName();
