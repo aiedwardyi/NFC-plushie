@@ -1,0 +1,92 @@
+{
+  "places": {
+    "암사역": [
+      { "address_name": "서울 강동구 암사동 501", "category_group_code": "SW8", "category_group_name": "지하철역", "category_name": "교통,수송 > 지하철,전철 > 수도권8호선", "id": "21160777", "place_name": "암사역 8호선", "road_address_name": "서울 강동구 올림픽로 지하 776", "x": "127.12754072968517", "y": "37.55015818096496" },
+      { "address_name": "서울 강동구 암사동 502-19", "category_group_code": "", "category_group_name": "", "category_name": "가정,생활 > 생활용품점 > 다이소", "id": "27520978", "place_name": "다이소 암사역점", "road_address_name": "서울 강동구 올림픽로 779", "x": "127.12745335537048", "y": "37.55068355704697" },
+      { "address_name": "서울 강동구 암사동 378", "category_group_code": "SW8", "category_group_name": "지하철역", "category_name": "교통,수송 > 지하철,전철 > 수도권8호선", "id": "1293907761", "place_name": "암사역사공원역 8호선", "road_address_name": "서울 강동구 아리수로27길 2", "x": "127.137563111896", "y": "37.5571837185175" }
+    ],
+    "강남역": [
+      { "address_name": "서울 강남구 역삼동 858", "category_group_code": "SW8", "category_group_name": "지하철역", "category_name": "교통,수송 > 지하철,전철 > 수도권2호선", "id": "21160803", "place_name": "강남역 2호선", "road_address_name": "서울 강남구 강남대로 지하 396", "x": "127.02800140627488", "y": "37.49808633653005" },
+      { "address_name": "서울 강남구 역삼동 858", "category_group_code": "SW8", "category_group_name": "지하철역", "category_name": "교통,수송 > 지하철,전철 > 신분당선", "id": "18381853", "place_name": "강남역 신분당선", "road_address_name": "서울 강남구 강남대로 지하 396", "x": "127.028185245594", "y": "37.4967771303817" },
+      { "address_name": "서울 강남구 역삼동 620-9", "category_group_code": "CE7", "category_group_name": "카페", "category_name": "가정,생활 > 여가시설 > 만화방 > 만화카페 > 놀숲", "id": "798713718", "place_name": "놀숲 강남역점", "road_address_name": "서울 강남구 강남대로98길 17", "x": "127.02796403633766", "y": "37.50098127819602" }
+    ]
+  },
+  "amsaToGangnam": {
+    "status": "OK",
+    "properties": { "total": 15, "bus": 5, "subway": 5, "busAndSubway": 5, "landingURL": "https://map.kakao.com/link/by/traffic/%EC%B6%9C%EB%B0%9C,37.550158,127.127541/%EB%8F%84%EC%B0%A9,37.497942,127.027610" },
+    "routes": [
+      {
+        "properties": { "type": "SUBWAY", "totalDistance": 11551, "totalTime": 1518, "transfers": 1, "fare": { "value": 1650 } },
+        "steps": [
+          { "properties": { "guidance": "8호선 (암사 > 잠실(송파구청))", "type": "SUBWAY", "distance": 4600, "time": 490, "stops": [{ "name": "암사" }, { "name": "천호(풍납토성)" }, { "name": "강동구청" }, { "name": "몽촌토성(평화의문)" }, { "name": "잠실(송파구청)" }], "vehicles": [{ "name": "8호선", "type": "일반" }] } },
+          { "properties": { "guidance": "잠실(송파구청)잠실역 환승", "type": "WALKING", "distance": 211, "time": 212, "stops": [{ "name": "잠실(송파구청)" }, { "name": "잠실(송파구청)" }] } },
+          { "properties": { "guidance": "2호선 (잠실(송파구청) > 강남)", "type": "SUBWAY", "distance": 6700, "time": 720, "stops": [{ "name": "잠실(송파구청)" }, { "name": "잠실새내" }, { "name": "종합운동장" }, { "name": "삼성(무역센터)" }, { "name": "선릉" }, { "name": "역삼" }, { "name": "강남" }], "vehicles": [{ "name": "2호선", "type": "일반" }] } }
+        ]
+      },
+      {
+        "properties": { "type": "SUBWAY", "totalDistance": 14792, "totalTime": 1795, "transfers": 2, "fare": { "value": 2350 } },
+        "steps": [
+          { "properties": { "guidance": "8호선 (암사 > 석촌)", "type": "SUBWAY", "distance": 5800, "time": 640, "stops": [{ "name": "암사" }, { "name": "천호(풍납토성)" }, { "name": "강동구청" }, { "name": "몽촌토성(평화의문)" }, { "name": "잠실(송파구청)" }, { "name": "석촌" }], "vehicles": [{ "name": "8호선", "type": "일반" }] } },
+          { "properties": { "guidance": "석촌석촌역 환승", "type": "WALKING", "distance": 51, "time": 109, "stops": [{ "name": "석촌" }, { "name": "석촌" }] } },
+          { "properties": { "guidance": "9호선 (석촌 > 신논현)", "type": "SUBWAY", "distance": 7900, "time": 725, "stops": [{ "name": "석촌" }, { "name": "종합운동장" }, { "name": "봉은사" }, { "name": "선정릉" }, { "name": "신논현" }], "vehicles": [{ "name": "9호선", "type": "급행" }] } },
+          { "properties": { "guidance": "신논현신논현역 환승", "type": "WALKING", "distance": 141, "time": 218, "stops": [{ "name": "신논현" }, { "name": "신논현" }] } },
+          { "properties": { "guidance": "신분당선 (신논현 > 강남)", "type": "SUBWAY", "distance": 900, "time": 103, "stops": [{ "name": "신논현" }, { "name": "강남" }], "vehicles": [{ "name": "신분당선", "type": "일반" }] } }
+        ]
+      }
+    ]
+  },
+  "gangnamToGyodae": {
+    "status": "OK",
+    "properties": { "total": 8, "bus": 7, "subway": 1, "busAndSubway": 0, "landingURL": "https://map.kakao.com/link/by/traffic/%EA%B0%95%EB%82%A8%EC%97%AD,37.498086,127.028001/%EA%B5%90%EB%8C%80%EC%97%AD,37.493470,127.014060" },
+    "routes": [
+      {
+        "properties": { "type": "SUBWAY", "totalDistance": 1314, "totalTime": 310, "transfers": 0, "fare": { "value": 1550 } },
+        "steps": [
+          { "properties": { "guidance": "2호선 (강남 > 교대(법원.검찰청))", "type": "SUBWAY", "distance": 1200, "time": 120, "stops": [{ "name": "강남" }, { "name": "교대(법원.검찰청)" }], "vehicles": [{ "name": "2호선", "type": "일반" }] } }
+        ]
+      },
+      {
+        "properties": { "type": "BUS", "totalDistance": 1460, "totalTime": 674, "transfers": 0, "fare": { "min": 1500, "max": 2500 } },
+        "steps": [
+          { "properties": { "guidance": "간선 740외 4대 (강남역9번출구 > 지하철2호선교대역4번출구)", "type": "BUS", "distance": 1036, "time": 250, "stops": [{ "name": "강남역9번출구" }, { "name": "서초동진흥아파트" }, { "name": "서초동유원아파트" }, { "name": "지하철2호선교대역4번출구" }], "vehicles": [{ "name": "740", "type": "간선" }, { "name": "040", "type": "간선" }, { "name": "N61(심야)", "type": "간선" }, { "name": "N75(심야)", "type": "간선" }, { "name": "N64(심야)", "type": "간선" }] } }
+        ]
+      },
+      {
+        "properties": { "type": "BUS", "totalDistance": 1464, "totalTime": 691, "transfers": 0, "fare": { "value": 1200 } },
+        "steps": [
+          { "properties": { "guidance": "마을 서초10 (강남역9번출구 > 2호선교대역7번출구)", "type": "BUS", "distance": 1152, "time": 370, "stops": [{ "name": "강남역9번출구" }, { "name": "진흥아파트" }, { "name": "유원아파트" }, { "name": "지하철2호선교대역4번출구" }, { "name": "2호선교대역7번출구" }], "vehicles": [{ "name": "서초10", "type": "마을" }] } }
+        ]
+      },
+      {
+        "properties": { "type": "BUS", "totalDistance": 1465, "totalTime": 919, "transfers": 0, "fare": { "min": 1500, "max": 2500 } },
+        "steps": [
+          { "properties": { "guidance": "간선 740외 5대 (서초동진흥아파트 > 지하철2호선교대역4번출구)", "type": "BUS", "distance": 673, "time": 146, "stops": [{ "name": "서초동진흥아파트" }, { "name": "서초동유원아파트" }, { "name": "지하철2호선교대역4번출구" }], "vehicles": [{ "name": "740", "type": "간선" }, { "name": "040", "type": "간선" }, { "name": "0411", "type": "지선" }, { "name": "N61(심야)", "type": "간선" }, { "name": "N75(심야)", "type": "간선" }, { "name": "N64(심야)", "type": "간선" }] } }
+        ]
+      },
+      {
+        "properties": { "type": "BUS", "totalDistance": 2682, "totalTime": 1314, "transfers": 0, "fare": { "value": 1500 } },
+        "steps": [
+          { "properties": { "guidance": "간선 144 (수협서초지점 > 교대역13번출구)", "type": "BUS", "distance": 1896, "time": 614, "stops": [{ "name": "수협서초지점" }, { "name": "서초청소년도서관" }, { "name": "서초동신동아아파트" }, { "name": "창신교회앞.서리풀노리학교" }, { "name": "서울교대정문앞" }, { "name": "교대역13번출구" }], "vehicles": [{ "name": "144", "type": "간선" }] } }
+        ]
+      },
+      {
+        "properties": { "type": "BUS", "totalDistance": 3369, "totalTime": 1402, "transfers": 0, "fare": { "value": 1200 } },
+        "steps": [
+          { "properties": { "guidance": "마을 서초03 (강남역.삼성전자 > 교대역13번출구)", "type": "BUS", "distance": 2995, "time": 1062, "stops": [{ "name": "강남역.삼성전자" }, { "name": "우성아파트사거리" }, { "name": "현대렉시온오피스텔.파이낸셜뉴스" }, { "name": "뱅뱅사거리" }, { "name": "래미안리더스원아파트" }, { "name": "서초동신동아아파트" }, { "name": "창신교회앞.서리풀노리학교" }, { "name": "서초1동주민센터.서초현대아파트" }, { "name": "서초구립중앙노인종합복지관" }, { "name": "교대역13번출구" }], "vehicles": [{ "name": "서초03", "type": "마을" }] } }
+        ]
+      },
+      {
+        "properties": { "type": "BUS", "totalDistance": 2635, "totalTime": 1614, "transfers": 0, "fare": { "value": 1500 } },
+        "steps": [
+          { "properties": { "guidance": "간선 144외 1대 (서초청소년도서관 > 서울교대정문앞)", "type": "BUS", "distance": 1199, "time": 349, "stops": [{ "name": "서초청소년도서관" }, { "name": "서초동신동아아파트" }, { "name": "창신교회앞.서리풀노리학교" }, { "name": "서울교대정문앞" }], "vehicles": [{ "name": "144", "type": "간선" }, { "name": "350", "type": "간선" }] } }
+        ]
+      },
+      {
+        "properties": { "type": "BUS", "totalDistance": 1784, "totalTime": 1267, "transfers": 0, "fare": { "value": 1200 } },
+        "steps": [
+          { "properties": { "guidance": "마을 서초02 (서초래미안아파트남문 > 2호선교대역7번출구)", "type": "BUS", "distance": 765, "time": 247, "stops": [{ "name": "서초래미안아파트남문" }, { "name": "서초롯데캐슬프레지던트아파트" }, { "name": "유원아파트" }, { "name": "지하철2호선교대역4번출구" }, { "name": "2호선교대역7번출구" }], "vehicles": [{ "name": "서초02", "type": "마을" }] } }
+        ]
+      }
+    ]
+  }
+}
