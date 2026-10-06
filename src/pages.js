@@ -442,7 +442,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
   let kind = celebrate;
   if (!kind && mile) kind = "milestone";
   const talking = talk && Boolean(row.pet_name);
-  const mic = talking ? `<button type="button" class="talk-mic" data-talk-mic aria-label="말 걸기" aria-expanded="false" hidden>${ICONS.mic}</button>` : "";
+  const mic = talking ? `<button type="button" class="talk-mic" data-talk-mic aria-label="말 걸기" aria-expanded="false" aria-pressed="false" hidden>${ICONS.mic}</button>` : "";
   const dialog = `<p class="intro"${pet ? petAttr : ""}>${greeting}</p>${moments}${giftHtml}${mic}`;
   const extras = row.pet_name ? homeExtras(row, pet, found, mascot, talking) : { dock: "", sheets: "" };
   return page(
