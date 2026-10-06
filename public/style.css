@@ -2383,6 +2383,7 @@ html.has-reveal body::after { visibility: hidden; }
   .pet[data-pet="alive"].is-sleeping .pet-motion { animation: none; }
   .want.is-gone { animation: none; opacity: 0; }
   .wake-hint,
+  .wake-hint.is-nudge,
   .wh-plush,
   .wh-spot::after,
   .wh-key { animation: none; }
