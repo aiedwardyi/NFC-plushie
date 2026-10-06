@@ -495,6 +495,16 @@ html[data-theme="8bit"] [data-care="play"] .dock-cap::before { background-image:
 html[data-theme="8bit"] [data-care="sleep"] .dock-cap::before { background-image: url("/themes/px/sleep.svg"); }
 html[data-theme="8bit"] .dock-btn.is-side .dock-cap::before { width: 24px; height: 24px; }
 html[data-theme="8bit"] .wake-tap { border-radius: 0; font-family: "Galmuri11", monospace; box-shadow: 4px 4px 0 #1d1d2b; outline: 3px solid #1d1d2b; }
+html[data-theme="8bit"] .wake-hint { border-radius: 0; font-family: "Galmuri11", monospace; box-shadow: 4px 4px 0 #1d1d2b; outline: 3px solid #1d1d2b; }
+html[data-theme="8bit"] .wh-phone,
+html[data-theme="8bit"] .wh-phone::before,
+html[data-theme="8bit"] .wh-spot,
+html[data-theme="8bit"] .wh-spot::after,
+html[data-theme="8bit"] .wh-key { border-radius: 0; }
+html[data-theme="8bit"] .wh-plush { image-rendering: pixelated; }
+html[data-theme="8bit"] .wh-plush,
+html[data-theme="8bit"] .wh-spot::after,
+html[data-theme="8bit"] .wh-key { animation-timing-function: steps(4); }
 html[data-theme="8bit"] .sun-flash { background: #fff1e8; animation-timing-function: steps(4); }
 
 @media (prefers-reduced-motion: reduce) {
