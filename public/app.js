@@ -1948,9 +1948,10 @@ const care = (function careLoop() {
     sound("want");
   }
 
-  function screenBusy() {
+  // Loose skips a tap's after-glow (combo key, gift glow), which talk can share the screen with.
+  function screenBusy(loose = false) {
     return Boolean(sheetOpen || waking || (demo && !demo.hidden) || root.classList.contains("has-reveal") || root.classList.contains("g-on")
-      || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump, .gift.is-glow, .combo-key"));
+      || document.querySelector(`canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump${loose ? "" : ", .gift.is-glow, .combo-key"}`));
   }
 
   // Waits for ms of quiet: no sheet, reveal or celebration on screen.
@@ -2477,7 +2478,7 @@ const care = (function careLoop() {
     if (id) press(id);
   });
   if (owner) window.addEventListener("load", () => preload(world()), { once: true });
-  return { morning, opened: open, restyle, hold, release, busy: screenBusy, hearts: tweenHearts, fx: { say, sparkles, cheer, box, move, sound, voice } };
+  return { morning, opened: open, restyle, hold, release, busy: screenBusy, blocked: () => screenBusy(true), hearts: tweenHearts, fx: { say, sparkles, cheer, box, move, sound, voice } };
 })();
 
 function percent(r) {
@@ -3864,7 +3865,6 @@ const farm = (function farmRoom() {
   const intro = dialogBox?.querySelector(".intro");
   if (!mic || !bar || !dock || !intro || !care) return;
   const input = bar.querySelector("[data-talk-input]");
-  const voiceBtn = bar.querySelector("[data-talk-voice]");
   const sendBtn = bar.querySelector("[data-talk-send]");
   const hint = bar.querySelector("[data-talk-hint]");
   const uid = dock.dataset.careUid;
@@ -3900,11 +3900,7 @@ const farm = (function farmRoom() {
     const n = count(input.value);
     if (n > MAX) setHint(`${MAX}자까지 보낼 수 있어요 (${n}/${MAX})`);
     else if (!hint.classList.contains("is-tap")) setHint("");
-    sendBtn.disabled = inflight || n > MAX;
-    // One key ends the bar: the mic while the box is empty or listening, send once there are words.
-    const words = n > 0 && !rec;
-    sendBtn.hidden = !words;
-    voiceBtn.hidden = words;
+    sendBtn.disabled = inflight || Boolean(rec) || n === 0 || n > MAX;
   }
 
   // Keeps the bar above the phone keyboard and the speech line in view above the bar.
@@ -4176,8 +4172,8 @@ const farm = (function farmRoom() {
     if (!rec) return;
     const r = rec;
     rec = null;
-    voiceBtn.classList.remove("is-listening");
-    voiceBtn.setAttribute("aria-pressed", "false");
+    mic.classList.remove("is-listening");
+    mic.setAttribute("aria-pressed", "false");
     checkLength();
     try {
       if (abort) r.abort();
@@ -4235,8 +4231,8 @@ const farm = (function farmRoom() {
     };
     rec = r;
     setHint("");
-    voiceBtn.classList.add("is-listening");
-    voiceBtn.setAttribute("aria-pressed", "true");
+    mic.classList.add("is-listening");
+    mic.setAttribute("aria-pressed", "true");
     checkLength();
     try {
       r.start();
@@ -4247,7 +4243,7 @@ const farm = (function farmRoom() {
   }
 
   function busy() {
-    return Boolean(careHold.busy || careHold.asleep || waking || care.busy());
+    return Boolean(careHold.busy || careHold.asleep || waking || care.blocked());
   }
 
   function sync() {
@@ -4256,12 +4252,9 @@ const farm = (function farmRoom() {
   }
 
   mic.addEventListener("pointerdown", (event) => event.stopPropagation());
+  // The only mic: opens the bar and listens; a press while listening ends the utterance.
   mic.addEventListener("click", () => {
     ensureAudio();
-    if (open) {
-      close();
-      return;
-    }
     openBar();
     listen();
   });
@@ -4271,7 +4264,6 @@ const farm = (function farmRoom() {
   });
   bar.addEventListener("submit", (event) => event.preventDefault());
   sendBtn.addEventListener("click", () => send(input.value));
-  voiceBtn.addEventListener("click", listen);
   input.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" || event.isComposing || event.keyCode === 229) return;
     event.preventDefault();

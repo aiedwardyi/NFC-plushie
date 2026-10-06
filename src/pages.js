@@ -398,7 +398,6 @@ function talkBar(name) {
     <div class="talk-row">
       <input class="talk-input" data-talk-input type="text" enterkeyhint="send" autocomplete="off" placeholder="${label}" aria-label="${label}">
       <button type="button" class="talk-send" data-talk-send aria-label="보내기">${ICONS.send}</button>
-      <button type="button" class="talk-voice" data-talk-voice aria-label="목소리로 말하기" aria-pressed="false">${ICONS.mic}</button>
     </div>
   </form>`;
 }
@@ -443,7 +442,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
   let kind = celebrate;
   if (!kind && mile) kind = "milestone";
   const talking = talk && Boolean(row.pet_name);
-  const mic = talking ? `<button type="button" class="talk-mic" data-talk-mic aria-label="말 걸기" aria-expanded="false" hidden>${ICONS.mic}</button>` : "";
+  const mic = talking ? `<button type="button" class="talk-mic" data-talk-mic aria-label="말 걸기" aria-expanded="false" aria-pressed="false" hidden>${ICONS.mic}</button>` : "";
   const dialog = `<p class="intro"${pet ? petAttr : ""}>${greeting}</p>${moments}${giftHtml}${mic}`;
   const extras = row.pet_name ? homeExtras(row, pet, found, mascot, talking) : { dock: "", sheets: "" };
   return page(

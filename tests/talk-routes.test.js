@@ -125,7 +125,7 @@ test("the owner of a listed, named pet gets the mic and the bar; others don't", 
   const ctx = await setup(t);
   const jar = await meet(ctx, A, "Mochi");
   const home = await ctx.request(`/t?uid=${A}`, { jar });
-  assert.match(home.html, /<button type="button" class="talk-mic" data-talk-mic aria-label="말 걸기" aria-expanded="false" hidden>/);
+  assert.match(home.html, /<button type="button" class="talk-mic" data-talk-mic aria-label="말 걸기" aria-expanded="false" aria-pressed="false" hidden>/);
   assert.match(home.html, /placeholder="Mochi에게 말 걸기"/);
   assert.match(home.html, /<p class="intro"[^>]*>[^<]*<\/p>(?:(?!<\/section>)[\s\S])*data-talk-mic/);
   const unlisted = await meet(ctx, B, "Bori");
