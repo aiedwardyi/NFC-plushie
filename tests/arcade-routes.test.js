@@ -79,6 +79,88 @@ async function play(ctx, jar, body) {
 const visit = (ctx, jar) => ctx.request(`/t?uid=${A}`, { jar: { ...jar, pet_skip: A } });
 const count = (html, re) => (html.match(re) || []).length;
 
+test("race rejects locked, own and malformed rivals without writing", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  const before = ctx.row();
+  for (const body of [{ rival: "horse" }, { rival: "rat" }, { rival: "__proto__" }, { rival: null }, { won: 1 }, { won: "true" }, { won: undefined }]) {
+    const out = await play(ctx, jar, { game: "race", rival: "sheep", won: true, ...body });
+    assert.equal(out.status, 400, JSON.stringify(body));
+    assert.deepEqual(ctx.row(), before);
+  }
+});
+
+test("race requires an awake named owner", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  const body = { game: "race", rival: "sheep", won: false };
+  const before = ctx.row();
+  assert.equal((await play(ctx, {}, body)).status, 403);
+  assert.equal((await play(ctx, { owner_token: "wrong" }, body)).status, 403);
+  assert.equal((await play(ctx, jar, { ...body, uid: B })).status, 403);
+  assert.deepEqual(ctx.row(), before);
+  await ctx.request("/care", { jar, body: { uid: A, act: "sleep" } });
+  const sleeping = ctx.row();
+  assert.equal((await play(ctx, jar, body)).status, 409);
+  assert.deepEqual(ctx.row(), sleeping);
+});
+
+test("race persists wins, preserves losses and caps each rival independently", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  const body = { game: "race", rival: "sheep", won: true };
+  const first = await play(ctx, jar, body);
+  assert.deepEqual(first.body.race.sheep, { level: 2, best: 1 });
+  assert.equal(first.body.rivalLevel, 1);
+  const lost = await play(ctx, jar, { ...body, won: false });
+  assert.deepEqual(lost.body.race, first.body.race);
+  assert.match((await visit(ctx, jar)).html, /data-race="[^\"]*sheep[^\"]*level[^\"]*2/);
+  for (let i = 0; i < 22; i++) await play(ctx, jar, body);
+  const saved = JSON.parse(ctx.row().race);
+  assert.deepEqual(saved, { horse: { level: 1, best: 0 }, sheep: { level: 20, best: 20 } });
+  const swapped = await play(ctx, { ...jar, mascot: "sheep" }, { ...body, rival: "horse" });
+  assert.equal(swapped.status, 200);
+  assert.deepEqual(swapped.body.race.horse, { level: 2, best: 1 });
+  assert.equal((await play(ctx, { ...jar, mascot: "sheep" }, body)).status, 400);
+});
+
+test("the race card shows the pet, its line and the saved rival levels", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await play(ctx, jar, { game: "race", rival: "sheep", won: true });
+  const sheet = (await visit(ctx, jar)).html.match(/<div class="sheet" data-sheet="arcade"[\s\S]*?<\/section>\s*<\/div>/)[0];
+  const card = sheet.match(/<li class="g-card is-ready"><span class="g-thumb r-thumb">.*<\/li>/)[0];
+  assert.match(card, /<img class="g-thumb-pet" src="\/mascot-horse-512-v3\.png" alt="">.*<b>달리기 시합<\/b><small>화면을 톡톡! 결승선까지 달려요<\/small>.*<button type="button" class="g-start" data-game="race" data-race="[^"]+">시작<\/button>/);
+  const saved = JSON.parse(card.match(/data-race="([^"]+)"/)[1].replaceAll("&quot;", '"'));
+  assert.deepEqual(saved, { horse: { level: 1, best: 0 }, sheep: { level: 2, best: 1 } });
+});
+
+test("race and gi share three XP plays and reset at Seoul midnight", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  const xp = ctx.row().xp;
+  const race = { game: "race", rival: "sheep", won: false };
+  const replies = [await play(ctx, jar), await play(ctx, jar, race), await play(ctx, jar), await play(ctx, jar, race)];
+  assert.deepEqual(replies.map((r) => [r.body.xpGain, r.body.xpLeft]), [[5, 2], [5, 1], [5, 0], [0, 0]]);
+  assert.equal(ctx.row().xp, xp + 15);
+  assert.equal(ctx.row().gi_best, 1000);
+  ctx.advance(14 * 60 * MIN + MIN);
+  const next = await play(ctx, jar, race);
+  assert.deepEqual([next.body.xpGain, next.body.xpLeft], [5, 2]);
+});
+
+test("race leaves gi best and care state intact", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await play(ctx, jar, { height: 5000 });
+  const before = ctx.row();
+  await play(ctx, jar, { game: "race", rival: "sheep", won: true });
+  const after = ctx.row();
+  for (const field of Object.keys(before).filter((key) => !["xp", "arcade_day", "arcade_plays", "race"].includes(key))) assert.deepEqual(after[field], before[field], field);
+  const gi = await play(ctx, jar, { height: 6000 });
+  assert.deepEqual(gi.body, { ok: true, xpGain: 5, xpLeft: 0, best: 6000, isBest: true, level: 1, leveledUp: false, xpInto: after.xp + 5, xpSpan: 100 });
+});
+
 test("the first 3 plays of the day give 5 XP each, the rest none", async (t) => {
   const ctx = await setup(t);
   const { jar } = await meet(ctx, A, "Mochi");

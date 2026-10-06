@@ -22,3 +22,22 @@ export function applyPlay(state, height, now) {
     isBest: height > state.giBest,
   };
 }
+
+export function raceState(text) {
+  let data;
+  try { data = JSON.parse(text); } catch { data = null; }
+  return Object.fromEntries(["horse", "sheep"].map((kind) => {
+    const r = data?.[kind];
+    const best = Number.isInteger(r?.best) ? Math.max(0, Math.min(20, r.best)) : 0;
+    return [kind, { level: Math.min(20, best + 1), best }];
+  }));
+}
+
+// One finished race, counted as a day's play with the 기 모으기 record left as is. The win is the page's word, so it only raises that rival, never XP.
+export function applyRace(state, race, rival, won, now) {
+  const out = applyPlay(state, state.giBest, now);
+  const before = race[rival];
+  const best = won ? Math.max(before.best, before.level) : before.best;
+  const next = { ...race, [rival]: { level: Math.min(20, best + 1), best } };
+  return { ...out, race: next, rivalLevel: before.level };
+}

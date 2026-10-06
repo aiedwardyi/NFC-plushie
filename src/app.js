@@ -8,7 +8,7 @@ import { GIFT_COUNT as GIFT_TOTAL, GIFT_TIERS, GIFTS } from "./gifts.js";
 import { PET, applyTap, currentMood, levelForXp, parseTapUid, seoulDayKey, xpProgress } from "./pet.js";
 import { applyCare, careWant, mealsNow, playsNow } from "./care.js";
 import { comboNext, comboTap } from "./combo.js";
-import { ARCADE, applyPlay, xpPlaysLeft } from "./arcade.js";
+import { ARCADE, applyPlay, applyRace, raceState, xpPlaysLeft } from "./arcade.js";
 import { FARM, addGiftSeeds, farmDot, farmView, giftSeeds, harvestFarm, nextRipeAt, openFarm, parseFarm, pickPlot, ripenFarm } from "./farm.js";
 import { devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
 import { mountTalk, purgeTalk, takeQuestion } from "./chat.js";
@@ -243,6 +243,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       combo: extra.combo || 0,
       arcadeLeft: xpPlaysLeft(care, t),
       giBest: care.giBest,
+      race: raceState(fresh.race),
       farm: { dot: farmDot(farm, levelForXp(farmRow.xp ?? 0), t), next: farm ? nextRipeAt(farm, t) : null, now: t, visit: extra.visit || null },
     };
   }
@@ -481,6 +482,27 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   });
 
   app.post("/arcade", (req, res) => {
+    if (req.body?.game === "race") {
+      const { uid, rival, won } = req.body;
+      const own = req.demoMascot || "horse";
+      if (!validUid(uid) || !["horse", "sheep"].includes(rival) || rival === own || typeof won !== "boolean") return res.status(400).json({ ok: false });
+      const reply = db.transaction(() => {
+        const row = getRow(uid);
+        if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row?.pet_name) return 403;
+        if (row.slept_at !== null) return 409;
+        const t = now();
+        const st = petState(row, t);
+        const out = applyRace(st, raceState(row.race), rival, won, t);
+        const xp = st.xp + out.xpGain;
+        db.prepare("UPDATE plushies SET arcade_day = ?, arcade_plays = ?, race = ?, xp = ? WHERE uid = ?")
+          .run(out.arcadeDay, out.arcadePlays, JSON.stringify(out.race), xp, uid);
+        const after = xpProgress(xp);
+        return { ok: true, race: out.race, rivalLevel: out.rivalLevel, xpGain: out.xpGain, xpLeft: out.xpLeft,
+          level: after.level, leveledUp: after.level > levelForXp(st.xp), xpInto: after.into, xpSpan: after.span };
+      })();
+      if (typeof reply === "number") return res.status(reply).json({ ok: false });
+      return res.json(reply);
+    }
     const { uid, game, height } = req.body || {};
     if (!validUid(uid) || game !== "gi" || !validHeight(height)) return res.status(400).json({ ok: false });
     const reply = db.transaction(() => {

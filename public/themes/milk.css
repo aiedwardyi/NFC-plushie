@@ -326,6 +326,8 @@ html[data-theme="milk"] .g-card { background: #fff; box-shadow: inset 0 0 0 1.5p
 html[data-theme="milk"] .g-card.is-ready { background: linear-gradient(135deg, #fff0f5, #fff); box-shadow: inset 0 0 0 2px #ff8fb3, 0 6px 16px rgba(255, 143, 179, .25); }
 html[data-theme="milk"] .g-start { background: linear-gradient(180deg, #ffb3cb, #ff7fa8); color: #fff; box-shadow: 0 3px 0 #e0577c; }
 html[data-theme="milk"] .g-thumb { background: #ffe4ec; }
+html[data-theme="milk"] .r-thumb { background: repeating-conic-gradient(rgba(255, 143, 171, .25) 0 25%, transparent 0 50%) 0 0 / 14px 14px, #ffe4ec; }
+html[data-theme="milk"] .r-thumb::before { background: repeating-linear-gradient(180deg, rgba(255, 143, 171, .85) 0 2px, transparent 2px 6px); }
 html[data-theme="milk"] .g-thumb-aura { background: radial-gradient(circle, rgba(255, 143, 179, .9) 0 22%, rgba(255, 143, 179, .3) 42%, transparent 66%); }
 html[data-theme="milk"] .g-gifts { background: none; color: var(--muted); font-family: inherit; font-weight: 700; box-shadow: none; }
 html[data-theme="milk"] svg[data-icon="moon"] .i-a { fill: #ffe3ec; stroke: #e0577c; }

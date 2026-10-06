@@ -229,6 +229,7 @@ function arcadeSheet(pet, found = [], mascot = "horse") {
   return sheetHtml("arcade", "오락실", `<p class="g-today" data-arcade-today><span>오늘 XP 놀이</span>${pips}<b>${left ? `${left}번 남았어요` : "다 했어요!"}</b></p>
       <ul class="g-list">
         <li class="g-card is-ready"><span class="g-thumb"><span class="g-thumb-aura"></span><img class="g-thumb-pet" src="/mascot-${mascotKind(mascot)}-512-v3.png" alt=""></span><span class="g-txt"><b>기 모으기</b><small>인형을 톡톡! 하늘 끝까지 날아가요</small></span><button type="button" class="g-start" data-game="gi">시작</button></li>
+        <li class="g-card is-ready"><span class="g-thumb r-thumb"><img class="g-thumb-pet" src="/mascot-${mascotKind(mascot)}-512-v3.png" alt=""></span><span class="g-txt"><b>달리기 시합</b><small>화면을 톡톡! 결승선까지 달려요</small></span><button type="button" class="g-start" data-game="race" data-race="${escapeHtml(JSON.stringify(pet?.race || {}))}">시작</button></li>
         ${locked}
       </ul>
       <button type="button" class="g-gifts${pet?.gift ? " has-new" : ""}" data-open-gifts><span class="g-gift-ic">${ICONS.gift}</span>모은 선물 <b>${count}/${GIFT_COUNT}</b><span class="g-chev" aria-hidden="true">›</span></button>`);
