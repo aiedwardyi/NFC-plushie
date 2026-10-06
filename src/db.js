@@ -30,6 +30,7 @@ const petColumns = [
   "arcade_day TEXT",
   "arcade_plays INTEGER",
   "gi_best INTEGER",
+  "race TEXT",
   "farm TEXT",
 ];
 
