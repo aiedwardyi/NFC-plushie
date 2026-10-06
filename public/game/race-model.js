@@ -78,6 +78,7 @@ export function stepRace(race, dt) {
     race.time = t1;
     return true;
   }
+  if (!(dt > 0)) return false;
   const fade = Math.exp(-dt);
   const energy = race.energy * (1 - fade) / dt;
   race.energy *= fade;

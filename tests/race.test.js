@@ -24,6 +24,16 @@ test("wins advance only that rival, losses keep the record, level 20 caps", () =
   assert.deepEqual(race.horse, { level: 1, best: 0 });
 });
 
+test("a zero step mid-race leaves the race running", () => {
+  const race = newRace(1);
+  for (let i = 0; i < 240; i++) stepRace(race, 1 / 240);
+  const at = [...race.distance];
+  assert.equal(stepRace(race, 0), false);
+  assert.deepEqual(race.distance, at);
+  while (race.finish.some((t) => t === null) && race.time < 40) stepRace(race, 1 / 60);
+  assert.ok(race.finish.every(Number.isFinite));
+});
+
 function simulate(rate, level, dashes = []) {
   const race = newRace(level);
   let tap = 0;

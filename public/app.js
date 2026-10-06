@@ -3708,18 +3708,22 @@ const racing = (function raceRoom() {
   let held = null;
   let playing = false;
   let retry = 0;
+  let posted = 0;
   const sounds = ["count", "go", "ding", "tier", "race-hop", "race-dash", "race-crowd", "race-shutter", "race-win", "race-lose", "race-pop", "race-drum"];
   const api = {
     still: () => prefersReducedMotion(),
     sfx: (name, options) => playSfx(name, options),
     buzz: (pattern) => tryVibrate(pattern),
     async finish(rival, won) {
+      const run = ++posted;
       try {
         const res = await fetch("/arcade", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
           body: JSON.stringify({ uid: dock.dataset.careUid, game: "race", rival, won }) });
         if (!res.ok) return null;
         const r = await res.json();
         if (!r.ok) return null;
+        // A slow reply from an earlier race must not roll back a newer one.
+        if (run !== posted) return r;
         state = r.race;
         dock.dataset.arcadeLeft = String(r.xpLeft);
         sheet.querySelectorAll(".g-pip").forEach((pip, i) => pip.classList.toggle("is-used", i < 3 - r.xpLeft));
@@ -3802,7 +3806,7 @@ const racing = (function raceRoom() {
   });
   start.addEventListener("click", begin);
   // Hiding cancels only before the gun; a race or its card just pauses with the page.
-  document.addEventListener("visibilitychange", () => { if (document.hidden) { held = null; if (playing && ["pick", "count"].includes(ready?.phase)) ready.abort(); } });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { held = null; paint(); if (playing && ["pick", "count"].includes(ready?.phase)) ready.abort(); } });
   window.addEventListener("pagehide", restyle);
   return { restyle };
 })();

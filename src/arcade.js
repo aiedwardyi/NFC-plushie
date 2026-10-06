@@ -33,6 +33,7 @@ export function raceState(text) {
   }));
 }
 
+// One finished race, counted as a day's play with the 기 모으기 record left as is. The win is the page's word, so it only raises that rival, never XP.
 export function applyRace(state, race, rival, won, now) {
   const out = applyPlay(state, state.giBest, now);
   const before = race[rival];
