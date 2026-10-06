@@ -1596,6 +1596,7 @@ if (themeSheet) {
     care?.restyle();
     combo?.restyle();
     arcade?.restyle();
+    racing?.restyle();
     farm?.restyle();
   }
 
@@ -3687,6 +3688,122 @@ const arcade = (function arcadeRoom() {
     game = null;
     ready = null;
   });
+  return { restyle };
+})();
+
+/* 오락실: 달리기 시합 on its own full-screen stage, loaded when the room first opens; a finished race uses one of the day's 3 XP plays. */
+const racing = (function raceRoom() {
+  const dock = document.querySelector(".dock[data-care-uid]");
+  const sheet = document.querySelector('[data-sheet="arcade"]');
+  const start = sheet?.querySelector('[data-game="race"]');
+  if (!dock || !start || !care || !combo) return null;
+  const root = document.documentElement;
+  const blurb = start.closest(".g-card").querySelector("small");
+  const thumb = start.closest(".g-card").querySelector(".g-thumb-pet");
+  const label = blurb.textContent;
+  const button = dock.querySelector('[data-open="arcade"]');
+  let state = JSON.parse(start.dataset.race || "{}");
+  let game = null;
+  let ready = null;
+  let held = null;
+  let playing = false;
+  let retry = 0;
+  const sounds = ["count", "go", "ding", "tier", "race-hop", "race-dash", "race-crowd", "race-shutter", "race-win", "race-lose", "race-pop", "race-drum"];
+  const api = {
+    still: () => prefersReducedMotion(),
+    sfx: (name, options) => playSfx(name, options),
+    buzz: (pattern) => tryVibrate(pattern),
+    async finish(rival, won) {
+      try {
+        const res = await fetch("/arcade", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
+          body: JSON.stringify({ uid: dock.dataset.careUid, game: "race", rival, won }) });
+        if (!res.ok) return null;
+        const r = await res.json();
+        if (!r.ok) return null;
+        state = r.race;
+        dock.dataset.arcadeLeft = String(r.xpLeft);
+        sheet.querySelectorAll(".g-pip").forEach((pip, i) => pip.classList.toggle("is-used", i < 3 - r.xpLeft));
+        sheet.querySelector("[data-arcade-today] b").textContent = r.xpLeft ? `${r.xpLeft}번 남았어요` : "다 했어요!";
+        button.classList.toggle("has-new", sheet.querySelector("[data-open-gifts]").classList.contains("has-new") || r.xpLeft > 0);
+        paintLevel(r);
+        return r;
+      } catch { return null; }
+    },
+  };
+  function prepare() {
+    if (!game) {
+      const made = loadPixi().then(() => import(`/game/race.js${retry ? `?retry=${retry}` : ""}`)).then((m) => m.createRace(api));
+      game = made;
+      made.then((g) => { if (game === made) ready = g; else g.destroy(); }, () => { if (game === made) { game = null; retry++; } });
+    }
+    return game;
+  }
+  function paint() {
+    start.disabled = careHold.asleep || Boolean(held);
+    start.textContent = held ? "준비 중…" : "시작";
+    blurb.textContent = careHold.asleep ? "쿨쿨 자는 중이에요" : label;
+  }
+  async function run(g, mode) {
+    playing = true;
+    closeSheet();
+    combo.end();
+    care.hold();
+    root.classList.add("g-on", "r-on");
+    combo.sink(() => g.tap("nfc"));
+    let out = "quit";
+    try { out = await g.play(mode, state, root.dataset.mascot === "sheep" ? "sheep" : "horse"); }
+    finally {
+      combo.sink(null);
+      combo.end();
+      root.classList.remove("g-on", "r-on");
+      care.release();
+      playing = false;
+      button.focus({ preventScroll: true });
+    }
+    if (out === "quit") care.fx.say("재밌었어요! 또 달려요!");
+  }
+  function begin() {
+    if (held || playing || careHold.asleep || petBusy()) return;
+    const tap = {};
+    held = tap;
+    paint();
+    playSfx(`care-${root.dataset.theme === "8bit" ? "chip" : "soft"}-press`);
+    tryVibrate(12);
+    const listening = "NDEFReader" in window ? combo.listen() : null;
+    const reader = listening && Promise.race([listening, new Promise((done) => setTimeout(() => done(null), 15000))]);
+    Promise.all([prepare(), reader]).then(([g, nfc]) => {
+      if (held !== tap) return;
+      held = null;
+      paint();
+      if (sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) return;
+      run(g, nfc ? "nfc" : "screen");
+    }, () => {
+      if (held !== tap) return;
+      held = null;
+      paint();
+      blurb.textContent = "지금은 열 수 없어요. 다시 눌러 주세요";
+    });
+  }
+  function restyle() {
+    held = null;
+    const old = game;
+    game = null;
+    ready = null;
+    old?.then((g) => g.destroy(), () => {});
+  }
+  button.addEventListener("click", () => {
+    held = null;
+    paint();
+    const canon = pet?.querySelector('[data-frame="canon"]');
+    if (canon) thumb.src = canon.getAttribute("src");
+    const kit = root.dataset.theme === "8bit" ? "chip" : "soft";
+    sounds.forEach((name) => loadSfx(`game-${kit}-${name}`));
+    if (!careHold.asleep) prepare().catch(() => {});
+  });
+  start.addEventListener("click", begin);
+  // Hiding cancels only before the gun; a race or its card just pauses with the page.
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { held = null; if (playing && ["pick", "count"].includes(ready?.phase)) ready.abort(); } });
+  window.addEventListener("pagehide", restyle);
   return { restyle };
 })();
 
