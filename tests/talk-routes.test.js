@@ -178,6 +178,20 @@ test("a reply comes back as text with sources, logged with its cost", async (t) 
   assert.ok(Math.abs(log[1].cost - (600 * 1 + 20 * 5) / 1e6) < 1e-12);
 });
 
+test("a [춤] reply dances: the tag leaves the line, the turn keeps it", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  ctx.provider.replyWith = async () => ({ ok: true, stop: "end_turn", text: "[춤] 빙글빙글 춤춰요!", sources: [], usage: { input: 900, output: 30, searches: 0 }, ms: 5 });
+  assert.deepEqual(await say(ctx, jar, "춤 춰 줘!"), { status: 200, body: { ok: true, text: "빙글빙글 춤춰요!", sources: [], action: "dance" } });
+  await ctx.app.locals.talkIdle();
+  assert.equal(ctx.db.prepare("SELECT reply FROM talk_turns WHERE uid = ?").get(A).reply, "[춤] 빙글빙글 춤춰요!");
+  assert.equal(ctx.provider.notebooks[0].prompt.includes("[춤]"), false);
+  ctx.provider.replyWith = async () => ({ ok: true, stop: "end_turn", text: "[춤]", sources: [], usage: { input: 900, output: 5, searches: 0 }, ms: 5 });
+  assert.deepEqual((await say(ctx, jar, "또 춰 줘")).body, { ok: true, text: "신나게 춤출게요!", sources: [], action: "dance" });
+  ctx.provider.replyWith = async () => ({ ok: true, stop: "end_turn", text: "춤은 내일 춰요.", sources: [], usage: { input: 900, output: 5, searches: 0 }, ms: 5 });
+  assert.deepEqual((await say(ctx, jar, "춤 좋아해?")).body, { ok: true, text: "춤은 내일 춰요.", sources: [] });
+});
+
 test("failures and refusals answer with the pet's own lines and keep no turn", async (t) => {
   const ctx = await setup(t);
   const jar = await meet(ctx, A, "Mochi");
