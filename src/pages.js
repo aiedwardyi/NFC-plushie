@@ -398,7 +398,6 @@ function talkBar(name) {
     <div class="talk-row">
       <input class="talk-input" data-talk-input type="text" enterkeyhint="send" autocomplete="off" placeholder="${label}" aria-label="${label}">
       <button type="button" class="talk-send" data-talk-send aria-label="보내기">${ICONS.send}</button>
-      <button type="button" class="talk-voice" data-talk-voice aria-label="목소리로 말하기" aria-pressed="false">${ICONS.mic}</button>
     </div>
   </form>`;
 }

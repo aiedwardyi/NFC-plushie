@@ -2838,7 +2838,6 @@ html.f-on .window { touch-action: manipulation; }
 }
 .talk-bar .talk-input::placeholder { color: var(--tb-ink); opacity: .5; }
 .talk-bar .talk-input:focus-visible { box-shadow: inset 0 0 0 2px var(--tb-ring), 0 0 0 3px rgba(255, 255, 255, 0.12); }
-.talk-bar .talk-voice,
 .talk-bar .talk-send {
   all: unset;
   display: grid;
@@ -2851,14 +2850,9 @@ html.f-on .window { touch-action: manipulation; }
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-.talk-bar .talk-voice,
 .talk-bar .talk-send { background: var(--tb-key); color: var(--tb-key-ink); }
-.talk-bar .talk-voice[hidden],
-.talk-bar .talk-send[hidden] { display: none; }
 .talk-bar .talk-send:disabled { opacity: .45; cursor: default; }
-.talk-bar .talk-voice:focus-visible,
 .talk-bar .talk-send:focus-visible { outline: 2px solid var(--tb-hint); outline-offset: 1px; }
-.talk-bar .talk-voice svg,
 .talk-bar .talk-send svg {
   width: 21px;
   height: 21px;
@@ -2868,7 +2862,8 @@ html.f-on .window { touch-action: manipulation; }
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.talk-bar .talk-voice.is-listening {
+.dialog .talk-mic.is-listening {
+  opacity: 1;
   background: var(--coral);
   color: #fff;
   animation: talk-listen 1s ease-in-out infinite alternate;
@@ -2923,5 +2918,5 @@ html[data-theme="najeon"] .talk-bar {
 @media (prefers-reduced-motion: reduce) {
   .talk-bar { transition: none; }
   .dialog .intro.is-thinking .talk-dots,
-  .talk-bar .talk-voice.is-listening { animation: none; }
+  .dialog .talk-mic.is-listening { animation: none; }
 }
