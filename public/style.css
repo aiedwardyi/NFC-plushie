@@ -2281,6 +2281,88 @@ html.has-reveal body::after { visibility: hidden; }
   animation: wake-call-in .5s var(--ease-out) .2s both, wake-call-bob 2.4s ease-in-out .7s infinite;
 }
 .wake-tap.is-gone { opacity: 0; }
+
+/* Asleep: a card shows the phone meeting the plushie, since a finger on the screen never wakes it */
+.wake-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: 92%;
+  padding: 8px 16px 8px 10px;
+  color: var(--cocoa);
+  background: var(--paper);
+  border-radius: 18px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .3), 0 10px 24px rgba(0, 0, 0, .35);
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity .3s ease;
+  animation: wake-call-in .45s var(--ease-out) both;
+}
+.wake-hint.is-gone { opacity: 0; }
+.wake-hint.is-nudge { animation: wake-hint-nudge .45s ease-out; }
+@keyframes wake-hint-nudge {
+  0%, 100% { transform: translateX(-50%); }
+  25% { transform: translateX(calc(-50% - 6px)); }
+  50% { transform: translateX(calc(-50% + 5px)); }
+  75% { transform: translateX(calc(-50% - 3px)); }
+}
+.wh-text { display: flex; flex-direction: column; gap: 1px; line-height: 1.25; }
+.wh-text b { font-size: 15px; font-weight: 900; }
+.wh-text small { font-size: 12px; font-weight: 700; opacity: .7; }
+.wh-art { position: relative; flex: none; width: 60px; height: 48px; }
+.wh-phone { position: absolute; left: 2px; top: 4px; width: 24px; height: 40px; border-radius: 6px; background: #2a3146; box-shadow: inset 0 0 0 2px #fff, 0 0 0 1px rgba(42, 49, 70, .5); }
+.wh-phone::before { content: ""; position: absolute; left: 5px; top: 5px; width: 5px; height: 5px; border-radius: 50%; background: #8a92a8; }
+.wh-spot { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #ffd36a; }
+.wh-spot::after { content: ""; position: absolute; inset: -2px; border: 2px solid #ffd36a; border-radius: 50%; opacity: 0; animation: wh-wave 2s ease-out infinite; }
+.wh-plush { position: absolute; left: 25px; top: 9px; width: 32px; height: 32px; object-fit: contain; animation: wh-tap-back 2s ease-in-out infinite; }
+@keyframes wh-tap-back {
+  0%, 100% { transform: translateX(8px) rotate(12deg); }
+  32% { transform: translateX(-9px) rotate(-3deg); }
+  40% { transform: translateX(-7px) rotate(-2deg) scale(1.08, .92); }
+  64% { transform: translateX(8px) rotate(12deg); }
+}
+@keyframes wh-wave {
+  0%, 30% { opacity: 0; transform: scale(.6); }
+  34% { opacity: 1; }
+  78%, 100% { opacity: 0; transform: scale(2.8); }
+}
+/* iPhone: the reader sits at the top edge, so the plushie comes down onto it */
+.wake-hint[data-spot="top"] .wh-art { height: 58px; }
+.wake-hint[data-spot="top"] .wh-phone { left: 18px; top: 28px; height: 30px; border-radius: 6px 6px 0 0; }
+.wake-hint[data-spot="top"] .wh-phone::before { left: 7px; top: 4px; width: 10px; height: 3px; border-radius: 2px; background: #000; }
+.wake-hint[data-spot="top"] .wh-spot { top: 0; }
+.wake-hint[data-spot="top"] .wh-plush { left: 16px; top: 0; width: 28px; height: 28px; transform-origin: 50% 100%; animation-name: wh-tap-top; }
+@keyframes wh-tap-top {
+  0%, 100% { transform: translateY(-5px) rotate(-10deg); }
+  32% { transform: translateY(1px) rotate(0); }
+  40% { transform: translateY(2px) scale(1.08, .9); }
+  64% { transform: translateY(-5px) rotate(-10deg); }
+}
+.wh-key {
+  position: absolute;
+  left: 9px;
+  top: 6px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 900;
+  color: #2a3146;
+  background: #fff;
+  box-shadow: inset 0 0 0 2px #2a3146, 0 4px 0 #8a92a8;
+  animation: wh-press 1.6s ease-in-out infinite;
+}
+@keyframes wh-press {
+  0%, 40%, 100% { transform: none; box-shadow: inset 0 0 0 2px #2a3146, 0 4px 0 #8a92a8; }
+  50%, 60% { transform: translateY(3px); box-shadow: inset 0 0 0 2px #2a3146, 0 1px 0 #8a92a8; }
+}
 .sun-flash {
   position: absolute;
   inset: 0;
@@ -2300,6 +2382,12 @@ html.has-reveal body::after { visibility: hidden; }
   .dock-btn.is-want .dock-cap::after,
   .pet[data-pet="alive"].is-sleeping .pet-motion { animation: none; }
   .want.is-gone { animation: none; opacity: 0; }
+  .wake-hint,
+  .wh-plush,
+  .wh-spot::after,
+  .wh-key { animation: none; }
+  .wake-hint .wh-plush { transform: translateX(-7px); }
+  .wake-hint[data-spot="top"] .wh-plush { transform: translateY(1px); }
   .dock-btn.is-want .dock-cap::after { opacity: .9; }
   .sky::before,
   .stars,

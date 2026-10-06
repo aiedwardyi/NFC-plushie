@@ -1805,12 +1805,16 @@ const care = (function careLoop() {
   const art = () => ART[world()] || ART.classic;
 
   const LINES = {
-    classic: { feed: "냠냠! 사과가 아삭아삭 맛있어요!", nibble: "한 입만 더 먹을게요!", stash: "배불러요! 이건 나중에 먹을게요.", play: "와아, 신나요!", again: "헤헤, 진짜 재밌어요!", tired: "헥헥… 숨차요! 조금 쉬었다 놀아요.", content: "배부르고 신나요! 인형을 한 번 더 톡 해 볼래요?", sleep: "잘 자요… 인형을 톡 하면 깨어날게요.", morning: "잘 잤어요! 좋은 아침이에요!", wake: "잘 잤어요! 몸이 가뿐해요!" },
-    "8bit": { feed: "냠냠! HP가 가득 찼어요!", nibble: "한 입만 더! 냠!", stash: "HP가 꽉 찼어요! 이건 저장해 둘게요.", play: "점프! 점프! 최고 기록이에요!", again: "보너스 스테이지! 헤헤, 재밌어요!", tired: "헥헥… 스태미나 바닥! 조금 쉬었다 놀아요.", content: "HP도 기분도 MAX! 인형을 한 번 더 톡 해 볼래요?", sleep: "세이브 완료… 인형을 톡 하면 이어서 해요.", morning: "새 게임 시작! 좋은 아침이에요!", wake: "이어서 하기! 체력이 가득해요!" },
-    milk: { feed: "쪼옥~ 달콤한 딸기우유 최고예요!", nibble: "한 모금만 더 마실게요!", stash: "배불러요! 이건 나중에 마실게요.", play: "말랑말랑 딸기공 받아라!", again: "헤헤, 딸기공 또 잡았어요!", tired: "헥헥… 몸이 말랑말랑 녹았어요! 조금 쉬었다 놀아요.", content: "배부르고 달콤해요! 인형을 한 번 더 톡 해 볼래요?", sleep: "달콤한 꿈 꿀게요… 인형을 톡 하면 깨어날게요.", morning: "잘 잤어요! 딸기처럼 상큼한 아침이에요!", wake: "잘 잤어요! 딸기처럼 상큼해요!" },
-    najeon: { feed: "약과가 달콤하고 쫀득해요!", nibble: "한 입만 더 먹을게요!", stash: "배불러요! 약과는 나중에 먹을게요.", play: "제기차기 열 번 성공!", again: "이번엔 스무 번! 헤헤, 재밌어요!", tired: "헥헥… 다리가 후들후들해요. 조금 쉬었다 놀아요.", content: "배도 마음도 든든해요! 인형을 한 번 더 톡 해 볼래요?", sleep: "달빛 아래 잘 자요… 인형을 톡 하면 깨어날게요.", morning: "잘 잤어요! 해님이 떴어요!", wake: "잘 잤어요! 마음이 반짝반짝해요." },
+    classic: { feed: "냠냠! 사과가 아삭아삭 맛있어요!", nibble: "한 입만 더 먹을게요!", stash: "배불러요! 이건 나중에 먹을게요.", play: "와아, 신나요!", again: "헤헤, 진짜 재밌어요!", tired: "헥헥… 숨차요! 조금 쉬었다 놀아요.", content: "배부르고 신나요! 인형을 한 번 더 톡 해 볼래요?", sleep: "잘 자요… 폰에 인형을 톡 하면 깨어날게요.", morning: "잘 잤어요! 좋은 아침이에요!", wake: "잘 잤어요! 몸이 가뿐해요!" },
+    "8bit": { feed: "냠냠! HP가 가득 찼어요!", nibble: "한 입만 더! 냠!", stash: "HP가 꽉 찼어요! 이건 저장해 둘게요.", play: "점프! 점프! 최고 기록이에요!", again: "보너스 스테이지! 헤헤, 재밌어요!", tired: "헥헥… 스태미나 바닥! 조금 쉬었다 놀아요.", content: "HP도 기분도 MAX! 인형을 한 번 더 톡 해 볼래요?", sleep: "세이브 완료… 폰에 인형을 톡 하면 이어서 해요.", morning: "새 게임 시작! 좋은 아침이에요!", wake: "이어서 하기! 체력이 가득해요!" },
+    milk: { feed: "쪼옥~ 달콤한 딸기우유 최고예요!", nibble: "한 모금만 더 마실게요!", stash: "배불러요! 이건 나중에 마실게요.", play: "말랑말랑 딸기공 받아라!", again: "헤헤, 딸기공 또 잡았어요!", tired: "헥헥… 몸이 말랑말랑 녹았어요! 조금 쉬었다 놀아요.", content: "배부르고 달콤해요! 인형을 한 번 더 톡 해 볼래요?", sleep: "달콤한 꿈 꿀게요… 폰에 인형을 톡 하면 깨어날게요.", morning: "잘 잤어요! 딸기처럼 상큼한 아침이에요!", wake: "잘 잤어요! 딸기처럼 상큼해요!" },
+    najeon: { feed: "약과가 달콤하고 쫀득해요!", nibble: "한 입만 더 먹을게요!", stash: "배불러요! 약과는 나중에 먹을게요.", play: "제기차기 열 번 성공!", again: "이번엔 스무 번! 헤헤, 재밌어요!", tired: "헥헥… 다리가 후들후들해요. 조금 쉬었다 놀아요.", content: "배도 마음도 든든해요! 인형을 한 번 더 톡 해 볼래요?", sleep: "달빛 아래 잘 자요… 폰에 인형을 톡 하면 깨어날게요.", morning: "잘 잤어요! 해님이 떴어요!", wake: "잘 잤어요! 마음이 반짝반짝해요." },
   };
-  const MUMBLE = "음냐… 인형을 톡 해 주면 일어날게요…";
+  const MUMBLE = "음냐… 화면 말고 진짜 인형으로 깨워 주세요…";
+  // Where the phone reads the plushie: iPhones at the top edge, Android phones on the back; a desk page wakes on a reload.
+  const TAP_SPOT = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) ? "top"
+    : /Android/.test(navigator.userAgent) || navigator.maxTouchPoints > 0 ? "back" : "desk";
+  const WAKE_HINT = { top: "폰 윗부분에 인형을 톡!", back: "폰 뒷면에 인형을 톡!", desk: "새로고침(F5)하면 깨어나요" };
   const WANTS = { feed: "배고파요", play: "놀고 싶어요", sleep: "졸려요" };
   const line = (key) => (LINES[world()] || LINES.classic)[key];
 
@@ -2242,8 +2246,57 @@ const care = (function careLoop() {
     document.body.classList.add("is-asleep-page");
   }
 
+  let hintEl = null;
+  let hintTimer = 0;
+  let pokes = 0;
+
+  // People tried to wake the pet with a finger on the screen; this shows the real move.
+  function wakeHint(ms = 5200) {
+    window.clearTimeout(hintTimer);
+    if (hintEl) {
+      hintEl.classList.remove("is-nudge");
+      void hintEl.offsetWidth;
+      hintEl.classList.add("is-nudge");
+    } else {
+      hintEl = document.createElement("div");
+      hintEl.className = "wake-hint";
+      hintEl.dataset.spot = TAP_SPOT;
+      hintEl.setAttribute("role", "status");
+      const art = document.createElement("span");
+      art.className = "wh-art";
+      art.setAttribute("aria-hidden", "true");
+      if (TAP_SPOT === "desk") {
+        art.innerHTML = '<span class="wh-key">F5</span>';
+      } else {
+        art.innerHTML = '<span class="wh-phone"><i class="wh-spot"></i></span>';
+        const plush = document.createElement("img");
+        plush.className = "wh-plush";
+        plush.alt = "";
+        plush.src = pet.querySelector('[data-frame="canon"]')?.getAttribute("src") || "";
+        art.appendChild(plush);
+      }
+      const text = document.createElement("span");
+      text.className = "wh-text";
+      text.innerHTML = `<b>${WAKE_HINT[TAP_SPOT]}</b><small>화면을 눌러서는 깨지 않아요</small>`;
+      hintEl.append(art, text);
+      win.appendChild(hintEl);
+    }
+    hintTimer = window.setTimeout(hideHint, ms);
+  }
+
+  function hideHint() {
+    window.clearTimeout(hintTimer);
+    const h = hintEl;
+    hintEl = null;
+    if (!h) return;
+    h.classList.add("is-gone");
+    window.setTimeout(() => h.remove(), 320);
+  }
+
   function lightsOn() {
     careHold.asleep = false;
+    pokes = 0;
+    hideHint();
     win.classList.remove("is-asleep");
     document.body.classList.remove("is-asleep-page");
     syncPet();
@@ -2290,6 +2343,9 @@ const care = (function careLoop() {
   }
 
   async function mumble() {
+    // One poke only stirs the pet; every second one shows how to really wake it.
+    pokes += 1;
+    if (pokes % 2 === 0) wakeHint();
     if (careHold.busy) return;
     careHold.busy = true;
     hush();
@@ -2320,11 +2376,12 @@ const care = (function careLoop() {
   }
 
   function press(id) {
-    if (careHold.busy || waking || greeting || pet.classList.contains("is-evolving") || root.classList.contains("has-reveal")) return;
+    if (waking || greeting || pet.classList.contains("is-evolving") || root.classList.contains("has-reveal")) return;
     if (careHold.asleep) {
       mumble();
       return;
     }
+    if (careHold.busy) return;
     const btn = dock.querySelector(`[data-care="${id}"]`);
     btn.classList.add("is-pressed");
     window.setTimeout(() => btn.classList.remove("is-pressed"), 140);
@@ -3493,7 +3550,7 @@ const farm = (function farmRoom() {
   const FARM_ICON = cap.innerHTML;
   const HOME_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>';
   const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
-  const ASLEEP = "쿨쿨 자는 중이에요. 인형을 톡 해서 깨워 주세요";
+  const ASLEEP = "쿨쿨 자는 중이에요. 폰에 인형을 톡 해서 깨워 주세요";
   const COOKIE_MS = 60 * 1000;
   const CALM_MS = 400;
   const SOUNDS = {
