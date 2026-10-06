@@ -13,6 +13,13 @@ const searchUse = (id) => ({ type: "server_tool_use", id, name: "web_search", in
 const searchResult = (id, content) => ({ type: "web_search_tool_result", tool_use_id: id, content });
 const hit = (url, title) => ({ type: "web_search_result", url, title, encrypted_content: "e", page_age: null });
 const cite = (url, title) => ({ type: "web_search_result_location", url, title, cited_text: "맑음", encrypted_index: "i" });
+const routeUse = (id) => ({ type: "tool_use", id, name: "transit_route", input: { from: "암사역", to: "강남역" } });
+const MAP = { title: "카카오맵 길찾기", url: "https://map.kakao.com/link/by/traffic/a/b" };
+
+function transitStub(outs) {
+  const asked = [];
+  return { asked, route: async (q) => (asked.push(q), outs.shift()) };
+}
 
 // A client that answers from a script and keeps every request.
 function scripted(responses) {
@@ -107,6 +114,26 @@ for (const model of ["claude-haiku-4-5", "claude-sonnet-5-5"]) {
     assert.deepEqual({ ...second, messages: null }, { ...first, messages: null });
   });
 
+  test(`${model}: a route question runs the tool, answers after it and links the map`, async () => {
+    const used = msg([...lead, text("찾아볼게요."), routeUse("r1")], "tool_use", usage(900, 30));
+    const s = scripted([used, msg([...lead, text("8호선 타고 잠실에서 2호선으로 갈아타요!")], "end_turn", usage(1200, 20))]);
+    const transit = transitStub([{ ok: true, text: "1) 지하철 25분", link: MAP }]);
+    const signal = AbortSignal.timeout(20000);
+    const out = await anthropicTalk({ apiKey: "k", model, Client: s.Client, transit }).reply({ ...ASK, signal });
+    assert.equal(out.text, "8호선 타고 잠실에서 2호선으로 갈아타요!");
+    assert.deepEqual(out.sources, [MAP]);
+    assert.deepEqual(out.usage, { input: 2100, output: 50, searches: 0 });
+    assert.equal(out.calls, 2);
+    assert.deepEqual(transit.asked, [{ from: "암사역", to: "강남역", signal }]);
+    const [first, second] = s.calls.map((c) => c.body);
+    assert.deepEqual(first.tools.map((t) => t.name), ["web_search", "transit_route"]);
+    assert.deepEqual(second.messages, [
+      ...ASK.messages,
+      { role: "assistant", content: used.content },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: "r1", content: "1) 지하철 25분" }] },
+    ]);
+  });
+
   test(`${model}: paused twice is a failure`, async () => {
     const s = scripted([msg([searchUse("s1")], "pause_turn"), msg([searchUse("s2")], "pause_turn")]);
     const out = await anthropicTalk({ apiKey: "k", model, Client: s.Client }).reply(ASK);
@@ -157,6 +184,51 @@ test("the client never retries", () => {
   }
   anthropicTalk({ apiKey: "k", model: "claude-haiku-4-5", Client });
   assert.equal(options.maxRetries, 0);
+});
+
+test("a failed route goes back marked as an error and the answer still comes through", async () => {
+  const s = scripted([msg([routeUse("r1")], "tool_use"), msg([text("지금은 길을 못 찾겠어요.")])]);
+  const transit = transitStub([{ ok: false, text: "길찾기가 지금 대답하지 않아요." }]);
+  const out = await anthropicTalk({ apiKey: "k", model: "claude-haiku-4-5", Client: s.Client, transit }).reply(ASK);
+  assert.deepEqual([out.ok, out.text, out.sources], [true, "지금은 길을 못 찾겠어요.", []]);
+  assert.deepEqual(s.calls[1].body.messages.at(-1).content, [{ type: "tool_result", tool_use_id: "r1", content: "길찾기가 지금 대답하지 않아요.", is_error: true }]);
+});
+
+test("a search pause and a route call can share one reply", async () => {
+  const paused = msg([searchUse("s1")], "pause_turn");
+  const used = msg([searchResult("s1", []), routeUse("r1")], "tool_use");
+  const s = scripted([paused, used, msg([text("8호선 타요!")])]);
+  const transit = transitStub([{ ok: true, text: "1) 지하철 25분", link: MAP }]);
+  const out = await anthropicTalk({ apiKey: "k", model: "claude-haiku-4-5", Client: s.Client, transit }).reply(ASK);
+  assert.deepEqual([out.ok, out.text, out.calls, out.sources], [true, "8호선 타요!", 3, [MAP]]);
+  assert.deepEqual(s.calls[2].body.messages, [
+    ...ASK.messages,
+    { role: "assistant", content: paused.content },
+    { role: "assistant", content: used.content },
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "r1", content: "1) 지하철 25분" }] },
+  ]);
+});
+
+test("a failed retry drops the earlier map link", async () => {
+  const s = scripted([msg([routeUse("r1")], "tool_use"), msg([routeUse("r2")], "tool_use"), msg([text("그 길은 못 찾았어요.")])]);
+  const transit = transitStub([{ ok: true, text: "a", link: MAP }, { ok: false, text: "길찾기가 지금 대답하지 않아요." }]);
+  const out = await anthropicTalk({ apiKey: "k", model: "claude-haiku-4-5", Client: s.Client, transit }).reply(ASK);
+  assert.deepEqual([out.ok, out.text, out.sources], [true, "그 길은 못 찾았어요.", []]);
+});
+
+test("route calls stop after two rounds", async () => {
+  const s = scripted([msg([routeUse("r1")], "tool_use"), msg([routeUse("r2")], "tool_use"), msg([routeUse("r3")], "tool_use")]);
+  const transit = transitStub([{ ok: true, text: "a", link: MAP }, { ok: true, text: "b", link: MAP }]);
+  const out = await anthropicTalk({ apiKey: "k", model: "claude-haiku-4-5", Client: s.Client, transit }).reply(ASK);
+  assert.deepEqual([out.ok, out.stop, out.calls, transit.asked.length], [false, "tool_use", 3, 2]);
+});
+
+test("the route tool is offered only with a Kakao key", async () => {
+  for (const [env, tools] of [[{}, ["web_search"]], [{ KAKAO_REST_KEY: "rest" }, ["web_search", "transit_route"]]]) {
+    const s = scripted([msg([text("안녕하세요!")])]);
+    await talkFromEnv({ ANTHROPIC_API_KEY: "k", TALK_UIDS: "04AAAAAAAAAAA1", ...env }, true, { Client: s.Client }).provider.reply(ASK);
+    assert.deepEqual(s.calls[0].body.tools.map((t) => t.name), tools);
+  }
 });
 
 test("links, markdown and non-http citations never reach the line", () => {

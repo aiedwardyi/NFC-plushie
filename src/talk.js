@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { kakaoTransit } from "./transit.js";
 
 // Everything provider-specific lives here; callers see plain { ok, text, sources, stop, usage, ms } and { ok, changes } shapes.
 
@@ -16,6 +17,20 @@ const SEARCH_TOOL = {
   max_uses: 2,
   user_location: { type: "approximate", city: "Seoul", region: "Seoul", country: "KR", timezone: "Asia/Seoul" },
 };
+const ROUTE_TOOL = {
+  name: "transit_route",
+  description: "Live public transit directions in Korea (subway and bus) between two named places: lines, transfer stations, stop counts, minutes and fare. Use it for every question about how to get from one place to another instead of guessing.",
+  input_schema: {
+    type: "object",
+    properties: {
+      from: { type: "string", description: "Start place as the owner named it, e.g. 암사역" },
+      to: { type: "string", description: "Destination as the owner named it, e.g. 강남역" },
+    },
+    required: ["from", "to"],
+    additionalProperties: false,
+  },
+};
+const ROUTE_ROUNDS = 2;
 
 export function costOf(model, usage) {
   const price = MODELS[model] || MODELS[NOTEBOOK_MODEL];
@@ -59,11 +74,11 @@ export function lastSentence(text) {
   return m ? m[0].trim() : "";
 }
 
-// Text after the last search result is the answer; anything before it is preamble.
+// Text after the last search result or route call is the answer; anything before it is preamble.
 export function readReply(content, stop) {
   if (stop === "refusal") return { ok: false, stop, text: "", sources: [] };
   if (stop !== "end_turn" && stop !== "max_tokens") return { ok: false, stop, text: "", sources: [] };
-  const last = content.map((b) => b.type).lastIndexOf("web_search_tool_result");
+  const last = content.findLastIndex((b) => b.type === "web_search_tool_result" || b.type === "tool_use");
   const blocks = content.slice(last + 1).filter((b) => b.type === "text");
   let text = clean(blocks.map((b) => b.text).join(""));
   if (stop === "max_tokens") text = lastSentence(text);
@@ -109,29 +124,55 @@ const NOTEBOOK_SCHEMA = {
 
 const failure = (error) => (error instanceof Anthropic.APIUserAbortError ? "timeout" : error instanceof Anthropic.APIError ? `api_${error.status ?? "conn"}` : "error");
 
-export function anthropicTalk({ apiKey, model, Client = Anthropic }) {
+export function anthropicTalk({ apiKey, model, Client = Anthropic, transit = null }) {
   const client = new Client({ apiKey, maxRetries: 0 });
   const params = MODELS[model].params;
+  const tools = transit ? [SEARCH_TOOL, ROUTE_TOOL] : [SEARCH_TOOL];
+  async function runTools(blocks, signal) {
+    let link = null;
+    const results = [];
+    for (const use of blocks.filter((b) => b.type === "tool_use")) {
+      const out = use.name === ROUTE_TOOL.name ? await transit.route({ ...use.input, signal }) : { ok: false, text: "unknown tool" };
+      if (out.ok) link = out.link;
+      results.push({ type: "tool_result", tool_use_id: use.id, content: out.text, ...(out.ok ? {} : { is_error: true }) });
+    }
+    return { results, link };
+  }
   return {
     model,
     async reply({ system, messages, signal }) {
       const started = performance.now();
-      const body = { model, max_tokens: REPLY_TOKENS, system, messages, tools: [SEARCH_TOOL], ...params };
+      const body = { model, max_tokens: REPLY_TOKENS, system, messages, tools, ...params };
       let usage = ZERO;
-      let calls = 1;
+      let calls = 0;
       try {
-        const first = await client.messages.create(body, { signal });
-        usage = usageOf(first.usage);
-        let content = first.content;
-        let stop = first.stop_reason;
-        if (stop === "pause_turn") {
-          calls = 2;
-          const next = await client.messages.create({ ...body, messages: [...messages, { role: "assistant", content: first.content }] }, { signal });
-          usage = addUsage(usage, usageOf(next.usage));
-          content = [...content, ...next.content];
-          stop = next.stop_reason;
+        let content = [];
+        let stop = null;
+        let paused = false;
+        let rounds = 0;
+        let link = null;
+        for (;;) {
+          calls += 1;
+          const res = await client.messages.create(body, { signal });
+          usage = addUsage(usage, usageOf(res.usage));
+          content = [...content, ...res.content];
+          stop = res.stop_reason;
+          if (stop === "pause_turn" && !paused) {
+            paused = true;
+            body.messages = [...body.messages, { role: "assistant", content: res.content }];
+          } else if (stop === "tool_use" && transit && rounds < ROUTE_ROUNDS) {
+            rounds += 1;
+            const ran = await runTools(res.content, signal);
+            link = ran.link;
+            body.messages = [...body.messages, { role: "assistant", content: res.content }, { role: "user", content: ran.results }];
+          } else {
+            break;
+          }
         }
-        return { ...readReply(content, stop), usage, calls, ms: Math.round(performance.now() - started) };
+        const out = readReply(content, stop);
+        const map = httpUrl(link?.url || "");
+        if (out.ok && map) out.sources = [{ title: link.title, url: map }, ...out.sources].slice(0, 2);
+        return { ...out, usage, calls, ms: Math.round(performance.now() - started) };
       } catch (error) {
         return { ok: false, stop: failure(error), text: "", sources: [], usage, calls, ms: Math.round(performance.now() - started) };
       }
@@ -216,5 +257,6 @@ export function talkFromEnv(env, production, { Client = Anthropic } = {}) {
   }
   const model = env.TALK_MODEL || "claude-haiku-4-5";
   if (!env.ANTHROPIC_API_KEY || !MODELS[model]) return null;
-  return { provider: anthropicTalk({ apiKey: env.ANTHROPIC_API_KEY, model, Client }), uids };
+  const transit = env.KAKAO_REST_KEY ? kakaoTransit({ key: env.KAKAO_REST_KEY }) : null;
+  return { provider: anthropicTalk({ apiKey: env.ANTHROPIC_API_KEY, model, Client, transit }), uids };
 }
