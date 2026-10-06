@@ -2053,12 +2053,18 @@ const care = (function careLoop() {
     motion.getAnimations().forEach((a) => a.cancel());
   }
 
+  let danceAsked = -Infinity;
+
   function end() {
     motion.getAnimations().forEach((a) => a.cancel());
     layer.replaceChildren();
     pet.classList.remove("is-care");
     careHold.busy = false;
     face();
+    if (performance.now() - danceAsked < 5000) {
+      danceAsked = -Infinity;
+      dance();
+    }
   }
 
   async function feed(beat) {
@@ -2228,16 +2234,18 @@ const care = (function careLoop() {
   function windRings(b) {
     const cx = b.x + b.w / 2;
     const rings = [[1.02, 0.34], [0.74, 0.48], [0.44, 0.62], [0.14, 0.76]];
-    const arcs = (far) => rings.map(([fy, fr], i) => {
+    const arcs = (far) => rings.map(([fy, fr]) => {
       const y = b.y + b.h * fy;
       const rx = b.w * fr;
-      return `<path class="dw-arc" style="--i:${i}" d="M${cx - rx} ${y} A${rx} ${rx * 0.24} 0 0 ${far ? 1 : 0} ${cx + rx} ${y}" pathLength="96"/>`;
+      return `<path class="dw-arc" d="M${cx - rx} ${y} A${rx} ${rx * 0.24} 0 0 ${far ? 1 : 0} ${cx + rx} ${y}" pathLength="96"/>`;
     }).join("");
     const make = (far) => {
       const el = document.createElement("div");
       el.className = `dance-wind ${far ? "is-far" : "is-near"}`;
       el.setAttribute("aria-hidden", "true");
       el.innerHTML = `<svg viewBox="0 0 ${b.W} ${b.H}" width="${b.W}" height="${b.H}">${arcs(far)}</svg>`;
+      // Inline style attributes are blocked by the CSP, so each ring's index is set here.
+      el.querySelectorAll(".dw-arc").forEach((arc, i) => arc.style.setProperty("--i", String(i)));
       el.style.transformOrigin = `${cx}px ${b.y + b.h * 0.6}px`;
       return el;
     };
@@ -2277,7 +2285,12 @@ const care = (function careLoop() {
   // Talk's dance: two spinning hops, a whirlwind spin, a finishing leap. Hops ride the pet, turns its motion layer.
   let dancing = false;
   async function dance() {
-    if (dancing || careHold.busy || careHold.asleep || still()) return;
+    if (dancing || careHold.asleep || still()) return;
+    // A dance asked for mid-action starts when that action ends.
+    if (careHold.busy) {
+      danceAsked = performance.now();
+      return;
+    }
     dancing = true;
     careHold.busy = true;
     setWant(null);
