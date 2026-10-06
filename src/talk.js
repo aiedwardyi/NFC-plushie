@@ -163,7 +163,7 @@ export function anthropicTalk({ apiKey, model, Client = Anthropic, transit = nul
           } else if (stop === "tool_use" && transit && rounds < ROUTE_ROUNDS) {
             rounds += 1;
             const ran = await runTools(res.content, signal);
-            link = ran.link || link;
+            link = ran.link;
             body.messages = [...body.messages, { role: "assistant", content: res.content }, { role: "user", content: ran.results }];
           } else {
             break;

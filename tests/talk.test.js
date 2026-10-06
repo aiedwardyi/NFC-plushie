@@ -194,6 +194,28 @@ test("a failed route goes back marked as an error and the answer still comes thr
   assert.deepEqual(s.calls[1].body.messages.at(-1).content, [{ type: "tool_result", tool_use_id: "r1", content: "길찾기가 지금 대답하지 않아요.", is_error: true }]);
 });
 
+test("a search pause and a route call can share one reply", async () => {
+  const paused = msg([searchUse("s1")], "pause_turn");
+  const used = msg([searchResult("s1", []), routeUse("r1")], "tool_use");
+  const s = scripted([paused, used, msg([text("8호선 타요!")])]);
+  const transit = transitStub([{ ok: true, text: "1) 지하철 25분", link: MAP }]);
+  const out = await anthropicTalk({ apiKey: "k", model: "claude-haiku-4-5", Client: s.Client, transit }).reply(ASK);
+  assert.deepEqual([out.ok, out.text, out.calls, out.sources], [true, "8호선 타요!", 3, [MAP]]);
+  assert.deepEqual(s.calls[2].body.messages, [
+    ...ASK.messages,
+    { role: "assistant", content: paused.content },
+    { role: "assistant", content: used.content },
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "r1", content: "1) 지하철 25분" }] },
+  ]);
+});
+
+test("a failed retry drops the earlier map link", async () => {
+  const s = scripted([msg([routeUse("r1")], "tool_use"), msg([routeUse("r2")], "tool_use"), msg([text("그 길은 못 찾았어요.")])]);
+  const transit = transitStub([{ ok: true, text: "a", link: MAP }, { ok: false, text: "길찾기가 지금 대답하지 않아요." }]);
+  const out = await anthropicTalk({ apiKey: "k", model: "claude-haiku-4-5", Client: s.Client, transit }).reply(ASK);
+  assert.deepEqual([out.ok, out.text, out.sources], [true, "그 길은 못 찾았어요.", []]);
+});
+
 test("route calls stop after two rounds", async () => {
   const s = scripted([msg([routeUse("r1")], "tool_use"), msg([routeUse("r2")], "tool_use"), msg([routeUse("r3")], "tool_use")]);
   const transit = transitStub([{ ok: true, text: "a", link: MAP }, { ok: true, text: "b", link: MAP }]);
