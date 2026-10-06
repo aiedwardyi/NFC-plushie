@@ -2005,16 +2005,29 @@ html.has-reveal body::after { visibility: hidden; }
   white-space: pre;
   transform-origin: 50% 80%;
   visibility: hidden;
+  will-change: transform, opacity;
 }
 .reveal-name > span {
   grid-area: 1 / 1;
   color: transparent;
 }
-/* Outline sits under the gold: stroked on the gold itself, it also traced the font's overlapping strokes inside each letter. */
-.reveal-name-edge {
+/* Outline sits under the gold: stroked on the gold itself, it also traced the font's overlapping strokes inside each letter.
+   Filled, so its shadow is the whole letter; the gold hides the fill. */
+.reveal-name > .reveal-name-edge {
+  color: rgba(58, 34, 6, 0.92);
   -webkit-text-stroke: 6px rgba(58, 34, 6, 0.92);
+  filter: drop-shadow(0 10px 0 #070A16) drop-shadow(0 0 34px rgba(255, 206, 110, 0.4));
 }
+/* The landing flash: a blurred gold copy that only fades, so the blur rasterizes once. */
+.reveal-name > .reveal-name-glow {
+  color: #FFCE6E;
+  filter: blur(36px);
+  opacity: 0;
+  will-change: opacity;
+}
+/* Filtered siblings paint in the stacking phase; relative keeps the gold on top of them. */
 .reveal-name-gold {
+  position: relative;
   -webkit-background-clip: text;
   background-clip: text;
 }
