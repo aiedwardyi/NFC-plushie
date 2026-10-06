@@ -285,6 +285,8 @@ html[data-theme="milk"] .demo-close { color: var(--berry-soft); }
 html[data-theme="milk"] .still-wash { background: radial-gradient(ellipse at center, rgba(255, 143, 171, 0.3), rgba(255, 143, 171, 0.06) 55%, transparent 78%); }
 
 /* Care */
+html[data-theme="milk"] .dance-wind,
+html[data-theme="milk"] .dance-note { --dw-ink: #fff; --dw-glow: rgba(255, 111, 160, .9); --dw-note: #ff6fa0; }
 html[data-theme="milk"] .zzz { color: #fff; text-shadow: 0 2px 0 rgba(180, 70, 120, .45); }
 html[data-theme="milk"] .dock-btn.is-want .dock-cap::after { border-color: #ff8fb3; }
 html[data-theme="milk"] .sparkle { background: #fff; }

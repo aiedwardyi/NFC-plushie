@@ -188,6 +188,7 @@ export function fakeTalk({ delayMs = 600 } = {}) {
       }
       if (/길게/.test(said)) return done({ text: FAKE_LONG });
       if (/img|<|>/.test(said)) return done({ text: `${said} 라고 했어요?` });
+      if (/춤/.test(said)) return done({ text: "[춤] 빙글빙글, 신나게 춤춰요!" });
       if (/\?|뭐|어때/.test(said)) return done({ text: "음, 저는 토닥토닥이 제일 좋아요. 당신은요?" });
       return done({ text: "우와, 그랬어요? 이야기해 줘서 고마워요!" });
     },

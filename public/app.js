@@ -2059,12 +2059,18 @@ const care = (function careLoop() {
     motion.getAnimations().forEach((a) => a.cancel());
   }
 
+  let danceAsked = -Infinity;
+
   function end() {
     motion.getAnimations().forEach((a) => a.cancel());
     layer.replaceChildren();
     pet.classList.remove("is-care");
     careHold.busy = false;
     face();
+    if (performance.now() - danceAsked < 5000) {
+      danceAsked = -Infinity;
+      dance();
+    }
   }
 
   async function feed(beat) {
@@ -2226,6 +2232,149 @@ const care = (function careLoop() {
     say(line(beat));
     await wait(800);
     return 800;
+  }
+
+  const NOTES = { classic: ["♪", "♫", "✦"], "8bit": ["♪", "♫"], milk: ["♥", "♪", "♫"], najeon: ["♪", "✿", "♫"] };
+
+  // A funnel of wind rings around the pet: the far half of each ring goes behind it, the near half over it.
+  function windRings(b) {
+    const cx = b.x + b.w / 2;
+    const rings = [[1.02, 0.34], [0.74, 0.48], [0.44, 0.62], [0.14, 0.76]];
+    const arcs = (far) => rings.map(([fy, fr]) => {
+      const y = b.y + b.h * fy;
+      const rx = b.w * fr;
+      return `<path class="dw-arc" d="M${cx - rx} ${y} A${rx} ${rx * 0.24} 0 0 ${far ? 1 : 0} ${cx + rx} ${y}" pathLength="96"/>`;
+    }).join("");
+    const make = (far) => {
+      const el = document.createElement("div");
+      el.className = `dance-wind ${far ? "is-far" : "is-near"}`;
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = `<svg viewBox="0 0 ${b.W} ${b.H}" width="${b.W}" height="${b.H}">${arcs(far)}</svg>`;
+      // Inline style attributes are blocked by the CSP, so each ring's index is set here.
+      el.querySelectorAll(".dw-arc").forEach((arc, i) => arc.style.setProperty("--i", String(i)));
+      el.style.transformOrigin = `${cx}px ${b.y + b.h * 0.6}px`;
+      return el;
+    };
+    const far = make(true);
+    const near = make(false);
+    win.insertBefore(far, pet);
+    layer.appendChild(near);
+    return [far, near];
+  }
+
+  // Notes ride a helix up around the pet; smaller and dimmer on the far side.
+  function notes(b) {
+    const cx = b.x + b.w / 2;
+    const glyphs = NOTES[world()] || NOTES.classic;
+    for (let i = 0; i < 8; i++) {
+      const note = document.createElement("span");
+      note.className = "dance-note";
+      note.textContent = glyphs[i % glyphs.length];
+      const a0 = Math.random() * Math.PI * 2;
+      const frames = [];
+      for (let k = 0; k <= 12; k++) {
+        const t = k / 12;
+        const a = a0 + t * Math.PI * 2.4;
+        const r = b.w * (0.58 - 0.16 * t);
+        const near = (Math.sin(a) + 1) / 2;
+        const fade = t < 0.12 ? t / 0.12 : t > 0.82 ? (1 - t) / 0.18 : 1;
+        frames.push({
+          transform: `translate(${cx + Math.cos(a) * r}px, ${b.y + b.h * (0.95 - 1.1 * t) + Math.sin(a) * r * 0.24}px) translate(-50%, -50%) scale(${0.55 + 0.55 * near})`,
+          opacity: fade * (0.35 + 0.65 * near),
+        });
+      }
+      layer.appendChild(note);
+      note.animate(frames, { duration: 1500 + Math.random() * 400, delay: i * 110, fill: "both" }).finished.finally(() => note.remove()).catch(() => {});
+    }
+  }
+
+  // Talk's dance: two spinning hops, a whirlwind spin, a finishing leap. Hops ride the pet, turns its motion layer.
+  let dancing = false;
+  async function dance() {
+    if (dancing || careHold.asleep || still()) return;
+    // A dance asked for mid-action starts when that action ends.
+    if (careHold.busy) {
+      danceAsked = performance.now();
+      return;
+    }
+    dancing = true;
+    careHold.busy = true;
+    setWant(null);
+    pet.classList.add("is-care");
+    motion.getAnimations().forEach((a) => a.cancel());
+    const b = box();
+    let wind = [];
+    pet.style.transformOrigin = "50% 100%";
+    const quarter = (from, to, ms) => move(motion, [{ transform: `scaleX(${from})` }, { transform: `scaleX(${to})` }], { duration: ms, easing: "ease-in-out" });
+    // Edge-on the pet stays a sliver, so it never blinks out mid-turn.
+    async function turn(ms) {
+      await quarter(1, 0.06, ms / 4);
+      face("away");
+      await quarter(0.06, 1, ms / 4);
+      await quarter(1, 0.06, ms / 4);
+      face("happy");
+      await quarter(0.06, 1, ms / 4);
+    }
+    const hop = (up, ms) => move(pet, [
+      { transform: "translateY(0) scale(1)" },
+      { transform: "translateY(0) scale(1.1, .88)", offset: 0.16, easing: "ease-out" },
+      { transform: `translateY(${-up}%) scale(.94, 1.08)`, offset: 0.5, easing: "ease-in" },
+      { transform: `translateY(${-up}%) scale(1)`, offset: 0.58, easing: "ease-in" },
+      { transform: "translateY(0) scale(1.08, .9)", offset: 0.86, easing: "ease-out" },
+      { transform: "translateY(0) scale(1)" },
+    ], { duration: ms });
+    try {
+      face("happy");
+      for (const rate of [1, 1.12]) {
+        // The wind gathers under the second hop.
+        if (rate > 1) {
+          wind = windRings(b);
+          for (const el of wind) el.animate([{ opacity: 0, transform: "scale(.4)" }, { opacity: 0.55, transform: "scale(.8)", offset: 0.6 }, { opacity: 1, transform: "scale(1)" }], { duration: 760, easing: "ease-out", fill: "forwards" });
+        }
+        const h = hop(16, 640);
+        sound("boing", 60, { rate, gain: 0.7 });
+        await wait(120);
+        sound("whoosh", 0, { gain: 0.5 });
+        await turn(400);
+        await h;
+      }
+      // The whirlwind: notes ride it while the pet hovers and twirls.
+      notes(b);
+      sound("whoosh", 0, { rate: 1.2, gain: 0.8 });
+      const hover = move(pet, [
+        { transform: "translateY(0)" },
+        { transform: "translateY(-13%)", offset: 0.25, easing: "ease-out" },
+        { transform: "translateY(-16%)", offset: 0.75 },
+        { transform: "translateY(0)" },
+      ], { duration: 1260, easing: "ease-in-out" });
+      for (const ms of [440, 360, 320]) await turn(ms);
+      await hover;
+      // Finale: a big leap, the wind bursts out, hearts on the landing.
+      const leap = hop(24, 760);
+      sound("whistle-up", 60, { gain: 0.7 });
+      for (const el of wind) el.animate([{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(1.5)" }], { duration: 520, delay: 120, easing: "ease-out", fill: "forwards" });
+      await wait(140);
+      await turn(300);
+      sparkles(b.x + b.w / 2, b.y + b.h * 0.2, 8, b.w * 0.9);
+      sound("sparkle");
+      await leap;
+      cheer();
+      tryVibrate(18);
+      await move(pet, [
+        { transform: "rotate(0)" },
+        { transform: "rotate(-7deg)", offset: 0.25 },
+        { transform: "rotate(7deg)", offset: 0.55 },
+        { transform: "rotate(-4deg)", offset: 0.8 },
+        { transform: "rotate(0)" },
+      ], { duration: 640, easing: "ease-in-out" });
+    } finally {
+      for (const el of wind) el.remove();
+      pet.getAnimations().forEach((a) => a.cancel());
+      pet.style.transformOrigin = "";
+      end();
+      dancing = false;
+      if (opened) wantLater(dock.dataset.want, 1200);
+    }
   }
 
   let moonEl = null;
@@ -2540,7 +2689,7 @@ const care = (function careLoop() {
     if (id) press(id);
   });
   if (owner) window.addEventListener("load", () => preload(world()), { once: true });
-  return { morning, opened: open, restyle, hold, release, busy: screenBusy, blocked: () => screenBusy(true), hearts: tweenHearts, fx: { say, sparkles, cheer, box, move, sound, voice } };
+  return { morning, opened: open, restyle, hold, release, dance, busy: screenBusy, blocked: () => screenBusy(true), hearts: tweenHearts, fx: { say, sparkles, cheer, box, move, sound, voice } };
 })();
 
 function percent(r) {
@@ -4225,8 +4374,12 @@ const farm = (function farmRoom() {
         }
         if (pending !== mine || sayToken !== line) return;
         pending = null;
-        if (reply?.ok && typeof reply.text === "string" && reply.text) answer(reply.text, reply.sources);
-        else answer(typeof reply?.line === "string" ? reply.line : ERROR_LINE, null);
+        if (reply?.ok && typeof reply.text === "string" && reply.text) {
+          answer(reply.text, reply.sources);
+          if (reply.action === "dance") care?.dance();
+        } else {
+          answer(typeof reply?.line === "string" ? reply.line : ERROR_LINE, null);
+        }
       });
   }
 
