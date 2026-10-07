@@ -165,6 +165,36 @@ if (window.location.pathname === "/t") {
     window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
   }
 }
+// Phones hide the browser bars on the pet's home. Browsers allow it only inside a touch, so any touch outside fullscreen asks again.
+const immersive = (function immersive() {
+  const root = document.documentElement;
+  const asks = {};
+  let asked = false;
+  for (const name of ["nfc", "microphone"]) navigator.permissions?.query({ name }).then((s) => { asks[name] = s; }, () => {});
+  if (TAP_SPOT !== "desk" && document.fullscreenEnabled && document.querySelector(".dock[data-care-uid]")) {
+    window.addEventListener("click", (event) => {
+      asked = false;
+      if (!event.isTrusted || event.target.closest?.("a, input, textarea, select, [data-talk-bar], [data-talk-mic]")) return;
+      // After the page's own handlers, so a permission prompt one of them opens keeps the touch.
+      window.setTimeout(() => {
+        if (asked || document.fullscreenElement || document.querySelector(".name-form")
+          || root.classList.contains("has-reveal") || root.classList.contains("g-on")) return;
+        root.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+      }, 0);
+    }, true);
+    // The keyboard needs the browser's own resizing, so typing leaves fullscreen.
+    document.addEventListener("focusin", (event) => {
+      if (document.fullscreenElement === root && event.target.matches?.("input, textarea")) document.exitFullscreen().catch(() => {});
+    });
+  }
+  // A first permission prompt can wait unseen behind fullscreen, so it is asked with the bars showing.
+  function beforeAsk(name) {
+    if (asks[name]?.state !== "prompt") return;
+    asked = true;
+    if (document.fullscreenElement === root) document.exitFullscreen().catch(() => {});
+  }
+  return { beforeAsk };
+})();
 // Set only while talk is on: anything else taking the speech line drops the pet's pending answer.
 let talkHook = null;
 const pet = document.querySelector('[data-pet="alive"]');
@@ -3265,6 +3295,7 @@ const combo = (function tapCombo() {
   function listen() {
     if (!listening) {
       const controller = new AbortController();
+      immersive.beforeAsk("nfc");
       try {
         const reader = new NDEFReader();
         reader.addEventListener("reading", heard);
@@ -4646,6 +4677,7 @@ const farm = (function farmRoom() {
     mic.classList.add("is-listening");
     mic.setAttribute("aria-pressed", "true");
     checkLength();
+    immersive.beforeAsk("microphone");
     try {
       r.start();
     } catch {
@@ -4921,7 +4953,7 @@ const reveal = (function legendaryReveal() {
   }
 
   function exitFullscreen() {
-    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    if (document.fullscreenElement === overlay) document.exitFullscreen?.().catch(() => {});
   }
 
   function close() {
