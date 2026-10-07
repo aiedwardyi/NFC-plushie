@@ -324,6 +324,7 @@ test("the owner home shows the 오락실 and its sheet", async (t) => {
   assert.doesNotMatch(done.html, /has-new" data-open="arcade"|g-gifts has-new/);
   assert.match(done.html, / data-arcade-left="0" data-gi-best="4200" /);
   assert.match(done.html, /<i class="g-pip is-used"><\/i><i class="g-pip is-used"><\/i><i class="g-pip is-used"><\/i><b>다 했어요!<\/b>/);
+  assert.equal((await ctx.request("/kind", { jar, body: { uid: A, kind: "sheep" } })).status, 200);
   const sheep = await ctx.request(`/t?uid=${A}`, { jar: { ...jar, pet_skip: A, mascot: "sheep" } });
   assert.match(sheep.html, /<img class="g-thumb-pet" src="\/mascot-sheep-512-v3\.png" alt="">/);
 });

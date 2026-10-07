@@ -213,6 +213,7 @@ test("the 텃밭 dot goes out once the farm is open and growing", async (t) => {
 for (const kind of ["horse", "sheep"]) {
   test(`the ${kind} pet carries every face frame`, async (t) => {
     const { request, jar } = await named(t);
+    assert.equal((await request("/kind", { jar, body: { uid: A, kind } })).status, 200);
     const home = await request(`/t?uid=${A}`, { jar: { ...jar, mascot: kind } });
     const frames = home.html.match(/<img class="pet-frame[^>]*>/g);
     const srcOf = (img) => img.match(/ src="([^"]+)"/)[1];

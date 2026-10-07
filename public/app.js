@@ -4,6 +4,8 @@
   const MAX_AGE = String(400 * 24 * 60 * 60);
 
   function readKind() {
+    const saved = document.querySelector('meta[name="pet-kind"]');
+    if (saved) return saved.content;
     try {
       const params = new URLSearchParams(window.location.search);
       const q = params.get("mascot");

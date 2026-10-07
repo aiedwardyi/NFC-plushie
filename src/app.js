@@ -145,7 +145,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     if (mascot !== "sheep") return next();
     const send = res.send.bind(res);
     res.send = (body) => {
-      if (typeof body === "string" && body.includes("mascot-horse")) {
+      if (typeof body === "string" && body.includes("mascot-horse") && !body.includes('name="pet-kind"')) {
         // Keep toggle icons as horse|sheep; only rewrite pet frames outside the toggle.
         const parts = body.split(/(<aside class="mascot-toggle"[\s\S]*?<\/aside>)/);
         body = parts

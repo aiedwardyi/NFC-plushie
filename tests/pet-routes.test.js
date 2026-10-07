@@ -530,6 +530,22 @@ const dialogOf = (html) => html.match(/<section class="dialog"[\s\S]*?<\/section
 const setA = (ctx, sql, ...args) => ctx.db.prepare(`UPDATE plushies SET ${sql} WHERE uid = ?`).run(...args, A);
 const GUILT = /외로|왜 안|슬펐|미워/;
 
+test("saved animal controls artwork despite a conflicting browser preference", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  for (const kind of ["horse", "sheep"]) {
+    const other = kind === "horse" ? "sheep" : "horse";
+    setA(ctx, "kind = ?", kind);
+    for (const visitor of [jar, {}]) {
+      const result = await ctx.request(`/t?uid=${A}&view=1&mascot=${other}`, { jar: { ...visitor, mascot: other } });
+      assert.match(result.html, new RegExp(`<html lang="ko" data-mascot="${kind}"`));
+      const frames = [...result.html.matchAll(/<img class="pet-frame[^>]*src="([^"]+)"/g)];
+      assert.ok(frames.length);
+      for (const frame of frames) assert.ok(frame[1].includes(`mascot-${kind}-`));
+    }
+  }
+});
+
 test("the stat card shows a 포근 클래식 말 at 50/40/70/60, closed until asked", async (t) => {
   const ctx = await setup(t);
   const { jar } = await meet(ctx, A, "Mochi");

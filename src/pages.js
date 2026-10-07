@@ -369,7 +369,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
   const celebrateAttr = celebrate === "claim" || celebrate === "named" || celebrate === "milestone" || celebrate === "levelup" || celebrate === "reunion" || celebrate === "rare" || celebrate === "special"
     ? ` data-celebrate="${celebrate}"`
     : "";
-  const kind = mascot === "sheep" ? "sheep" : "horse";
+  const kind = (row?.kind || mascot) === "sheep" ? "sheep" : "horse";
   const horsePressed = kind === "horse" ? "true" : "false";
   const sheepPressed = kind === "sheep" ? "true" : "false";
   const horseActive = kind === "horse" ? " is-active" : "";
@@ -398,7 +398,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
   return `<!doctype html>
 <html lang="ko" data-mascot="${kind}"${themed ? ` data-theme="${look.id}"` : ""}>
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8">${row?.kind ? `\n  <meta name="pet-kind" content="${kind}">` : ""}
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="${look.color}">
   <meta name="color-scheme" content="light dark">
@@ -475,6 +475,7 @@ function homeExtras(row, pet, found, mascot, talk) {
 }
 
 export function petPage(row, code = null, { celebrate = "", pet = null, mascot = "horse", demo = "", found = [], theme = "classic", talk = false, ask = "", guest = false, card = null } = {}) {
+  mascot = row.kind || mascot;
   const firstMeet = celebrate === "claim" || celebrate === "named";
   let greeting = row.pet_name
     ? (firstMeet

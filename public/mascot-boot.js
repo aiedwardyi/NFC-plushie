@@ -28,6 +28,11 @@
     document.documentElement.setAttribute("data-time", h >= 5 && h < 11 ? "morning" : h >= 11 && h < 18 ? "day" : h >= 18 && h < 22 ? "evening" : "night");
     var KEY = "pokkey-mascot";
     var kind = "horse";
+    var saved = document.querySelector('meta[name="pet-kind"]');
+    if (saved) {
+      document.documentElement.setAttribute("data-mascot", saved.content);
+      return;
+    }
     var q = new URLSearchParams(location.search).get("mascot");
     if (q === "sheep" || q === "horse") kind = q;
     else {
