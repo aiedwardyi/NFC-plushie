@@ -235,7 +235,10 @@ export async function createRace(api) {
     S.groundRows = [...Array.from({ length: 72 }, (_, j) => (L.ch * L.f) / (Y0(far) + (gh * j) / 71 - L.hy)), 0.56, 0.52, 0.48, 0.44, 0.4, 0.36, 0.32, 0.28, 0.25, 0.22, 0.2].map((d) => ({ d, v: (Y0(d) - Y0(far)) / gh }));
     S.ground = quad(groundTex, 2, S.groundRows.length);
     S.groundPeriod = period;
-    root.addChild(S.ground.mesh);
+    // Under the ground's near edge (the picker's crane lifts it on short screens) the world's base shows, not the sky.
+    S.floor = new P.Sprite(P.Texture.WHITE);
+    S.floor.tint = look.base;
+    root.addChild(S.floor, S.ground.mesh);
     const white = tex(canvas(4, 4, 1, (x) => { x.fillStyle = "#fff"; x.fillRect(0, 0, 4, 4); }), false);
     S.startLine = quad(white, 2, 8);
     S.startLine.mesh.tint = look.line;
@@ -1175,6 +1178,10 @@ export async function createRace(api) {
       });
       q.pos.update();
       q.uv.update();
+      const edge = Y(S.groundRows[S.groundRows.length - 1].d);
+      S.floor.position.set(-L.over, edge - 1);
+      S.floor.width = W + 2 * L.over;
+      S.floor.height = Math.max(0, H + 2 * L.over - edge);
     }
     furniture(wdt);
     decal(S.startLine, 0, 0.12, 1);
