@@ -789,6 +789,12 @@ function tryVibrate(pattern) {
   }
 }
 
+// A buzz before the page's first touch is blocked, so a celebration's buzz waits for that touch while the celebration still shows.
+function celebrateBuzz(pattern, showing) {
+  if (navigator.userActivation?.hasBeenActive === false) firstTouch.push(() => showing() && tryVibrate(pattern));
+  else tryVibrate(pattern);
+}
+
 function enhanceRollingCounter({ duration = 400, goldPop = false } = {}) {
   const countEl = document.querySelector("[data-tap-count]");
   if (!countEl) return;
@@ -1058,7 +1064,7 @@ function reunionJump() {
   const pet = document.querySelector('[data-pet="alive"]');
   if (!pet || prefersReducedMotion()) return;
   pet.classList.add("is-reunion-jump");
-  tryVibrate([40, 60, 40]);
+  celebrateBuzz([40, 60, 40], () => pet.classList.contains("is-reunion-jump"));
   window.setTimeout(() => pet.classList.remove("is-reunion-jump"), 900);
 }
 
@@ -1091,7 +1097,7 @@ function runCelebrate() {
     }
     pulseFlash(FLASH_OPACITY, 150);
     shakeScreen(300);
-    tryVibrate([30, 40, 30, 40, 80]);
+    celebrateBuzz([30, 40, 30, 40, 80], () => document.querySelector("canvas.celebrate-layer"));
     burstConfetti({ mode: "claim" });
     enhanceRollingCounter({ duration: 400, goldPop: false });
     return;
@@ -1163,10 +1169,19 @@ const PAUSE_MS = { "!": 260, ".": 260, "?": 260, ",": 140 };
 let audio = null;
 let introLine = null;
 let waking = false;
+// Runs at the page's first touch: before it a phone plays no sound and blocks a buzz.
+const firstTouch = [];
 
 function wakeAudio() {
   try {
-    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (!audio) {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // A call or the lock screen stops sound (an iPhone says interrupted), so it is asked back while the page shows.
+      ctx.addEventListener("statechange", () => {
+        if (!document.hidden && (ctx.state === "suspended" || ctx.state === "interrupted")) ctx.resume().catch(() => {});
+      });
+      audio = ctx;
+    }
     audio.resume?.();
   } catch (_) {
     audio = null;
@@ -1358,6 +1373,11 @@ function typeLine(intro, line, onDone, delay = 520) {
     onDone(cursor);
   }
   function step() {
+    // Another line took the box: an unseen typing stops before its blips pile onto the new one.
+    if (!text.isConnected) {
+      finish();
+      return;
+    }
     const ch = chars[i++];
     text.textContent += ch;
     cursor.style.animation = "none";
@@ -1465,7 +1485,7 @@ function settleLine(index) {
   if (!last) lineTimer = window.setTimeout(() => sayLine(index + 1), AUTO_MS);
 }
 
-function sayLine(index, onTyped) {
+function sayLine(index, onTyped, delay = index === 0 ? 520 : 160) {
   const token = ++sayToken;
   const el = dialogLines[index];
   window.clearTimeout(lineTimer);
@@ -1474,10 +1494,10 @@ function sayLine(index, onTyped) {
   const text = lineText(el);
   showLine(index);
   if (el.classList.contains("gift")) glowGift();
-  typeLine(lineTarget(el), text, () => {
+  return typeLine(lineTarget(el), text, () => {
     if (token === sayToken) settleLine(index);
     onTyped?.();
-  }, index === 0 ? 520 : 160);
+  }, delay);
 }
 
 function startDialog(onTyped) {
@@ -1486,7 +1506,38 @@ function startDialog(onTyped) {
     return;
   }
   dialogBox.classList.add("is-seq");
-  sayLine(0, onTyped);
+  if (navigator.userActivation?.hasBeenActive) {
+    sayLine(0, onTyped);
+    return;
+  }
+  // A plushie tap opens the page untouched, and an untouched phone stays silent, so the first line waits behind a typing bubble.
+  const target = lineTarget(dialogLines[0]);
+  const text = lineText(dialogLines[0]);
+  const dots = document.createElement("span");
+  const spoken = document.createElement("span");
+  dots.className = "dialog-dots";
+  dots.setAttribute("aria-hidden", "true");
+  dots.innerHTML = "<i></i><i></i><i></i>";
+  spoken.className = "visually-hidden";
+  spoken.textContent = text;
+  target.replaceChildren(dots, spoken);
+  showLine(0);
+  const token = sayToken;
+  firstTouch.push((event) => {
+    const control = event.target.closest?.("a, button, input, select, textarea, label");
+    // On the next task, so the touch that starts the line can't also finish it.
+    window.setTimeout(() => {
+      if (token !== sayToken) {
+        if (dots.isConnected) target.textContent = text;
+        onTyped?.();
+      } else if (control || prefersReducedMotion() || document.querySelector(".sheet.is-open, .demo-sheet.is-open, .has-reveal, .g-on, .f-on")) {
+        // The touch started something that talks for itself, so the line shows at once, unspoken.
+        sayLine(0, onTyped)();
+      } else {
+        sayLine(0, onTyped, 60);
+      }
+    }, 0);
+  });
 }
 
 dialogBox?.addEventListener("pointerdown", () => {
@@ -2051,7 +2102,10 @@ const care = (function careLoop() {
     wantEl.setAttribute("aria-label", WANTS[id]);
     wantEl.innerHTML = `<i></i><i></i><span class="want-cloud">${wantArt(id)}</span>`;
     win.appendChild(wantEl);
-    sound("want");
+    // Before the page's first touch the sound is lost, so that touch plays it once if this bubble still shows.
+    const shown = wantEl;
+    if (navigator.userActivation?.hasBeenActive === false) firstTouch.push(() => wantEl === shown && sound("want"));
+    else sound("want");
   }
 
   // Loose skips a tap's after-glow (combo key, gift glow), which talk can share the screen with.
@@ -5103,7 +5157,18 @@ document.querySelector("[data-gift-grid]")?.addEventListener("click", (event) =>
 });
 
 if (document.querySelector('[data-rewarded="1"]')) document.querySelector(".level-line")?.classList.add("is-growing");
-document.addEventListener("pointerdown", wakeAudio, { once: true, capture: true });
+// Every touch wakes sound that is not running. A finger only unlocks it once it lifts, so its pointerdown waits for the pointerup.
+function rewake(event) {
+  if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+  if (navigator.userActivation?.hasBeenActive === false) return;
+  if (!audio) wakeAudio();
+  else if (audio.state !== "running") audio.resume?.().catch(() => {});
+  for (const fn of firstTouch.splice(0)) fn(event);
+}
+for (const type of ["pointerdown", "pointerup", "keydown"]) document.addEventListener(type, rewake, true);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && audio && audio.state !== "running" && navigator.userActivation?.hasBeenActive !== false) audio.resume?.().catch(() => {});
+});
 
 /* Legendary reveal: 15s video, the owner's name and first-meet date drawn live over it. */
 const reveal = (function legendaryReveal() {

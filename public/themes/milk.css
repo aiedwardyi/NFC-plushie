@@ -150,6 +150,8 @@ html[data-theme="milk"] .dialog-name {
 }
 html[data-theme="milk"] .dialog-cursor,
 html[data-theme="milk"] .dialog-cursor.is-done { background: var(--straw-deep); }
+html[data-theme="milk"] .dialog-dots { background: #ffe3ea; }
+html[data-theme="milk"] .dialog-dots i { background: var(--straw-deep); }
 html[data-theme="milk"] .gift-label,
 html[data-theme="milk"] .reader-label { background: #ffe3ea; color: var(--straw-deep); }
 

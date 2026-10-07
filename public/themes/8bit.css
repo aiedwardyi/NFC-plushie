@@ -244,6 +244,8 @@ html[data-theme="8bit"] .reader-label {
   font-weight: 700;
 }
 html[data-theme="8bit"] .dialog-cursor.is-done { animation: dialog-nudge .7s steps(2, jump-none) infinite alternate; }
+html[data-theme="8bit"] .dialog-dots { gap: 4px; padding: 5px 7px; border-radius: 0; background: rgba(11, 13, 26, 0.1); }
+html[data-theme="8bit"] .dialog-dots i { width: 6px; height: 6px; border-radius: 0; background: var(--ink); animation-timing-function: steps(2, jump-none); }
 
 /* Dock: square cartridge buttons with pixel icons */
 html[data-theme="8bit"] .dock-cap {
