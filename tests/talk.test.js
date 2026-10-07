@@ -57,7 +57,7 @@ for (const model of ["claude-haiku-4-5", "claude-sonnet-5-5"]) {
     const { body, opts } = s.calls[0];
     assert.equal(opts.signal, signal);
     assert.equal(body.model, model);
-    assert.equal(body.max_tokens, 300);
+    assert.equal(body.max_tokens, 600);
     assert.deepEqual(body.tools, [{ type: "web_search_20250305", name: "web_search", max_uses: 2, user_location: { type: "approximate", city: "Seoul", region: "Seoul", country: "KR", timezone: "Asia/Seoul" } }]);
     assert.equal(body.tool_choice, undefined);
     assert.equal(body.temperature, undefined);

@@ -9,7 +9,7 @@ export const MODELS = {
 };
 export const NOTEBOOK_MODEL = "claude-haiku-4-5";
 export const SEARCH_USD = 0.01;
-const REPLY_TOKENS = 300;
+const REPLY_TOKENS = 600;
 const NOTEBOOK_TOKENS = 1024;
 const SEARCH_TOOL = {
   type: "web_search_20250305",
