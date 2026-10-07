@@ -1109,7 +1109,14 @@ let waking = false;
 
 function wakeAudio() {
   try {
-    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (!audio) {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // A call or the lock screen stops sound (an iPhone says interrupted), so it is asked back while the page shows.
+      ctx.addEventListener("statechange", () => {
+        if (!document.hidden && (ctx.state === "suspended" || ctx.state === "interrupted")) ctx.resume().catch(() => {});
+      });
+      audio = ctx;
+    }
     audio.resume?.();
   } catch (_) {
     audio = null;
@@ -4794,7 +4801,17 @@ document.querySelector("[data-gift-grid]")?.addEventListener("click", (event) =>
 });
 
 if (document.querySelector('[data-rewarded="1"]')) document.querySelector(".level-line")?.classList.add("is-growing");
-document.addEventListener("pointerdown", wakeAudio, { once: true, capture: true });
+// Every touch wakes sound that is not running. A finger only unlocks it once it lifts, so its pointerdown waits for the pointerup.
+function rewake(event) {
+  if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+  if (navigator.userActivation?.hasBeenActive === false) return;
+  if (!audio) wakeAudio();
+  else if (audio.state !== "running") audio.resume?.().catch(() => {});
+}
+for (const type of ["pointerdown", "pointerup", "keydown"]) document.addEventListener(type, rewake, true);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && audio && audio.state !== "running" && navigator.userActivation?.hasBeenActive !== false) audio.resume?.().catch(() => {});
+});
 
 /* Legendary reveal: 15s video, the owner's name and first-meet date drawn live over it. */
 const reveal = (function legendaryReveal() {
