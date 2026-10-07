@@ -1623,7 +1623,7 @@ export async function createFarm(api) {
   async function xpFlight(r) {
     if (r.xpGain <= 0) return;
     const box = win.getBoundingClientRect();
-    const pin = document.querySelector(".level-pin").getBoundingClientRect();
+    const pin = (document.querySelector(".level-pin") || win).getBoundingClientRect();
     const el = domAdd("f-xp f-delivery", `+${r.xpGain} XP`, document.body);
     el.style.left = `${box.left + W * 0.64}px`;
     el.style.top = `${box.top + H * 0.4}px`;
