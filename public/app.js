@@ -3889,6 +3889,17 @@ const farm = (function farmRoom() {
   const api = {
     win,
     pet,
+    // The open farm's size even while it is shut, so the stage is built once instead of rebuilt on the first open.
+    size() {
+      const shut = !root.classList.contains("f-layout");
+      if (shut) root.classList.add("f-layout");
+      const out = { W: win.clientWidth, H: win.clientHeight };
+      if (shut) root.classList.remove("f-layout");
+      return out;
+    },
+    picking: () => picking.size > 0 || harvesting,
+    fail: (error) => broken(error),
+    uid,
     say: (text) => care.fx.say(text),
     sfx: (name, { rate, gain } = {}) => playSfx(name, { rate, gain }),
     buzz,
@@ -4003,13 +4014,39 @@ const farm = (function farmRoom() {
     if (view && isOpen) ready?.redraw(view);
   }
 
+  let drag = null;
+  function screenAt(x, y, swipe = false) {
+    const hit = ready.plotAt(x, y);
+    if (!hit) return;
+    if (hit.kind === "ripe") pick(hit.plot);
+    else if (!swipe && (hit.kind === "growing" || hit.kind === "locked")) ready.wiggle(hit.plot);
+  }
   function onScreen(event) {
     if (!ready || !isOpen || event.target.closest?.("button, .f-card")) return;
     const box = win.getBoundingClientRect();
-    const hit = ready.plotAt(event.clientX - box.left, event.clientY - box.top);
-    if (!hit) return;
-    if (hit.kind === "ripe") pick(hit.plot);
-    else if (hit.kind === "growing" || hit.kind === "locked") ready.wiggle(hit.plot);
+    if (ready.loadAt(event.clientX - box.left, event.clientY - box.top)) return;
+    drag = { id: event.pointerId, x: event.clientX - box.left, y: event.clientY - box.top, moved: false };
+    win.setPointerCapture(event.pointerId);
+    screenAt(drag.x, drag.y, true);
+  }
+  function onMove(event) {
+    if (!drag || drag.id !== event.pointerId || !ready || !isOpen) return;
+    const box = win.getBoundingClientRect();
+    const x = event.clientX - box.left;
+    const y = event.clientY - box.top;
+    const distance = Math.hypot(x - drag.x, y - drag.y);
+    if (distance < 4) return;
+    drag.moved = true;
+    const steps = Math.ceil(distance / 12);
+    for (let i = 1; i <= steps; i++) screenAt(drag.x + (x - drag.x) * i / steps, drag.y + (y - drag.y) * i / steps, true);
+    ready.trail(x, y);
+    drag.x = x;
+    drag.y = y;
+  }
+  function onUp(event) {
+    if (!drag || drag.id !== event.pointerId) return;
+    if (!drag.moved && event.type !== "pointercancel") screenAt(drag.x, drag.y);
+    drag = null;
   }
 
   // Only ripe plots come here: a growing one just wiggles on the stage.
@@ -4018,7 +4055,10 @@ const farm = (function farmRoom() {
     picking.add(plot);
     acting = acting.then(() => post("pick", plot)).then(({ status, reply }) => {
       picking.delete(plot);
-      if (!isOpen || !ready) return;
+      if (!isOpen || !ready) {
+        if (reply) flush(reply);
+        return;
+      }
       if (!reply) {
         failed(status);
         return;
@@ -4033,7 +4073,10 @@ const farm = (function farmRoom() {
     ready.knock();
     acting = acting.then(() => post("harvest")).then(({ status, reply }) => {
       harvesting = false;
-      if (!isOpen || !ready) return;
+      if (!isOpen || !ready) {
+        if (reply) flush(reply);
+        return;
+      }
       if (!reply) {
         failed(status);
         return;
@@ -4047,7 +4090,7 @@ const farm = (function farmRoom() {
     talkHook?.close(true);
     combo.end();
     care.hold();
-    root.classList.add("f-on");
+    root.classList.add("f-on", "f-layout");
     combo.sink(onPlushie);
     setCookie(true);
     window.clearInterval(cookieTimer);
@@ -4055,6 +4098,9 @@ const farm = (function farmRoom() {
     window.clearTimeout(dotTimer);
     paintButton(true);
     win.addEventListener("pointerdown", onScreen);
+    win.addEventListener("pointermove", onMove);
+    win.addEventListener("pointerup", onUp);
+    win.addEventListener("pointercancel", onUp);
     return st.enter(reply, how);
   }
 
@@ -4065,6 +4111,10 @@ const farm = (function farmRoom() {
     setCookie(false);
     window.clearInterval(cookieTimer);
     win.removeEventListener("pointerdown", onScreen);
+    win.removeEventListener("pointermove", onMove);
+    win.removeEventListener("pointerup", onUp);
+    win.removeEventListener("pointercancel", onUp);
+    drag = null;
     root.classList.remove("f-on");
     paintButton(false);
     playSfx(`care-${kit()}-press`);
@@ -4072,6 +4122,7 @@ const farm = (function farmRoom() {
     const st = ready;
     (st ? st.leave() : Promise.resolve()).catch(() => {}).then(() => {
       if (isOpen) return;
+      root.classList.remove("f-layout");
       care.release();
       if (stale) restyle();
     });

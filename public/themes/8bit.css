@@ -274,6 +274,8 @@ html[data-theme="8bit"] .dock-cap::before {
 html[data-theme="8bit"] [data-open="arcade"] .dock-cap::before { background-image: url("/themes/px/arcade.svg"); }
 html[data-theme="8bit"] [data-farm] .dock-cap::before { background-image: url("/themes/px/farm.svg"); }
 html.f-on[data-theme="8bit"] [data-farm] .dock-cap::before { background-image: url("/themes/px/home.svg"); }
+html[data-theme="8bit"] .f-guide, html[data-theme="8bit"] .f-order, html[data-theme="8bit"] .f-chip { border-radius: 0; }
+html[data-theme="8bit"] .f-guide { font-family: "Galmuri11", monospace; }
 html[data-theme="8bit"] .dock-btn.has-new .dock-cap::after {
   top: -6px;
   right: -6px;

@@ -17,14 +17,14 @@ const CROPS = {
 };
 // 3 x 2, back row first, so plots 4 and 5 (Lv 2 and 3) sit front right as in the mockup.
 const LAYOUT = [
-  { row: "back", x: 0.4, w: 0.185 },
-  { row: "back", x: 0.62, w: 0.185 },
-  { row: "back", x: 0.84, w: 0.185 },
-  { row: "front", x: 0.385, w: 0.215 },
-  { row: "front", x: 0.62, w: 0.215 },
-  { row: "front", x: 0.855, w: 0.215 },
+  { row: "back", x: 0.31, w: 0.27 },
+  { row: "back", x: 0.585, w: 0.27 },
+  { row: "back", x: 0.86, w: 0.27 },
+  { row: "front", x: 0.31, w: 0.27 },
+  { row: "front", x: 0.585, w: 0.27 },
+  { row: "front", x: 0.86, w: 0.27 },
 ];
-const ROW = { back: 0.625, front: 0.8 };
+const ROW = { back: 0.64, front: 0.9 };
 const LOCK_AT = [1, 1, 1, 1, 2, 3];
 const PENTA = [1, 1.122, 1.26, 1.498, 1.682, 2, 2.245, 2.52];
 const PILE_MAX = 14;
@@ -37,6 +37,7 @@ const LINES = {
   ripe: "인형을 톡 해 볼래요?",
   growing: "아직 자라는 중이에요!",
   bus: "포키 버스 도착! 빵빵!",
+  load: "바구니를 눌러 버스에 실어요!",
   gold: "황금 감자다!",
   yum: "냠냠! 황금 감자 최고예요!",
   plot: "새 밭이 열렸어요!",
@@ -332,6 +333,11 @@ export async function createFarm(api) {
   let busGrow = 1;
   let S = {};
   const L = {};
+  const guideKey = `farm-guide:${api.uid}`;
+  let guideDone = false;
+  let guideStep = 0;
+  let guideTimer = 0;
+  try { guideDone = localStorage.getItem(guideKey) === "1"; } catch {}
   const tweens = [];
   const parts = [];
   const tickers = new Set();
@@ -484,12 +490,12 @@ export async function createFarm(api) {
   }
 
   function measure() {
-    return { W: win.clientWidth, H: win.clientHeight };
+    return api.size();
   }
 
   async function setupStage() {
     ({ W, H } = measure());
-    petH = 0.33 * H;
+    petH = Math.min(0.28 * H, 0.3 * W);
     await buildTextures();
     app = new P.Application();
     await app.init({ width: W, height: H, resolution: Math.min(2, window.devicePixelRatio || 1), autoDensity: true, backgroundAlpha: 0, antialias: true, preference: "webgl" });
@@ -522,7 +528,7 @@ export async function createFarm(api) {
     S.farm = new P.Container();
     S.cam.addChild(S.farm);
     S.farm.x = W;
-    const skyH = yOf(0.5);
+    const skyH = yOf(0.4);
     for (const [k, tex] of [["skyDay", T.sky], ["skyDusk", T.dusk], ["skyNight", T.night]]) {
       S[k] = sprite(tex, S.farm, 0, 0, 0, 0);
       S[k].width = W;
@@ -536,19 +542,19 @@ export async function createFarm(api) {
     S.farm.addChild(S.sun);
     S.moonN = sprite(T.moonN, S.farm, xOf(0.8), yOf(0.12), 0.5, 0.5, 46);
     S.clouds = [sprite(T.art.cloud, S.farm, xOf(0.52), yOf(0.12), 0.5, 0.5, 92), sprite(T.art.cloud, S.farm, xOf(0.9), yOf(0.24), 0.5, 0.5, 64)];
-    S.hills = sprite(T.hills, S.farm, 0, yOf(0.3), 0, 0);
+    S.hills = sprite(T.hills, S.farm, 0, yOf(0.2), 0, 0);
     S.hills.width = W;
     S.hills.height = yOf(0.2);
-    S.road = new P.Graphics().rect(0, yOf(0.455), W, yOf(0.06)).fill(0xf4e8cc).rect(0, yOf(0.455), W, 2).fill(0xe0cfa8).rect(0, yOf(0.513), W, 2.5).fill(0xd9c69c);
+    S.road = new P.Graphics().rect(0, yOf(0.35), W, yOf(0.06)).fill(0xf4e8cc).rect(0, yOf(0.35), W, 2).fill(0xe0cfa8).rect(0, yOf(0.408), W, 2.5).fill(0xd9c69c);
     S.farm.addChild(S.road);
-    S.stop = sprite(T.art.stop, S.farm, xOf(0.48), yOf(0.462), 0.5, 1, 26);
+    S.stop = sprite(T.art.stop, S.farm, xOf(0.48), yOf(0.357), 0.5, 1, 26);
     S.busLayer = new P.Container();
     S.farm.addChild(S.busLayer);
-    S.bus = sprite(T.art.bus, S.busLayer, W + 120, yOf(0.505), 0.5, 1, 116);
+    S.bus = sprite(T.art.bus, S.busLayer, W + 120, yOf(0.4), 0.5, 1, W * 0.48);
     S.busBase = S.bus.scale.x;
-    S.grass = sprite(T.grass, S.farm, 0, yOf(0.515), 0, 0);
+    S.grass = sprite(T.grass, S.farm, 0, yOf(0.41), 0, 0);
     S.grass.width = W;
-    S.grass.height = H - yOf(0.515) + 2;
+    S.grass.height = H - yOf(0.41) + 2;
     S.beds = new P.Container();
     S.farm.addChild(S.beds);
     S.mid = new P.Container();
@@ -567,21 +573,24 @@ export async function createFarm(api) {
       const pw = xOf(d.w);
       const bed = sprite(T.bedDry, S.beds, cx, cy);
       bed.width = pw;
-      bed.height = pw * 0.4;
+      bed.height = pw * 0.56;
       const wet = sprite(T.bedWet, S.beds, cx, cy);
       wet.width = pw;
-      wet.height = pw * 0.4;
+      wet.height = pw * 0.56;
       wet.alpha = 0;
       const plant = sprite(plantTex("potato", 0), S.mid, cx, cy + pw * 0.05, 0.5, 0.94);
-      plant.width = pw * 0.82;
-      plant.height = pw * 0.82 * 1.125;
+      plant.width = pw * 1.08;
+      plant.height = pw * 1.08 * 1.125;
       plant.zIndex = cy;
       plant.visible = false;
       plant.base = plant.scale.x;
       const lock = sprite(T.art.lock, S.mid, cx, cy - pw * 0.05, 0.5, 0.75, pw * 0.24);
       lock.zIndex = cy + 1;
       lock.visible = false;
-      plots.push({ i, row: d.row, cx, cy, w: pw, bed, wet, plant, lock, lockY: lock.y, data: null, stage: -1, tag: null });
+      const glow = sprite(T.glow, S.beds, cx, cy - pw * 0.2, 0.5, 0.5, pw * 1.3);
+      glow.tint = 0xffd36a;
+      glow.alpha = 0;
+      plots.push({ glow, plantY: plant.y, i, row: d.row, cx, cy, w: pw, bed, wet, plant, lock, lockY: lock.y, data: null, stage: -1, tag: null });
     });
     S.basketGlow = sprite(T.glow, S.mid, xOf(0.155), yOf(0.995) - xOf(0.22) * 0.3, 0.5, 0.5, xOf(0.5));
     S.basketGlow.tint = 0xffe39a;
@@ -688,6 +697,7 @@ export async function createFarm(api) {
 
   /* ---------- the drawn field ---------- */
   let truth = null;
+  let latestReply = null;
   let clock = { server: Date.now(), at: performance.now() };
   const serverNow = () => clock.server + (performance.now() - clock.at);
   const pending = new Set();
@@ -805,7 +815,8 @@ export async function createFarm(api) {
       L.cta.innerHTML = text;
     }
     L.cta.classList.toggle("is-ripe", ctaRipe);
-    L.cta.hidden = !text || showing;
+    if (ctaRipe && !showing && !guideDone && !guideStep && !busState) guide(1);
+    L.cta.hidden = !text || showing || guideStep > 0 || Boolean(busState);
   }
   function nudgeCta() {
     if (calm || L.cta.hidden) return;
@@ -832,7 +843,20 @@ export async function createFarm(api) {
     return v;
   }
   // Ends whatever runs now: dropped tweens and pauses never call back, and every hold in flight throws STOP.
-  function cut() {
+  function cut({ keepRound = false } = {}) {
+    flushRound();
+    clearTimeout(guideTimer);
+    guideStep = 0;
+    clearTimeout(busTimer);
+    busState = "";
+    loadBus = null;
+    order = null;
+    if (!keepRound) {
+      round.length = 0;
+      cargo.length = 0;
+      roundNote = 0;
+      for (const it of [...S.pile.children]) it.destroy();
+    }
     gen += 1;
     tweens.length = 0;
     for (const id of naps) clearTimeout(id);
@@ -861,10 +885,10 @@ export async function createFarm(api) {
       el.getAnimations().forEach((a) => a.cancel());
       el.remove();
     }
-    document.querySelectorAll(".f-prompt").forEach((el) => el.remove());
+    document.querySelectorAll(".f-prompt, .f-delivery").forEach((el) => el.remove());
     busGrow = 1;
     S.bus.x = W + 120;
-    S.bus.y = yOf(0.505);
+    S.bus.y = yOf(0.4);
     S.bus.rotation = 0;
     S.bus.scale.set(S.busBase);
     S.basketFront.scale.set(S.basketBase);
@@ -1008,6 +1032,8 @@ export async function createFarm(api) {
       it.destroy();
       thump({ gain: 0.5, rate: 1.3 });
       addToPile(crop, tx, ty + 4);
+      cargo.push(crop);
+      paintOrder();
       bumpBasket();
     });
   }
@@ -1016,6 +1042,11 @@ export async function createFarm(api) {
     burst(p.cx, p.cy, 6, { tex: T.dirt, a0: Math.PI * 1.1, a1: Math.PI * 1.9, v0: 50, v1: 120, ay: 420, s0: 0.25, s1: 0.45, l0: 0.35, l1: 0.55 });
   }
   function twinkle(dt, t) {
+    for (const p of plots) {
+      const ripe = p.stage === 3 && p.plant.visible && !pending.has(p.i);
+      p.glow.alpha = ripe ? 0.32 + (calm ? 0 : Math.sin(t * 2.4 + p.i) * 0.09) : 0;
+      p.plant.y = p.plantY - (ripe && !calm ? (1 + Math.sin(t * 2.4 + p.i)) * 2 : 0);
+    }
     if (Math.floor(t * 6) === Math.floor((t - dt) * 6)) return;
     const ripe = plots.filter((p) => p.stage === 3 && p.plant.visible);
     if (!ripe.length || calm) return;
@@ -1484,17 +1515,6 @@ export async function createFarm(api) {
     ringPulse(pc.x, pc.y, 3.2, 0xfff1b8, 700);
     await hold(pause(260));
     const regular = r.picked.filter((pk) => pk.crop !== "gold");
-    const chips = regular.length ? domAdd("f-chips") : null;
-    const chipOf = {};
-    const bumpChip = (crop) => {
-      if (!chips) return;
-      if (!chipOf[crop]) {
-        chipOf[crop] = domAdd("f-chip", `<img src="${artUrl(`item-${crop}`)}" alt=""><span>0</span>`, chips);
-      }
-      const n = chipOf[crop].querySelector("span");
-      n.textContent = String(Number(n.textContent) + 1);
-      if (!calm) domAnim(chipOf[crop], [{ transform: "scale(1.25)" }, { transform: "scale(1)" }], { duration: 220, fill: "none" });
-    };
     let note = 0;
     const landed = [];
     for (const pk of regular) {
@@ -1502,7 +1522,7 @@ export async function createFarm(api) {
       squash(p);
       leafBurst(p);
       for (let j = 0; j < CROPS[pk.crop].items; j++) {
-        landed.push(toBasket(p, pk.crop, note++).then(() => bumpChip(pk.crop)));
+        landed.push(toBasket(p, pk.crop, note++));
         await hold(pause(70));
       }
       p.plant.visible = false;
@@ -1514,112 +1534,214 @@ export async function createFarm(api) {
     await hold(Promise.all(landed));
     await hold(pause(regular.length ? 600 : 200));
     face("canon");
-    if (regular.length) await bus();
-    if (r.xpGain > 0) {
-      game("result", { gain: 0.9 });
-      api.level(r);
-      bigText(`+${r.xpGain} XP`, "is-xp", 900);
-      await hold(pause(1500));
-    }
-    if (chips) domAnim(chips, [{ opacity: 1 }, { opacity: 0 }], { duration: 300 }).then(() => chips.remove());
-    if (r.leveledUp) await levelLine(r.level);
-    await aftermath(r, { levelShown: true });
+    await bus(true);
   }
 
-  // 포키 버스 drives in, swells as the basket loads into it, honks and leaves.
-  async function bus() {
-    say(LINES.bus);
-    const busX = xOf(0.68);
-    const bx0 = W + 120;
-    S.bus.x = bx0;
-    busGrow = 1;
-    S.bus.scale.set(S.busBase);
-    const trail = (dt, t) => {
-      if (Math.floor(t * 14) !== Math.floor((t - dt) * 14)) emit(T.dust, { x: S.bus.x + 56 * busGrow, y: S.bus.y - 4, vx: rnd(10, 30), vy: rnd(-12, -4), life: 0.6, s0: 0.25, s1: 0.5, a0: 0.8, a1: 0, layer: S.busLayer });
-    };
-    const bob = (dt, t) => {
-      S.bus.y = yOf(0.505) - Math.abs(Math.sin(t * 22)) * 1.2;
-    };
-    tickers.add(trail);
-    tickers.add(bob);
-    farmSfx("honk", { at: 300 });
-    const bubble = domAdd("f-bubble", "빵빵!", L.field);
-    bubble.style.top = `${yOf(0.3)}px`;
-    const follow = () => {
-      bubble.style.left = `${S.bus.x - 6}px`;
-    };
-    tickers.add(follow);
-    await hold(tween(1700, (k) => {
-      S.bus.x = lerp(bx0, busX, k);
-    }, E.out3));
-    tickers.delete(trail);
-    tickers.delete(bob);
-    buzz(20);
-    await hold(tween(260, (k) => {
-      S.bus.rotation = -Math.sin(k * Math.PI) * 0.05;
-    }));
-    S.bus.rotation = 0;
-    domAnim(bubble, [{ opacity: 1 }, { opacity: 0 }], { duration: 300 }).then(() => {
-      tickers.delete(follow);
-      bubble.remove();
-    });
-    const items = [...S.pile.children];
-    for (const [i, it] of items.entries()) {
-      const lp = S.farm.toLocal(it.getGlobalPosition());
-      const { crop } = it;
-      const fly = sprite(it.texture, S.fx, lp.x, lp.y, 0.5, 0.5, flySize(crop, 24));
-      it.destroy();
-      const s0 = fly.scale.x;
-      sfx("drop", { gain: 0.45, rate: 1 + Math.min(i, 12) * 0.06 });
-      arc(fly, lp.x, lp.y, S.bus.x + rnd(-20, 30), S.bus.y - 40 * busGrow, 520, 80, { spin: 5, s0, s1: crop === "sprout" ? s0 : s0 * 0.55 }).then(() => {
-        fly.destroy();
-        busGrow = Math.min(1.32, busGrow + 0.028);
-        const bb = S.busBase * busGrow;
-        tween(140, (k) => {
-          const q = Math.sin(k * Math.PI) * 0.03;
-          S.bus.scale.set(bb * (1 + q), bb * (1 - q));
-        });
-      });
-      await hold(pause(95));
+  const round = [];
+  const cargo = [];
+  const flights = new Set();
+  let busTimer = 0;
+  let busState = "";
+  let loadBus = null;
+  let order = null;
+  let roundNote = 0;
+  let lastPick = 0;
+
+  function guide(step) {
+    guideStep = step;
+    L.guide?.remove();
+    L.hand?.remove();
+    const text = step === 1 ? "쓱 밀어서 수확해요!" : step === 2 ? LINES.load : "다음엔 인형을 톡! 한 번에 수확해요";
+    say(text);
+    L.cta.hidden = true;
+    L.guide = domAdd("f-guide", `${step === 3 ? KEY_SVG : ""}<b>${text}</b>`);
+    L.guide.setAttribute("role", "status");
+    if (step === 3) return;
+    L.hand = domAdd(`f-hand is-${step === 1 ? "swipe" : "basket"}`, '<svg viewBox="0 0 80 88" aria-hidden="true"><path d="M25 43V13c0-10 13-10 13 0v23c3-8 13-5 13 2 5-6 13-2 13 5 8-3 13 2 11 11l-5 19c-2 8-9 11-21 11-13 0-21-4-27-12L8 53c-5-8 4-16 11-9l9 9" fill="#fffaf0" stroke="#4a2c20" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>→</span>');
+    L.hand.style.left = `${step === 1 ? plots[0].cx : S.basketTop.x}px`;
+    L.hand.style.top = `${step === 1 ? plots[0].cy - 30 : S.basketTop.y - 20}px`;
+    L.hand.style.setProperty("--swipe", `${plots[2].cx - plots[0].cx}px`);
+    if (step === 2) {
+      const repeat = () => {
+        if (guideStep !== 2) return;
+        say(text);
+        guideTimer = setTimeout(repeat, 8000);
+      };
+      guideTimer = setTimeout(repeat, 8000);
     }
-    await hold(pause(600));
+  }
+  async function finishGuide() {
+    if (!guideStep) return;
+    clearTimeout(guideTimer);
+    guideDone = true;
+    try { localStorage.setItem(guideKey, "1"); } catch {}
+    guide(3);
+    await hold(new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(guideTimer);
+        win.removeEventListener("pointerdown", done);
+        waits.delete(done);
+        resolve();
+      };
+      waits.add(done);
+      win.addEventListener("pointerdown", done, { once: true });
+      guideTimer = setTimeout(done, 3000);
+    }));
+    L.guide?.remove();
+    guideStep = 0;
+  }
+
+  function flushRound() {
+    const newest = round.at(-1) || latestReply;
+    if (newest) api.level(newest);
+    for (const r of round) r.painted = true;
+  }
+  function roundReply() {
+    const newest = round.at(-1);
+    const unique = (key) => [...new Map(round.flatMap((r) => r[key]).map((p) => [p.plot, p])).values()];
+    return { ...newest, picked: unique("picked"), planted: unique("planted"), opened: [...new Set(round.flatMap((r) => r.opened))], seeds: round.flatMap((r) => r.seeds), leveledUp: round.some((r) => r.leveledUp), xpGain: round.reduce((n, r) => n + (r.painted ? 0 : r.xpGain), 0) };
+  }
+  function paintOrder(loaded = {}) {
+    if (!order) return;
+    const totals = {};
+    for (const crop of cargo) totals[crop] = (totals[crop] || 0) + 1;
+    order.innerHTML = Object.entries(totals).map(([crop, n]) => `<span class="f-chip"><img src="${artUrl(`item-${crop}`)}" alt="${CROPS[crop].name}"><span>${loaded[crop] || 0}/${n}</span></span>`).join("");
+  }
+  function scheduleBus() {
+    clearTimeout(busTimer);
+    if (!entered || !round.length || busState) return;
+    const ripe = plots.some((p) => p.stage === 3 && !pending.has(p.i));
+    const delay = ripe ? Math.max(0, lastPick + 2500 - performance.now()) : 600;
+    busTimer = setTimeout(async () => {
+      if (api.picking() || flights.size) {
+        scheduleBus();
+        return;
+      }
+      try { await bus(); } catch (e) { if (e !== STOP) api.fail(e); }
+    }, delay);
+  }
+  async function xpFlight(r) {
+    if (r.xpGain <= 0) return;
+    const box = win.getBoundingClientRect();
+    const pin = (document.querySelector(".level-pin") || win).getBoundingClientRect();
+    const el = domAdd("f-xp f-delivery", `+${r.xpGain} XP`, document.body);
+    el.style.left = `${box.left + W * 0.64}px`;
+    el.style.top = `${box.top + H * 0.4}px`;
+    const dx = pin.left + pin.width / 2 - box.left - W * 0.64;
+    const dy = pin.top + pin.height / 2 - box.top - H * 0.4;
+    await hold(domAnim(el, [{ transform: "translate(-50%, 0) scale(1.4)", opacity: 1 }, { transform: `translate(calc(-50% + ${dx}px), ${dy}px) scale(.6)`, opacity: 1 }], { duration: calm ? 300 : 850, easing: "ease-in-out" }));
+    el.remove();
+    game("result", { gain: 0.9 });
+    flushRound();
+    api.levelPop();
+  }
+  async function settle(r) {
+    await xpFlight(r);
+    flushRound();
+    await finishGuide();
+    round.length = 0;
+    cargo.length = 0;
+    roundNote = 0;
+    await aftermath(r);
+    busState = "";
+    showing = false;
+    paintCta();
+    schedule();
+  }
+  async function bus(auto = false) {
+    clearTimeout(busTimer);
+    // 황금 감자 never rides in the basket: a round of only gold skips the bus and keeps the guide for the next crop.
+    if (!cargo.length) {
+      clearTimeout(guideTimer);
+      guideStep = 0;
+      L.hand?.remove();
+      L.guide?.remove();
+      showing = true;
+      L.cta.hidden = true;
+      return settle(roundReply());
+    }
+    busState = "arriving";
+    L.cta.hidden = true;
+    say(LINES.bus);
+    const busX = xOf(0.64);
+    const bx0 = W + S.bus.width;
+    S.bus.x = bx0;
+    order = domAdd("f-bubble f-order", "", L.field);
+    order.style.left = `${busX}px`;
+    order.style.top = `${Math.max(66, S.bus.y - S.bus.height - 44)}px`;
+    paintOrder();
+    await hold(tween(400, (k) => { S.bus.x = lerp(bx0, busX, k); }, E.out3));
+    busState = "waiting";
+    order.dataset.state = busState;
+    if (!auto) {
+      if (guideStep === 1) guide(2);
+      else say(LINES.load);
+      const bounce = (dt, t) => {
+        S.basketGlow.alpha = 0.5 + Math.sin(t * 4) * 0.2;
+        S.basketFront.scale.set(S.basketBase * (1 + (calm ? 0 : Math.sin(t * 5) * 0.06)));
+      };
+      tickers.add(bounce);
+      await hold(new Promise((resolve) => {
+        loadBus = resolve;
+        if (guideStep !== 2) busTimer = setTimeout(() => { say("제가 실을게요!"); resolve(); }, 5000);
+      }));
+      tickers.delete(bounce);
+      clearTimeout(busTimer);
+    }
+    loadBus = null;
+    clearTimeout(guideTimer);
+    L.hand?.remove();
+    L.guide?.remove();
+    showing = true;
+    L.cta.hidden = true;
+    busState = "loading";
+    order.dataset.state = busState;
+    while (api.picking() || flights.size) await hold(pause(40));
+    S.basketGlow.alpha = 0;
+    S.basketFront.scale.set(S.basketBase);
+    const r = roundReply();
+    const loaded = {};
+    for (const [i, crop] of cargo.entries()) {
+      const it = S.pile.children[0];
+      if (it) it.destroy();
+      const fly = sprite(itemTex(crop), S.fx, S.basketTop.x, S.basketTop.y, 0.5, 0.5, flySize(crop, 30));
+      game("note-c6", { rate: PENTA[Math.min(i, 7)], gain: 0.7 });
+      await hold(arc(fly, fly.x, fly.y, busX, S.bus.y - S.bus.height * 0.45, 280, 65, { spin: 5 }));
+      fly.destroy();
+      loaded[crop] = (loaded[crop] || 0) + 1;
+      paintOrder(loaded);
+    }
+    domAdd("f-check", "✓", order);
+    game("ding");
+    buzz([25, 40, 65]);
+    await hold(pause(650));
     farmSfx("honk");
     voice("happy", { at: 120 });
-    const bx1 = S.bus.x;
-    tickers.add(trail);
-    tickers.add(bob);
-    await hold(tween(1500, (k) => {
-      S.bus.x = lerp(bx1, -130 * busGrow, k);
-    }, E.in2));
-    tickers.delete(trail);
-    tickers.delete(bob);
-    busGrow = 1;
-    S.bus.x = W + 120;
-    S.bus.scale.set(S.busBase);
+    busState = "leaving";
+    order.dataset.state = busState;
+    await hold(tween(900, (k) => { S.bus.x = lerp(busX, -S.bus.width, k); }, E.in2));
+    order.remove();
+    order = null;
+    await settle(r);
   }
 
   /* ---------- a screen pick ---------- */
-  function pickFx(r) {
+  async function pickFx(r) {
+    const landed = [];
     for (const pk of r.picked) {
       const p = plots[pk.plot];
       farmSfx("pop");
       buzz(10);
-      squash(p);
-      leafBurst(p);
       pending.add(pk.plot);
       if (pk.crop === "gold") continue;
+      await hold(squash(p));
+      leafBurst(p);
       p.plant.visible = false;
       p.stage = -1;
       p.data = { plot: pk.plot, crop: null };
-      toBasket(p, pk.crop, 3, 30);
-      if (pk.xp > 0) {
-        const el = domAdd("f-xp", `+${pk.xp} XP`, L.field);
-        placeTag(el, p.cx);
-        el.style.top = `${p.cy - p.w * 0.7}px`;
-        domAnim(el, [{ transform: "translate(-50%, 0)", opacity: 0 }, { transform: "translate(-50%, -10px)", opacity: 1, offset: 0.2 }, { transform: "translate(-50%, -34px)", opacity: 0 }], { duration: 1100, easing: "ease-out" }).then(() => el.remove());
-      }
+      landed.push(toBasket(p, pk.crop, roundNote++, 30));
     }
-    if (r.xpGain > 0) api.level(r);
+    await hold(Promise.all(landed));
   }
 
   // A growing plot shakes its leaves and says how long it has left; a locked one rattles its lock.
@@ -1688,7 +1810,7 @@ export async function createFarm(api) {
     paintCta();
     // The chip twinkle is mostly above 4 kHz, sharp on a phone speaker, so it plays softer.
     if (ripened) farmSfx("twinkle", { gain: kit === "chip" ? 0.6 : 1 });
-    if (!was && ctaRipe) {
+    if (!was && ctaRipe && !guideStep) {
       say(LINES.ripe);
       voice("ask", { at: 200 });
       sfx("want", { at: 300, gain: 0.8 });
@@ -1777,6 +1899,7 @@ export async function createFarm(api) {
       cut();
       calm = Boolean(api.still());
       entered = true;
+      latestReply = r;
       setTruth(r.farm);
       paintSky();
       const drawn = r.created ? r.farm.plots.map((p, i) => (r.planted.some((pl) => pl.plot === i) ? { plot: i, crop: null } : p)) : before(r);
@@ -1797,13 +1920,21 @@ export async function createFarm(api) {
         return undefined;
       }
       // The pet speaks for the farm as it opens, so the room's last line never lingers over it.
-      say(ctaRipe ? LINES.ripe : LINES.growing);
+      if (!guideStep) say(ctaRipe ? LINES.ripe : LINES.growing);
       chore(() => aftermath(r));
       return undefined;
     },
     // The plushie harvest, picks or not.
-    harvest(r, { knocked = false } = {}) {
-      if (!r.picked.length) {
+    async harvest(r, { knocked = false } = {}) {
+      try {
+        await hold(Promise.all(flights));
+      } catch (e) {
+        // A cut (집으로) while a picked crop still flew: nothing to show, and the page paints the reply.
+        if (e !== STOP) throw e;
+        setTruth(r.farm);
+        return undefined;
+      }
+      if (!r.picked.length && !round.length) {
         setTruth(r.farm);
         if (!knocked) knock();
         say(LINES.growing);
@@ -1815,16 +1946,20 @@ export async function createFarm(api) {
         }
         return Promise.resolve();
       }
-      cut();
+      if (latestReply === r && !round.length) latestReply = null;
+      cut({ keepRound: true });
+      latestReply = r;
+      round.push(r);
       setTruth(r.farm);
-      before(r).forEach((d, i) => drawPlot(i, d));
+      before(roundReply()).forEach((d, i) => drawPlot(i, d));
       for (const pl of r.planted) pending.add(pl.plot);
       for (const i of r.opened) pending.add(i);
       for (const pk of r.picked) pending.add(pk.plot);
       return show(() => harvestShow(r));
     },
-    // A screen pick: the crop pops into the basket now, the pet replants behind.
+    // Pick replies wait in the basket until delivery.
     picked(r) {
+      latestReply = r;
       setTruth(r.farm);
       if (!r.picked.length) {
         r.farm.plots.forEach((d, i) => {
@@ -1833,11 +1968,29 @@ export async function createFarm(api) {
         paintCta();
         return;
       }
-      pickFx(r);
+      round.push(r);
+      lastPick = performance.now();
+      const flight = pickFx(r);
+      flights.add(flight);
+      flight.catch((e) => { if (e !== STOP) api.fail(e); }).finally(() => {
+        flights.delete(flight);
+        scheduleBus();
+      });
       for (const pl of r.planted) pending.add(pl.plot);
       for (const i of r.opened) pending.add(i);
       paintCta();
-      chore(() => aftermath(r));
+    },
+    loadAt(x, y) {
+      if (!loadBus) return false;
+      const basket = x < W * 0.3 && y > H * 0.7;
+      const busHit = Math.abs(x - S.bus.x) < S.bus.width / 2 && y > S.bus.y - S.bus.height && y < S.bus.y + 12;
+      if (!basket && !busHit) return false;
+      loadBus();
+      return true;
+    },
+    trail(x, y) {
+      if (!entered || showing) return;
+      burst(x, y, 3, { tex: T.art.spark, tint: [0xffd36a, 0xffffff], v0: 8, v1: 30, s0: 0.2, s1: 0.35, l0: 0.2, l1: 0.4 });
     },
     knock,
     promptTouch,
