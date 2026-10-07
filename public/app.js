@@ -1316,6 +1316,11 @@ function typeLine(intro, line, onDone, delay = 520) {
     onDone(cursor);
   }
   function step() {
+    // Another line took the box: an unseen typing stops before its blips pile onto the new one.
+    if (!text.isConnected) {
+      finish();
+      return;
+    }
     const ch = chars[i++];
     text.textContent += ch;
     cursor.style.animation = "none";
