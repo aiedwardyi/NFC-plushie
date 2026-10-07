@@ -148,6 +148,27 @@ test("reload within 30 minutes is unrewarded and writes nothing but tap_count", 
   assert.equal(after.gift_found, before.gift_found);
 });
 
+test("a phone's reload (view=1) shows the pet and is no tap", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await ctx.request(`/t?uid=${A}`, { jar });
+  ctx.db.prepare("UPDATE plushies SET tap_count = 10 WHERE uid = ?").run(A);
+  ctx.advance(31 * MIN);
+  const before = ctx.row();
+  const view = await ctx.request(`/t?uid=${A}&view=1`, { jar });
+  assert.equal(view.status, 200);
+  assert.match(view.html, /data-rewarded="0" data-reason=""/);
+  assert.match(view.html, /data-combo="0"/);
+  assert.match(view.html, /10번 토닥여 줬어요!/);
+  assert.doesNotMatch(view.html, /data-celebrate|벌써 열 번이에요/);
+  assert.deepEqual(ctx.row(), before);
+  const stranger = await ctx.request(`/t?uid=${A}&view=1`);
+  assert.match(stranger.html, /이미 주인이 있어요/);
+  const tap = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.match(tap.html, /data-rewarded="1"/);
+  assert.equal(ctx.row().tap_count, 11);
+});
+
 test("the 7th eligible tap in a Seoul day hits the daily cap", async (t) => {
   const ctx = await setup(t);
   const { jar } = await meet(ctx, A, "Mochi");

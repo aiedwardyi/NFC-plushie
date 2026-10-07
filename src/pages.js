@@ -306,7 +306,7 @@ function farmAttrs(farm) {
   return ` data-farm-dot="${farm.dot ? 1 : 0}" data-farm-now="${farm.now}"${next}${visit}`;
 }
 
-export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = "horse", wake = false, morning = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, meet = false, theme = "classic", farm = null } = {}) {
+export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = "horse", wake = false, morning = false, asleep = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, meet = false, theme = "classic", farm = null } = {}) {
   const look = themeOf(theme);
   const title = escapeHtml(row?.pet_name || "새 친구");
   const timeEl = timeLine ? `<p class="time-line" data-time-line></p>` : "";
@@ -355,7 +355,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
   <script src="/mascot-boot.js"></script>
   <script src="/app.js" defer></script>
 </head>
-<body${bodyClass ? ` class="${bodyClass}"` : ""}${farmAttrs(farm)}${celebrateAttr}${wake ? " data-wake" : ""}${morning ? " data-morning" : ""}>
+<body${bodyClass ? ` class="${bodyClass}"` : ""}${farmAttrs(farm)}${celebrateAttr}${wake ? " data-wake" : ""}${morning ? " data-morning" : ""}${asleep ? " data-asleep" : ""}>
   <main>
     <header class="topbar">
       <span class="wordmark">POKKEY</span>
@@ -420,7 +420,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
       ? `만나서 반가워요, ${escapeHtml(row.pet_name)}!`
       : `다시 만나서 반가워요, ${escapeHtml(row.pet_name)}!`)
     : "안녕하세요! 찾아와 줘서 정말 기뻐요.";
-  if (pet?.morning) greeting = "쿨쿨… 쿨쿨…";
+  if (pet?.morning || pet?.asleep) greeting = "쿨쿨… 쿨쿨…";
   else if (ask) greeting = escapeHtml(ask);
   const recovery = code && !guest ? keyCard(code) : "";
   const prompt = row.pet_name ? "" : `<form action="/name" method="post" class="name-form" data-met="${metDay(row)}">
@@ -430,7 +430,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
     <button type="submit" class="primary">이 이름으로 지어줄게요!</button>
   </form>`;
   const returning = Boolean(row.pet_name) && !code;
-  const mile = returning ? milestoneLine(row.tap_count) : "";
+  const mile = returning && !pet?.view ? milestoneLine(row.tap_count) : "";
   const countHtml = returning
     ? `<p class="count" data-tap-count="${row.tap_count}"><span class="count-final">${row.tap_count}번 토닥여 줬어요!</span></p>`
     : "";
@@ -450,7 +450,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
     row,
     `${recovery}${prompt}`,
     {
-      waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet, mascot, wake: Boolean(code), morning: Boolean(pet?.morning), demo,
+      waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet, mascot, wake: Boolean(code), morning: Boolean(pet?.morning), asleep: Boolean(pet?.asleep), demo,
       dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, meet: !row.pet_name, theme, farm: row.pet_name ? pet?.farm : null, ...extras,
     },
   );

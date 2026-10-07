@@ -155,6 +155,14 @@ const careHold = { busy: false, asleep: false, touch: null };
 // Where the phone reads the plushie: iPhones at the top edge, Android phones on the back; a desk page wakes on a reload.
 const TAP_SPOT = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) ? "top"
   : /Android/.test(navigator.userAgent) || (navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches) ? "back" : "desk";
+// On a phone only the plushie taps: the page marks its own address view=1, so a reload or a restored tab is a quiet visit.
+if (TAP_SPOT !== "desk" && window.location.pathname === "/t") {
+  const url = new URL(window.location.href);
+  if (url.searchParams.has("uid") && url.searchParams.get("view") !== "1") {
+    url.searchParams.set("view", "1");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }
+}
 // Set only while talk is on: anything else taking the speech line drops the pet's pending answer.
 let talkHook = null;
 const pet = document.querySelector('[data-pet="alive"]');
@@ -2665,6 +2673,17 @@ const care = (function careLoop() {
     }, 0);
   }
 
+  // A reload finds the pet still asleep: no wake call, since only the plushie wakes it.
+  function doze() {
+    dialogBox.classList.add("is-seq");
+    showLine(0);
+    lightsOff();
+    face("closed");
+    placeMoon();
+    pet.classList.add("is-sleeping");
+    snore();
+  }
+
   // A tap combo stage holds the pet like an action, but leaves the opening dialog running.
   function hold() {
     careHold.busy = true;
@@ -2692,7 +2711,7 @@ const care = (function careLoop() {
     if (id) press(id);
   });
   if (owner) window.addEventListener("load", () => preload(world()), { once: true });
-  return { morning, opened: open, restyle, hold, release, dance, busy: screenBusy, blocked: () => screenBusy(true), hearts: tweenHearts, fx: { say, sparkles, cheer, box, move, sound, voice } };
+  return { morning, doze, opened: open, restyle, hold, release, dance, busy: screenBusy, blocked: () => screenBusy(true), hearts: tweenHearts, fx: { say, sparkles, cheer, box, move, sound, voice } };
 })();
 
 function percent(r) {
@@ -3616,7 +3635,7 @@ const arcade = (function arcadeRoom() {
   }
 
   function onScreen(event) {
-    if (ready?.phase !== "charge" || event.target.closest?.("button")) return;
+    if ((ready?.phase !== "charge" && ready?.phase !== "paused") || event.target.closest?.("button")) return;
     ready.tap("screen");
   }
 
@@ -3685,7 +3704,7 @@ const arcade = (function arcadeRoom() {
     window.setTimeout(() => openSheet("gifts", button), prefersReducedMotion() ? 0 : 300);
   });
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && (ready?.phase === "ready" || ready?.phase === "charge")) ready.abort();
+    if (document.hidden) ready?.pause();
   });
   window.addEventListener("pagehide", () => {
     ready?.destroy();
@@ -3809,8 +3828,8 @@ const racing = (function raceRoom() {
     if (!careHold.asleep) prepare().catch(() => {});
   });
   start.addEventListener("click", begin);
-  // Hiding cancels only before the gun; a race or its card just pauses with the page.
-  document.addEventListener("visibilitychange", () => { if (document.hidden) { held = null; paint(); if (playing && ["pick", "count"].includes(ready?.phase)) ready.abort(); } });
+  // A hidden page pauses the race wherever it is: its clock runs on animation frames.
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { held = null; paint(); } });
   window.addEventListener("pagehide", restyle);
   return { restyle };
 })();
@@ -5152,6 +5171,10 @@ if (document.body.hasAttribute("data-wake")) {
     combo?.start();
     farm?.start();
   });
+} else if (care && document.body.hasAttribute("data-asleep")) {
+  care.doze();
+  combo?.start();
+  farm?.start();
 } else {
   runCelebrate();
   startDialog(() => care?.opened());

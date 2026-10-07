@@ -177,6 +177,23 @@ test("the skip render after a redirect also wakes the pet", async (t) => {
   assert.equal(ctx.row().tap_count, taps);
 });
 
+test("a phone's reload (view=1) leaves a sleeping pet asleep; the next tap wakes it", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await care(ctx, jar, "sleep");
+  ctx.advance(MIN);
+  const before = ctx.row();
+  const view = await ctx.request(`/t?uid=${A}&view=1`, { jar });
+  assert.match(view.html, /<body class="is-home"[^>]* data-asleep>/);
+  assert.match(view.html, /<p class="intro"[^>]*>쿨쿨… 쿨쿨…<\/p>/);
+  assert.doesNotMatch(view.html, /data-morning/);
+  assert.deepEqual(ctx.row(), before);
+  const tap = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.match(tap.html, /data-morning/);
+  assert.doesNotMatch(tap.html, /data-asleep/);
+  assert.equal(ctx.row().slept_at, null);
+});
+
 test("a cooldown tap on a morning page drops the soft line", async (t) => {
   const ctx = await setup(t);
   const { jar } = await meet(ctx, A, "Mochi");

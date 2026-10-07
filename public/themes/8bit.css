@@ -587,7 +587,7 @@ html[data-theme="8bit"] .g-gifts.has-new .g-gift-ic::after { border-radius: 0; }
 html[data-theme="8bit"] .g-thumb-pet { image-rendering: pixelated; }
 html[data-theme="8bit"][data-mascot="horse"] .g-thumb-pet { content: url("/themes/px/horse-px.png"); }
 html[data-theme="8bit"][data-mascot="sheep"] .g-thumb-pet { content: url("/themes/px/sheep-px.png"); }
-html[data-theme="8bit"] .g-label { border-radius: 0; font-family: "Galmuri11", monospace; box-shadow: 3px 3px 0 rgba(0, 0, 0, .35); }
+html[data-theme="8bit"] .g-label, html[data-theme="8bit"] .g-pause { border-radius: 0; font-family: "Galmuri11", monospace; box-shadow: 3px 3px 0 rgba(0, 0, 0, .35); }
 html[data-theme="8bit"] .g-tier svg { image-rendering: pixelated; }
 html[data-theme="8bit"] .g-big { font-family: "Galmuri11", monospace; -webkit-text-stroke: 0; text-shadow: 5px 5px 0 #1d2b53, -2px -2px 0 #1d2b53, 2px -2px 0 #1d2b53, -2px 2px 0 #1d2b53; }
 html[data-theme="8bit"] .g-result, html[data-theme="8bit"] .g-badge, html[data-theme="8bit"] .g-actions button, html[data-theme="8bit"] .g-best { border-radius: 0; font-family: "Galmuri11", monospace; }
