@@ -2025,6 +2025,7 @@ export async function createFarm(api) {
     for (const t of Object.values(T.pet || {})) t.destroy(true);
     T.pet = null;
     facesFrom = "";
+    ctaText = "";
   }
   async function ready() {
     if (!built || changed()) {
