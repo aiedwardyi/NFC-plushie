@@ -4325,6 +4325,8 @@ const farm = (function farmRoom() {
   let seq = 0;
   let sources = null;
   let cited = null;
+  let buttons = null;
+  let linked = null;
   let rec = null;
 
   function setHint(text, tap = false) {
@@ -4408,6 +4410,9 @@ const farm = (function farmRoom() {
   function clearSources() {
     sources?.remove();
     sources = null;
+    buttons?.remove();
+    buttons = null;
+    linked = null;
   }
 
   // Someone else has the speech line now.
@@ -4523,6 +4528,34 @@ const farm = (function farmRoom() {
     mic.before(sources);
   }
 
+  // Only the Naver links the server built get a button.
+  function showLinks(list) {
+    const shown = (list || []).map((l) => {
+      try {
+        const url = new URL(l.url);
+        return url.protocol === "https:" && /(^|\.)naver\.com$/.test(url.hostname) ? { url, title: String(l.title || ""), map: l.kind === "map" } : null;
+      } catch {
+        return null;
+      }
+    }).filter(Boolean).slice(0, 2);
+    if (!shown.length) return;
+    buttons = document.createElement("p");
+    buttons.className = "talk-links";
+    for (const l of shown) {
+      const a = document.createElement("a");
+      const name = document.createElement("span");
+      const site = document.createElement("span");
+      a.href = l.url.href;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      name.textContent = `${l.map ? "📍" : "🔎"} ${l.title}`;
+      site.textContent = l.map ? "네이버 지도" : "네이버";
+      a.append(name, site);
+      buttons.append(a);
+    }
+    mic.before(buttons);
+  }
+
   function say(i, list) {
     const mine = seq;
     bubble = i;
@@ -4533,6 +4566,7 @@ const farm = (function farmRoom() {
       if (mine !== seq) return;
       if (last) {
         dialogBox.classList.add("is-end");
+        showLinks(linked);
         showSources(list);
       }
       // Ready on the next task, so the tap that finished the typing can't also advance.
@@ -4548,10 +4582,11 @@ const farm = (function farmRoom() {
     }
   }
 
-  function answer(text, list) {
+  function answer(text, list, links) {
     intro.classList.remove("is-thinking");
     bubbles = split(text);
     cited = list;
+    linked = links;
     say(0, list);
   }
 
@@ -4603,7 +4638,7 @@ const farm = (function farmRoom() {
         if (pending !== mine || sayToken !== line) return;
         pending = null;
         if (reply?.ok && typeof reply.text === "string" && reply.text) {
-          answer(reply.text, reply.sources);
+          answer(reply.text, reply.sources, reply.links);
           if (reply.action === "dance") care?.dance();
         } else {
           answer(typeof reply?.line === "string" ? reply.line : ERROR_LINE, null);
