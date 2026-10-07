@@ -306,7 +306,7 @@ function farmAttrs(farm) {
   return ` data-farm-dot="${farm.dot ? 1 : 0}" data-farm-now="${farm.now}"${next}${visit}`;
 }
 
-export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = "horse", wake = false, morning = false, asleep = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, meet = false, theme = "classic", farm = null } = {}) {
+export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = "horse", wake = false, morning = false, asleep = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, meet = false, theme = "classic", farm = null, owner = false } = {}) {
   const look = themeOf(theme);
   const title = escapeHtml(row?.pet_name || "새 친구");
   const timeEl = timeLine ? `<p class="time-line" data-time-line></p>` : "";
@@ -318,7 +318,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
   const sheepPressed = kind === "sheep" ? "true" : "false";
   const horseActive = kind === "horse" ? " is-active" : "";
   const sheepActive = kind === "sheep" ? " is-active" : "";
-  const toggle = `<aside class="mascot-toggle" data-mascot-toggle role="group" aria-label="친구 바꾸기">
+  const toggle = `<aside class="mascot-toggle" data-mascot-toggle${owner ? ' data-owner="1"' : ""} role="group" aria-label="친구 바꾸기">
     <button type="button" class="mascot-tog${horseActive}" data-mascot="horse" aria-label="말 친구" aria-pressed="${horsePressed}">
       <img src="/mascot-horse-512-v3.png" width="32" height="32" alt="" decoding="async" draggable="false">
     </button>
@@ -451,7 +451,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
     `${recovery}${prompt}`,
     {
       waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet, mascot, wake: Boolean(code), morning: Boolean(pet?.morning), asleep: Boolean(pet?.asleep), demo,
-      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, meet: !row.pet_name, theme, farm: row.pet_name ? pet?.farm : null, ...extras,
+      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, meet: !row.pet_name, theme, farm: row.pet_name ? pet?.farm : null, owner: Boolean(row.pet_name), ...extras,
     },
   );
 }

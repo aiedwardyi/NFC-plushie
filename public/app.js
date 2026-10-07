@@ -69,6 +69,18 @@
     window.setTimeout(() => pet.classList.remove("is-press"), 700);
   }
 
+  // The owner's own page also saves the animal on the server; anyone else's toggle stays in this browser.
+  function saveKind(next) {
+    const dock = document.querySelector(".dock[data-care-uid]");
+    if (!dock || !document.querySelector("[data-mascot-toggle][data-owner]")) return;
+    fetch("/kind", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: dock.dataset.careUid, kind: next }),
+      credentials: "same-origin",
+    }).catch(() => {});
+  }
+
   let kind = readKind();
   persist(kind);
   applyArt(kind);
@@ -85,6 +97,7 @@
     persist(kind);
     applyArt(kind); // swap FIRST so the squash is of the new pet
     bouncePet(); // same tick — one continuous motion
+    saveKind(kind);
   }
 
   function onPointerDown(event) {

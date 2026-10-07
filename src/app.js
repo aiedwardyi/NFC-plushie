@@ -12,6 +12,7 @@ import { ARCADE, applyPlay, applyRace, raceState, xpPlaysLeft } from "./arcade.j
 import { FARM, addGiftSeeds, farmDot, farmView, giftSeeds, harvestFarm, nextRipeAt, openFarm, parseFarm, pickPlot, ripenFarm } from "./farm.js";
 import { devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
 import { mountTalk, purgeTalk, takeQuestion } from "./chat.js";
+import { editionOf, parseStats, statSheet } from "./stats.js";
 
 const cookieAge = 400 * 24 * 60 * 60 * 1000;
 const cooldown = 15 * 60 * 1000;
@@ -21,6 +22,7 @@ const CARE_ACTS = ["feed", "play", "sleep"];
 const validHeight = (h) => Number.isInteger(h) && h % 10 === 0 && h >= 0 && h <= ARCADE.maxHeight;
 const FARM_ACTS = ["open", "pick", "harvest"];
 const validPlot = (p) => Number.isInteger(p) && p >= 0 && p < FARM.plots;
+const KINDS = ["horse", "sheep"];
 const parseDemoUids = (raw) => String(raw || "").split(",").map((s) => s.trim().toUpperCase()).filter(validUid);
 
 const STALE_LINE = "폰을 진짜 저한테 톡 대 주세요!";
@@ -82,7 +84,7 @@ function petState(row, t) {
   };
 }
 
-export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now, rng = Math.random, demoUids = parseDemoUids(process.env.DEMO_UIDS), openUids = parseDemoUids(process.env.OPEN_UIDS), guestUids = parseDemoUids(process.env.GUEST_UIDS), talk = null }) {
+export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now, rng = Math.random, demoUids = parseDemoUids(process.env.DEMO_UIDS), openUids = parseDemoUids(process.env.OPEN_UIDS), guestUids = parseDemoUids(process.env.GUEST_UIDS), rareUids = parseDemoUids(process.env.RARE_UIDS), legendaryUids = parseDemoUids(process.env.LEGENDARY_UIDS), talk = null }) {
   const anyone = [...new Set([...openUids, ...guestUids])];
   if (anyone.length) {
     const base = decisions;
@@ -156,6 +158,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   });
 
   const getRow = (uid) => db.prepare("SELECT * FROM plushies WHERE uid = ?").get(uid) || null;
+  const editions = { rare: rareUids, legendary: legendaryUids };
+  const sheetOf = (row, kind) => statSheet(parseStats(row.stats), kind, editionOf(row.uid, editions));
   const setOwner = (res, token) => res.cookie("owner_token", token, {
     httpOnly: true, sameSite: "lax", secure: production, maxAge: cookieAge, path: "/",
   });
@@ -315,6 +319,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         const view = !skip && req.query.view === "1";
         if (!skip && !view) db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ? WHERE uid = ?").run(stamp, serial);
         const afterTap = getRow(serial);
+        if (afterTap.pet_name && !afterTap.kind) db.prepare("UPDATE plushies SET kind = ? WHERE uid = ?").run(req.demoMascot || "horse", serial);
         const raiseMirror = () => {
           if (counter !== null && (afterTap.last_counter === null || counter > afterTap.last_counter)) {
             db.prepare("UPDATE plushies SET last_counter = ? WHERE uid = ?").run(counter, serial);
@@ -546,6 +551,19 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       return tendFarm(uid, row, act, plot, now()) || 409;
     })();
     if (typeof reply === "number") return res.status(reply).json({ ok: false });
+    res.json(reply);
+  });
+
+  app.post("/kind", (req, res) => {
+    const { uid, kind } = req.body || {};
+    if (!validUid(uid) || !KINDS.includes(kind)) return res.status(400).json({ ok: false });
+    const reply = db.transaction(() => {
+      const row = getRow(uid);
+      if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row.pet_name) return null;
+      db.prepare("UPDATE plushies SET kind = ? WHERE uid = ?").run(kind, uid);
+      return { ok: true, kind, stats: sheetOf(row, kind) };
+    })();
+    if (!reply) return res.status(403).json({ ok: false });
     res.json(reply);
   });
 

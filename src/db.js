@@ -32,6 +32,8 @@ const petColumns = [
   "gi_best INTEGER",
   "race TEXT",
   "farm TEXT",
+  "kind TEXT",
+  "stats TEXT",
 ];
 
 export function migratePetColumns(db, migrationMs = Date.now()) {
