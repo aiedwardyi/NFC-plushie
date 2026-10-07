@@ -215,7 +215,7 @@ html[data-theme="milk"] .mascot-tog.is-active { background: #ffe3ea; box-shadow:
 html[data-theme="milk"] .topbar .theme-btn { background: #fff; box-shadow: 0 0 0 2.5px var(--straw), 0 3px 0 2.5px #d94a72; }
 html[data-theme="milk"] .theme-grid .theme-card { box-shadow: 0 0 0 2.5px #ffd0dc; }
 html[data-theme="milk"] .theme-grid .theme-card[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--straw-deep), 0 8px 16px rgba(242, 87, 127, 0.3); }
-html[data-theme="milk"] .theme-grid .theme-card[aria-pressed="true"]::after { background-color: var(--straw-deep); }
+html[data-theme="milk"] .theme-grid .theme-card[aria-pressed="true"]::before { background-color: var(--straw-deep); }
 html[data-theme="milk"] .theme-name { font-family: "Cafe24Ssurround", sans-serif; font-weight: 400; }
 
 /* The reveal stays classic */

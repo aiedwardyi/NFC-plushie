@@ -1350,19 +1350,28 @@ html[data-mascot="sheep"] [data-pick="najeon"] .theme-thumb { background-image: 
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
 }
 .theme-grid .theme-card[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--gold-light), 0 8px 18px rgba(0, 0, 0, 0.35); }
+.theme-grid .theme-card[aria-pressed="true"]::before,
 .theme-grid .theme-card[aria-pressed="true"]::after {
   content: "";
   position: absolute;
+}
+.theme-grid .theme-card[aria-pressed="true"]::before {
   top: 8px;
   right: 8px;
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background:
-    linear-gradient(45deg, transparent 44%, var(--navy) 44% 56%, transparent 56%) 9px 7px / 6px 10px no-repeat,
-    linear-gradient(-45deg, transparent 44%, var(--navy) 44% 56%, transparent 56%) 12px 6px / 9px 14px no-repeat,
-    var(--gold-light);
+  background: var(--gold-light);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.theme-grid .theme-card[aria-pressed="true"]::after {
+  top: 13px;
+  right: 17.5px;
+  width: 4px;
+  height: 10px;
+  border: solid var(--navy);
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
 }
 
 /* World switch: the new world grows out of the pet, the pet converts last */
