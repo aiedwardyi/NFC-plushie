@@ -367,7 +367,16 @@ html[data-theme="8bit"] .topbar .theme-btn {
 html[data-theme="8bit"] .topbar .theme-btn .swatch { background: conic-gradient(#ffa300 0 25%, #29adff 0 50%, #ff77a8 0 75%, #fff1e8 0); }
 html[data-theme="8bit"] .theme-grid .theme-card { border-radius: 0; box-shadow: -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink), 0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink); }
 html[data-theme="8bit"] .theme-grid .theme-card[aria-pressed="true"] { box-shadow: -4px 0 0 0 var(--gold-light), 4px 0 0 0 var(--gold-light), 0 -4px 0 0 var(--gold-light), 0 4px 0 0 var(--gold-light); }
-html[data-theme="8bit"] .theme-grid .theme-card[aria-pressed="true"]::after { border-radius: 0; }
+html[data-theme="8bit"] .theme-grid .theme-card[aria-pressed="true"]::before { border-radius: 0; }
+html[data-theme="8bit"] .theme-grid .theme-card[aria-pressed="true"]::after {
+  top: 15px;
+  right: 27px;
+  width: 2px;
+  height: 2px;
+  border: 0;
+  transform: none;
+  box-shadow: 12px 0 0 .3px var(--navy), 14px 0 0 .3px var(--navy), 10px 2px 0 .3px var(--navy), 12px 2px 0 .3px var(--navy), 8px 4px 0 .3px var(--navy), 10px 4px 0 .3px var(--navy), 0 6px 0 .3px var(--navy), 2px 6px 0 .3px var(--navy), 6px 6px 0 .3px var(--navy), 8px 6px 0 .3px var(--navy), 2px 8px 0 .3px var(--navy), 4px 8px 0 .3px var(--navy), 6px 8px 0 .3px var(--navy), 4px 10px 0 .3px var(--navy);
+}
 html[data-theme="8bit"] .theme-name { font-weight: 700; }
 html[data-theme="8bit"] .theme-lede { font-size: 11px; color: var(--muted); }
 
