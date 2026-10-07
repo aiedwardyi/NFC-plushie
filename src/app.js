@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import express from "express";
 import cookieParser from "cookie-parser";
+import { DEFAULT_KIND, KINDS, KIND_IDS, kindOf } from "../public/kinds.js";
 import * as binding from "./binding.js";
 import { hash, ownerToken, recoveryCode } from "./secrets.js";
 import { EMPTY_FOUND, EMPTY_SEEN } from "./db.js";
@@ -9,9 +10,10 @@ import { PET, applyTap, currentMood, levelForXp, parseTapUid, seoulDayKey, xpPro
 import { applyCare, careWant, mealsNow, playsNow } from "./care.js";
 import { comboNext, comboTap } from "./combo.js";
 import { ARCADE, applyPlay, applyRace, raceState, xpPlaysLeft } from "./arcade.js";
-import { FARM, addGiftSeeds, farmDot, farmView, giftSeeds, harvestFarm, nextRipeAt, openFarm, parseFarm, pickPlot, ripenFarm } from "./farm.js";
-import { devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
+import { FARM, addGiftSeeds, buySeed, farmDot, farmView, feedCrop, giftSeeds, harvestFarm, nextRipeAt, openFarm, parseFarm, pickPlot, ripenFarm, sendCrops } from "./farm.js";
+import { KIND_CSS, awayLine, devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
 import { mountTalk, purgeTalk, takeQuestion } from "./chat.js";
+import { EDITIONS, STAT_KEYS, editionOf, parseStats, setBoost, statSheet, train, useBoost } from "./stats.js";
 
 const cookieAge = 400 * 24 * 60 * 60 * 1000;
 const cooldown = 15 * 60 * 1000;
@@ -19,9 +21,14 @@ const skipAge = 2 * 60 * 1000;
 const validUid = (uid) => typeof uid === "string" && /^[0-9A-F]{14}$/.test(uid);
 const CARE_ACTS = ["feed", "play", "sleep"];
 const validHeight = (h) => Number.isInteger(h) && h % 10 === 0 && h >= 0 && h <= ARCADE.maxHeight;
-const FARM_ACTS = ["open", "pick", "harvest"];
+const FARM_ACTS = ["open", "pick", "harvest", "feed", "send", "buy"];
+const PANTRY_ACTS = ["feed", "send", "buy"];
 const validPlot = (p) => Number.isInteger(p) && p >= 0 && p < FARM.plots;
+const validCrop = (id) => typeof id === "string" && Object.hasOwn(FARM.crops, id);
+const validCrops = (a) => Array.isArray(a) && a.length >= 1 && a.length <= FARM.pantryMax && a.every(validCrop);
+const TOGGLE_KINDS = KINDS.filter((k) => k.toggle).map((k) => k.id);
 const parseDemoUids = (raw) => String(raw || "").split(",").map((s) => s.trim().toUpperCase()).filter(validUid);
+const daysApart = (from, to) => (Date.parse(to) - Date.parse(from)) / (24 * 60 * 60 * 1000);
 
 const STALE_LINE = "폰을 진짜 저한테 톡 대 주세요!";
 const COOLDOWN_LINE = "방금 토닥여 줘서 기분 좋아요! 조금 있다가 또 토닥여 주세요.";
@@ -82,7 +89,7 @@ function petState(row, t) {
   };
 }
 
-export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now, rng = Math.random, demoUids = parseDemoUids(process.env.DEMO_UIDS), openUids = parseDemoUids(process.env.OPEN_UIDS), guestUids = parseDemoUids(process.env.GUEST_UIDS), talk = null }) {
+export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now, rng = Math.random, demoUids = parseDemoUids(process.env.DEMO_UIDS), openUids = parseDemoUids(process.env.OPEN_UIDS), guestUids = parseDemoUids(process.env.GUEST_UIDS), rareUids = parseDemoUids(process.env.RARE_UIDS), legendaryUids = parseDemoUids(process.env.LEGENDARY_UIDS), talk = null }) {
   const anyone = [...new Set([...openUids, ...guestUids])];
   if (anyone.length) {
     const base = decisions;
@@ -124,29 +131,30 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     },
   }));
 
-  // Dad demo: ?mascot=sheep|horse (cookie). Default horse. Does not touch binding.js.
+  // Dad demo: ?mascot= picks a switch kind (cookie), else the default kind. Does not touch binding.js.
   const resolveDemoMascot = (req, res) => {
     const q = typeof req.query?.mascot === "string" ? req.query.mascot : "";
-    if (q === "sheep" || q === "horse") {
+    if (TOGGLE_KINDS.includes(q)) {
       res.cookie("mascot", q, { httpOnly: false, sameSite: "lax", secure: production, maxAge: cookieAge, path: "/" });
       return q;
     }
-    return req.cookies?.mascot === "sheep" ? "sheep" : "horse";
+    return TOGGLE_KINDS.includes(req.cookies?.mascot) ? req.cookies.mascot : DEFAULT_KIND;
   };
   app.use((req, res, next) => {
     const mascot = resolveDemoMascot(req, res);
     req.demoMascot = mascot;
-    if (mascot !== "sheep") return next();
+    if (mascot === DEFAULT_KIND) return next();
     const send = res.send.bind(res);
+    const from = `mascot-${DEFAULT_KIND}`;
     res.send = (body) => {
-      if (typeof body === "string" && body.includes("mascot-horse")) {
-        // Keep toggle icons as horse|sheep; only rewrite pet frames outside the toggle.
+      if (typeof body === "string" && body.includes(from) && !body.includes('name="pet-kind"')) {
+        // Keep toggle and picker icons as they are; only rewrite pet frames outside them.
         const parts = body.split(/(<aside class="mascot-toggle"[\s\S]*?<\/aside>)/);
         body = parts
           .map((part) =>
             part.startsWith('<aside class="mascot-toggle"')
               ? part
-              : part.split("mascot-horse").join("mascot-sheep"),
+              : part.split(from).join(`mascot-${mascot}`),
           )
           .join("");
       }
@@ -156,6 +164,24 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   });
 
   const getRow = (uid) => db.prepare("SELECT * FROM plushies WHERE uid = ?").get(uid) || null;
+  const editions = { rare: rareUids, legendary: legendaryUids };
+  const sheetOf = (row, stats, kind) => statSheet(stats, kind, editionOf(row.uid, editions, row.edition));
+  // The saved animal wins over this browser's toggle.
+  const animalOf = (row, req) => row.kind || req.demoMascot || DEFAULT_KIND;
+  const cardOf = (row, req) => {
+    const kind = animalOf(row, req);
+    return { kind, edition: editionOf(row.uid, editions, row.edition), sheet: sheetOf(row, parseStats(row.stats), kind) };
+  };
+
+  // One care beat's write, for 밥 놀이 잠 and for a hungry pet's farm snack.
+  function saveCare(uid, out, t) {
+    const c = out.care;
+    if (out.beat !== "stash" && out.beat !== "mumble") {
+      db.prepare("UPDATE plushies SET fed_at = ?, meals = ?, played_at = ?, plays = ?, slept_at = ? WHERE uid = ?")
+        .run(c.fedAt, c.meals, c.playedAt, c.plays, c.sleptAt, uid);
+    }
+    if (out.gain > 0) db.prepare("UPDATE plushies SET mood_value = ?, mood_updated_at = ? WHERE uid = ?").run(out.moodAfter, t, uid);
+  }
   const setOwner = (res, token) => res.cookie("owner_token", token, {
     httpOnly: true, sameSite: "lax", secure: production, maxAge: cookieAge, path: "/",
   });
@@ -235,7 +261,9 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       // The key says 한 번 더 톡!, so a combo page saves the line for after the key runs out.
       comboLaterLine: out.rewarded || extra.morning || !(extra.combo > 0) ? "" : (UNREWARDED_LINES[out.reason] || ""),
       lonelyLine: !out.rewarded && moodAfter <= PET.moodLonelyAt ? LONELY_LINE : "",
-      reunionLine: out.rewarded && out.reunion ? REUNION_LINE : "",
+      // The away line already speaks for the time apart, so the reunion keeps its jump but not its line.
+      reunionLine: out.rewarded && out.reunion && !extra.away ? REUNION_LINE : "",
+      awayLine: extra.away || "",
       want: careWant(care, t) || "",
       meals: mealsNow(care, t),
       plays: playsNow(care, t),
@@ -250,36 +278,101 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     };
   }
 
-  // One farm action on a named, awake pet; null when there is no farm to pick from.
-  function tendFarm(uid, row, act, plot, t) {
-    const farm = parseFarm(row.farm);
-    if (!farm && act !== "open") return null;
+  // A reported game trains its stat once a Seoul day and spends that stat's snack boost.
+  function playStats(row, key, t) {
+    const trained = train(parseStats(row.stats), key, t);
+    const spent = useBoost(trained.stats, key);
+    return { stats: spent.stats, trained: { stat: key, gained: trained.gained }, boostUsed: spent.used };
+  }
+
+  // Saves a farm action's field, XP and stats, then answers like /arcade with the field and the stat sheet.
+  function farmReply(uid, row, act, farm, xpGain, stats, animal, t, extra) {
     const xp = row.xp ?? 0;
-    const out = act === "open" ? openFarm(farm, xp, t) : act === "pick" ? pickPlot(farm, xp, t, plot) : harvestFarm(farm, xp, t);
-    db.prepare("UPDATE plushies SET farm = ?, xp = ? WHERE uid = ?").run(JSON.stringify(out.farm), out.xpAfter, uid);
-    if (out.picked.some((p) => p.crop === "gold")) {
-      db.prepare("UPDATE plushies SET mood_value = ?, mood_updated_at = ? WHERE uid = ?").run(PET.moodMax, t, uid);
-    }
-    const after = xpProgress(out.xpAfter);
+    const xpAfter = xp + xpGain;
+    db.prepare("UPDATE plushies SET farm = ?, xp = ?, stats = ? WHERE uid = ?").run(JSON.stringify(farm), xpAfter, JSON.stringify(stats), uid);
+    const after = xpProgress(xpAfter);
     return {
       ok: true,
       act,
+      ...extra,
+      xpGain,
+      level: after.level,
+      leveledUp: levelForXp(xpAfter) > levelForXp(xp),
+      xpInto: after.into,
+      xpSpan: after.span,
+      hearts: heartHalves(currentMood(petState(getRow(uid), t), t)),
+      farm: farmView(farm, after.level, t),
+      stats: sheetOf(row, stats, animal),
+    };
+  }
+
+  // One farm action on a named, awake pet; null when there is no farm to pick from.
+  function tendFarm(uid, row, act, plot, t, animal) {
+    const farm = parseFarm(row.farm);
+    if (!farm && act !== "open") return null;
+    const xp = row.xp ?? 0;
+    let stats = parseStats(row.stats);
+    const sheet = sheetOf(row, stats, animal);
+    const bonus = { intBonus: sheet.int.bonus, chaBonus: sheet.cha.bonus };
+    const out = act === "open" ? openFarm(farm, xp, t, bonus) : act === "pick" ? pickPlot(farm, xp, t, plot, bonus) : harvestFarm(farm, xp, t, bonus);
+    let gained = 0;
+    if (out.picked.length) {
+      ({ stats, gained } = train(stats, "int", t));
+      stats = useBoost(stats, "int").stats;
+    }
+    if (out.bused.length) stats = useBoost(stats, "cha").stats;
+    if (out.picked.some((p) => p.crop === "gold")) {
+      db.prepare("UPDATE plushies SET mood_value = ?, mood_updated_at = ? WHERE uid = ?").run(PET.moodMax, t, uid);
+    }
+    return farmReply(uid, row, act, out.farm, out.xpGain, stats, animal, t, {
       created: out.created,
       picked: out.picked,
       planted: out.planted,
       opened: out.opened,
       seeds: out.seeds,
-      xpGain: out.xpGain,
-      level: after.level,
-      leveledUp: levelForXp(out.xpAfter) > levelForXp(xp),
-      xpInto: after.into,
-      xpSpan: after.span,
-      hearts: heartHalves(currentMood(petState(getRow(uid), t), t)),
-      farm: farmView(out.farm, after.level, t),
-    };
+      coinsGain: out.coinsGain,
+      bused: out.bused,
+      ...(act === "open" ? {} : { trained: { stat: "int", gained } }),
+    });
+  }
+
+  // Feed a pantry crop, send crops on the bus or buy a seed; null when the crop, the room or the coins aren't there.
+  function pantryFarm(uid, row, { act, crop, crops }, t, animal) {
+    const farm = parseFarm(row.farm);
+    if (!farm) return null;
+    let stats = parseStats(row.stats);
+    if (act === "feed") {
+      const out = feedCrop(farm, crop, t);
+      if (!out) return null;
+      const { stat, amount } = out.snack;
+      let set = false;
+      for (const key of stat === "all" ? STAT_KEYS : [stat]) {
+        const boosted = setBoost(stats, key, amount);
+        stats = boosted.stats;
+        set ||= boosted.set;
+      }
+      // A hungry pet takes the crop as its 밥 too, so the reply carries the dock's care state like /care.
+      const st = petState(row, t);
+      const meal = careWant(st, t) === "feed";
+      if (meal) saveCare(uid, applyCare(st, "feed", t), t);
+      const care = petState(getRow(uid), t);
+      return farmReply(uid, row, act, out.farm, out.xpGain, stats, animal, t, {
+        crop, boost: { stat, amount, set }, meal,
+        lonely: currentMood(care, t) <= PET.moodLonelyAt, want: careWant(care, t), meals: mealsNow(care, t), plays: playsNow(care, t),
+      });
+    }
+    if (act === "send") {
+      const out = sendCrops(farm, crops, sheetOf(row, stats, animal).cha.bonus, t);
+      if (!out) return null;
+      return farmReply(uid, row, act, out.farm, out.xpGain, useBoost(stats, "cha").stats, animal, t, { crops, coinsGain: out.coinsGain });
+    }
+    const out = buySeed(farm, crop, levelForXp(row.xp ?? 0));
+    if (!out) return null;
+    return farmReply(uid, row, act, out.farm, 0, stats, animal, t, { crop, price: out.price });
   }
 
   app.get("/health", (req, res) => res.type("text").send("ok"));
+  app.get("/kinds.css", (req, res) => res.type("css").send(KIND_CSS));
   app.get("/t", (req, res) => {
     // The open farm page sets farm_at; any tap spends it.
     const farmAt = req.cookies.farm_at;
@@ -307,7 +400,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           mood_value, mood_updated_at, xp, reward_day_count, gift_seen, gift_found, days_together, last_active_day, last_counter)
           VALUES (?, ?, ?, 1, ?, ?, 100, ?, 0, 0, ?, ?, 1, ?, ?)`)
           .run(serial, hash(token), guest ? null : hash(code), stamp, stamp, t, EMPTY_SEEN, EMPTY_FOUND, today, counter);
-        return { html: petPage(getRow(serial), code, { celebrate: "claim", demo, theme, guest }), token: guest ? null : token };
+        const fresh = getRow(serial);
+        return { html: petPage(fresh, code, { celebrate: "claim", demo, theme, guest, card: cardOf(fresh, req) }), token: guest ? null : token };
       }
       if (state === "OWNER") {
         // The skip cookie marks the redirect after /name or /claim, not a tap; view=1 is a phone page's own reload.
@@ -315,6 +409,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         const view = !skip && req.query.view === "1";
         if (!skip && !view) db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ? WHERE uid = ?").run(stamp, serial);
         const afterTap = getRow(serial);
+        if (afterTap.pet_name && !afterTap.kind) db.prepare("UPDATE plushies SET kind = ? WHERE uid = ?").run(req.demoMascot || DEFAULT_KIND, serial);
         const raiseMirror = () => {
           if (counter !== null && (afterTap.last_counter === null || counter > afterTap.last_counter)) {
             db.prepare("UPDATE plushies SET last_counter = ? WHERE uid = ?").run(counter, serial);
@@ -330,11 +425,12 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           const skipped = getRow(serial);
           const asleep = view && Boolean(skipped.pet_name) && skipped.slept_at !== null;
           const pet = petView(skipped, petState(skipped, t), { rewarded: false }, t, { morning, asleep, view });
-          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found), theme, talk: talks(serial) }) };
+          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found), theme, talk: talks(serial), card: cardOf(skipped, req) }) };
         }
         if (!afterTap.pet_name) {
           raiseMirror();
-          return { html: petPage(getRow(serial), null, { celebrate: flash, demo, theme }) };
+          const fresh = getRow(serial);
+          return { html: petPage(fresh, null, { celebrate: flash, demo, theme, card: cardOf(fresh, req) }) };
         }
         const st = petState(afterTap, t);
         const out = applyTap(st, t, {
@@ -345,6 +441,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         let extra = null;
         if (out.rewarded) extra = writePetReward(serial, st, out, getRow(serial), t, today);
         const fresh = getRow(serial);
+        // The day's first tap after a missed Seoul day opens with what happened meanwhile; a morning has its own wake line.
+        const away = out.rewarded && out.newActiveDay && !morning && daysApart(st.lastActiveDay, today) >= 2 ? awayLine(parseFarm(fresh.farm), t) : "";
         const mile = milestoneLine(fresh.tap_count);
         let visual = flash;
         if (!visual && out.rewarded && out.leveledUp) visual = "levelup";
@@ -352,7 +450,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         else if (!visual && mile) visual = "milestone";
         else if (!visual && out.rewarded && out.gift && out.gift.tier === "rare") visual = "rare";
         else if (!visual && out.rewarded && out.gift && out.gift.tier === "special") visual = "special";
-        const visit = farmAt === serial && !morning && parseFarm(fresh.farm) ? tendFarm(serial, fresh, "harvest", null, t) : null;
+        const visit = farmAt === serial && !morning && parseFarm(fresh.farm) ? tendFarm(serial, fresh, "harvest", null, t, animalOf(fresh, req)) : null;
         // A celebration, a morning or a farm visit takes the whole visit; a stale reload is not a tap.
         let combo = 0;
         if (morning || visual || visit) {
@@ -366,10 +464,10 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           combo = c.combo;
         }
         // A follow-up waits for a visit with nothing to celebrate.
-        const ask = talks(serial) && !visual && !morning && !visit && combo <= 1 ? takeQuestion(db, serial, today) : "";
-        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo, visit, farmRow: visit ? getRow(serial) : fresh }), demo, found: parseFound(fresh.gift_found), theme, talk: talks(serial), ask }) };
+        const ask = talks(serial) && !visual && !morning && !visit && !away && combo <= 1 ? takeQuestion(db, serial, today) : "";
+        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo, visit, away, farmRow: visit ? getRow(serial) : fresh }), demo, found: parseFound(fresh.gift_found), theme, talk: talks(serial), ask, card: cardOf(getRow(serial), req) }) };
       }
-      if (state === "STRANGER") return { html: strangerPage(row, "", { demo, theme }) };
+      if (state === "STRANGER") return { html: strangerPage(row, "", { demo, theme, card: cardOf(row, req) }) };
       throw new Error("Invalid binding result");
     })();
     if (result.token) setOwner(res, result.token);
@@ -381,7 +479,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     if (!validUid(uid)) return invalidUid(req, res);
     const row = getRow(uid);
     if (!decisions.canRename(row, req.cookies.owner_token || null, hash)) {
-      return res.status(403).send(row ? strangerPage(row, "", { theme: req.theme }) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>", { theme: req.theme }));
+      return res.status(403).send(row ? strangerPage(row, "", { theme: req.theme, card: cardOf(row, req) }) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>", { theme: req.theme }));
     }
     const trimmed = typeof name === "string" ? name.trim() : "";
     if (!trimmed || Array.from(trimmed).length > 24) {
@@ -403,13 +501,15 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const t = now();
       const st = petState(row, t);
       const out = applyCare(st, act, t);
-      const c = out.care;
+      saveCare(uid, out, t);
+      // The day's first real care trains 매력; a stash or a mumble changes nothing.
+      let stats = parseStats(row.stats);
+      let gained = 0;
       if (out.beat !== "stash" && out.beat !== "mumble") {
-        db.prepare("UPDATE plushies SET fed_at = ?, meals = ?, played_at = ?, plays = ?, slept_at = ? WHERE uid = ?")
-          .run(c.fedAt, c.meals, c.playedAt, c.plays, c.sleptAt, uid);
+        ({ stats, gained } = train(stats, "cha", t));
+        if (gained) db.prepare("UPDATE plushies SET stats = ? WHERE uid = ?").run(JSON.stringify(stats), uid);
       }
-      if (out.gain > 0) db.prepare("UPDATE plushies SET mood_value = ?, mood_updated_at = ? WHERE uid = ?").run(out.moodAfter, t, uid);
-      const after = { ...st, ...c };
+      const after = { ...st, ...out.care };
       return {
         ok: true,
         beat: out.beat,
@@ -419,6 +519,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         want: careWant(after, t),
         meals: mealsNow(after, t),
         plays: playsNow(after, t),
+        trained: { stat: "cha", gained },
+        stats: sheetOf(row, stats, animalOf(row, req)),
       };
     })();
     if (!reply) return res.status(403).json({ ok: false });
@@ -488,21 +590,24 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   app.post("/arcade", (req, res) => {
     if (req.body?.game === "race") {
       const { uid, rival, won } = req.body;
-      const own = req.demoMascot || "horse";
-      if (!validUid(uid) || !["horse", "sheep"].includes(rival) || rival === own || typeof won !== "boolean") return res.status(400).json({ ok: false });
+      if (!validUid(uid) || !KIND_IDS.includes(rival) || typeof won !== "boolean") return res.status(400).json({ ok: false });
       const reply = db.transaction(() => {
         const row = getRow(uid);
         if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row?.pet_name) return 403;
+        // Each pet races its own zodiac neighbour.
+        if (rival !== kindOf(animalOf(row, req)).rival) return 400;
         if (row.slept_at !== null) return 409;
         const t = now();
         const st = petState(row, t);
         const out = applyRace(st, raceState(row.race), rival, won, t);
         const xp = st.xp + out.xpGain;
-        db.prepare("UPDATE plushies SET arcade_day = ?, arcade_plays = ?, race = ?, xp = ? WHERE uid = ?")
-          .run(out.arcadeDay, out.arcadePlays, JSON.stringify(out.race), xp, uid);
+        const { stats, trained, boostUsed } = playStats(row, "agi", t);
+        db.prepare("UPDATE plushies SET arcade_day = ?, arcade_plays = ?, race = ?, xp = ?, stats = ? WHERE uid = ?")
+          .run(out.arcadeDay, out.arcadePlays, JSON.stringify(out.race), xp, JSON.stringify(stats), uid);
         const after = xpProgress(xp);
         return { ok: true, race: out.race, rivalLevel: out.rivalLevel, xpGain: out.xpGain, xpLeft: out.xpLeft,
-          level: after.level, leveledUp: after.level > levelForXp(st.xp), xpInto: after.into, xpSpan: after.span };
+          level: after.level, leveledUp: after.level > levelForXp(st.xp), xpInto: after.into, xpSpan: after.span,
+          trained, boostUsed, stats: sheetOf(row, stats, animalOf(row, req)) };
       })();
       if (typeof reply === "number") return res.status(reply).json({ ok: false });
       return res.json(reply);
@@ -517,8 +622,9 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const st = petState(row, t);
       const out = applyPlay(st, height, t);
       const xpAfter = st.xp + out.xpGain;
-      db.prepare("UPDATE plushies SET arcade_day = ?, arcade_plays = ?, gi_best = ?, xp = ? WHERE uid = ?")
-        .run(out.arcadeDay, out.arcadePlays, out.best, xpAfter, uid);
+      const { stats, trained, boostUsed } = playStats(row, "str", t);
+      db.prepare("UPDATE plushies SET arcade_day = ?, arcade_plays = ?, gi_best = ?, xp = ?, stats = ? WHERE uid = ?")
+        .run(out.arcadeDay, out.arcadePlays, out.best, xpAfter, JSON.stringify(stats), uid);
       const after = xpProgress(xpAfter);
       return {
         ok: true,
@@ -530,6 +636,9 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         leveledUp: levelForXp(xpAfter) > levelForXp(st.xp),
         xpInto: after.into,
         xpSpan: after.span,
+        trained,
+        boostUsed,
+        stats: sheetOf(row, stats, animalOf(row, req)),
       };
     })();
     if (typeof reply === "number") return res.status(reply).json({ ok: false });
@@ -537,15 +646,31 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   });
 
   app.post("/farm", (req, res) => {
-    const { uid, act, plot } = req.body || {};
-    if (!validUid(uid) || !FARM_ACTS.includes(act) || (act === "pick" && !validPlot(plot))) return res.status(400).json({ ok: false });
+    const { uid, act, plot, crop, crops } = req.body || {};
+    if (!validUid(uid) || !FARM_ACTS.includes(act) || (act === "pick" && !validPlot(plot))
+      || ((act === "feed" || act === "buy") && !validCrop(crop)) || (act === "send" && !validCrops(crops))) return res.status(400).json({ ok: false });
     const reply = db.transaction(() => {
       const row = getRow(uid);
       if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row.pet_name) return 403;
       if (row.slept_at !== null) return 409;
-      return tendFarm(uid, row, act, plot, now()) || 409;
+      const animal = animalOf(row, req);
+      const out = PANTRY_ACTS.includes(act) ? pantryFarm(uid, row, { act, crop, crops }, now(), animal) : tendFarm(uid, row, act, plot, now(), animal);
+      return out || 409;
     })();
     if (typeof reply === "number") return res.status(reply).json({ ok: false });
+    res.json(reply);
+  });
+
+  app.post("/kind", (req, res) => {
+    const { uid, kind } = req.body || {};
+    if (!validUid(uid) || !TOGGLE_KINDS.includes(kind)) return res.status(400).json({ ok: false });
+    const reply = db.transaction(() => {
+      const row = getRow(uid);
+      if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row.pet_name) return null;
+      db.prepare("UPDATE plushies SET kind = ? WHERE uid = ?").run(kind, uid);
+      return { ok: true, kind, name: kindOf(kind).name, stats: sheetOf(row, parseStats(row.stats), kind) };
+    })();
+    if (!reply) return res.status(403).json({ ok: false });
     res.json(reply);
   });
 
@@ -579,7 +704,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       return res.redirect(303, `/t?uid=${uid}`);
     }
     const demo = demoUids.includes(uid) ? uid : "";
-    res.status(result.status).send(result.row ? strangerPage(result.row, result.message, { demo, theme: req.theme }) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>", { theme: req.theme }));
+    res.status(result.status).send(result.row ? strangerPage(result.row, result.message, { demo, theme: req.theme, card: cardOf(result.row, req) }) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>", { theme: req.theme }));
   });
 
   if (demoUids.length) {
@@ -599,6 +724,22 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       setSkip(res, uid);
       res.redirect(303, `/t?uid=${uid}`);
     });
+    // The admin panel's animal and edition, saved on the pet like /kind, named or not; the demo chip's owner only.
+    const demoSave = (column, valid, said) => (req, res) => {
+      const { uid } = req.body || {};
+      const value = req.body?.[column];
+      if (!validUid(uid) || !valid(value)) return res.status(400).json({ ok: false });
+      const reply = db.transaction(() => {
+        if (!demoUids.includes(uid) || !decisions.canRename(getRow(uid), req.cookies.owner_token || null, hash)) return null;
+        db.prepare(`UPDATE plushies SET ${column} = ? WHERE uid = ?`).run(value, uid);
+        const row = getRow(uid);
+        return { ok: true, [column]: value, name: said(value), stats: sheetOf(row, parseStats(row.stats), animalOf(row, req)) };
+      })();
+      if (!reply) return res.status(403).json({ ok: false });
+      res.json(reply);
+    };
+    app.post("/demo/kind", demoSave("kind", (kind) => KIND_IDS.includes(kind), (kind) => kindOf(kind).name));
+    app.post("/demo/edition", demoSave("edition", (edition) => typeof edition === "string" && Object.hasOwn(EDITIONS, edition), (edition) => EDITIONS[edition].name));
   }
 
   if (!production) {
@@ -612,7 +753,9 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       if (!ok) {
         return res.status(404).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>", { theme: req.theme }));
       }
-      res.send(previewPetPage({ kind, count, tier, reason, mascot: req.demoMascot || "horse", theme: req.theme }));
+      // A preview shows any kind; only the switch kinds stick to this phone.
+      const mascot = KIND_IDS.includes(req.query.mascot) ? req.query.mascot : req.demoMascot || DEFAULT_KIND;
+      res.send(previewPetPage({ kind, count, tier, reason, mascot, theme: req.theme }));
     });
     app.post("/dev/prime", (req, res) => {
       const { uid, preset, tier } = req.body || {};

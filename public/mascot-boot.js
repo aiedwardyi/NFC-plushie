@@ -1,4 +1,4 @@
-/* Sync boot: apply saved mascot and sky band before deferred app.js. Default horse. */
+/* Sync boot: apply saved mascot and sky band before deferred app.js. Default: the server's kind. */
 (function () {
   try {
     // Script-inserted, so it never blocks first paint.
@@ -27,26 +27,34 @@
     var h = new Date().getHours();
     document.documentElement.setAttribute("data-time", h >= 5 && h < 11 ? "morning" : h >= 11 && h < 18 ? "day" : h >= 18 && h < 22 ? "evening" : "night");
     var KEY = "pokkey-mascot";
-    var kind = "horse";
+    // The switch's kinds are listed on this script's own tag.
+    var kinds = ((document.currentScript && document.currentScript.getAttribute("data-mascots")) || "").split(" ");
+    var base = document.documentElement.getAttribute("data-mascot");
+    var kind = base;
+    var saved = document.querySelector('meta[name="pet-kind"]');
+    if (saved) {
+      document.documentElement.setAttribute("data-mascot", saved.content);
+      return;
+    }
     var q = new URLSearchParams(location.search).get("mascot");
-    if (q === "sheep" || q === "horse") kind = q;
+    if (kinds.indexOf(q) !== -1) kind = q;
     else {
       try {
         var ls = localStorage.getItem(KEY);
-        if (ls === "sheep" || ls === "horse") kind = ls;
+        if (kinds.indexOf(ls) !== -1) kind = ls;
       } catch (e) {}
-      if (kind === "horse") {
-        var m = document.cookie.match(/(?:^|; )mascot=(sheep|horse)(?:;|$)/);
-        if (m) kind = m[1];
+      if (kind === base) {
+        var m = document.cookie.match(/(?:^|; )mascot=([a-z]+)(?:;|$)/);
+        if (m && kinds.indexOf(m[1]) !== -1) kind = m[1];
       }
     }
     document.documentElement.setAttribute("data-mascot", kind);
-    if (kind !== "sheep") return;
+    if (kind === base) return;
     var imgs = document.querySelectorAll("img.pet-frame");
     for (var i = 0; i < imgs.length; i++) {
       var src = imgs[i].getAttribute("src") || "";
-      if (src.indexOf("mascot-horse") !== -1) {
-        imgs[i].setAttribute("src", src.split("mascot-horse").join("mascot-sheep"));
+      if (src.indexOf("mascot-" + base) !== -1) {
+        imgs[i].setAttribute("src", src.split("mascot-" + base).join("mascot-" + kind));
       }
     }
     var btns = document.querySelectorAll(".mascot-tog");

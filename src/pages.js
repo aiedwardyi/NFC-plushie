@@ -1,5 +1,8 @@
+import { DEFAULT_KIND, KINDS, kindOf } from "../public/kinds.js";
 import { GIFTS, GIFT_COUNT, GIFT_TIERS } from "./gifts.js";
+import { FARM, isRipe } from "./farm.js";
 import { seoulDayKey } from "./pet.js";
+import { EDITIONS, STAT_KEYS, STAT_NAMES, parseStats, statSheet } from "./stats.js";
 
 export function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({
@@ -17,7 +20,37 @@ export function milestoneLine(count) {
   return "";
 }
 
+// What the next level brings, for the level line; "" past the last unlock.
+export function nextUnlock(level) {
+  const next = level + 1;
+  const names = Object.values(FARM.crops).filter((c) => c.level === next).map((c) => c.name);
+  if (next === FARM.shopLevel) names.push("씨앗 가게");
+  if (next === FARM.goldSeedLevel) names.push(`${FARM.crops.gold.name} 씨앗`);
+  return names.length ? `Lv ${next}: ${names.join(" + ")}` : "";
+}
+
+const UNLOCKS = Object.fromEntries(Array.from({ length: FARM.goldSeedLevel }, (_, i) => [i + 1, nextUnlock(i + 1)]).filter(([, text]) => text));
+const TIER_RANK = { rare: 3, special: 2, common: 1 };
+
+// 이 after a final consonant, 가 after a vowel.
+function withSubject(word) {
+  const c = word.charCodeAt(word.length - 1) - 0xac00;
+  return `${word}${c >= 0 && c < 11172 && c % 28 ? "이" : "가"}`;
+}
+
+// The first line after a missed Seoul day says what really happened while away, never a guilt line.
+export function awayLine(farm, now) {
+  const ripe = (farm?.plots || []).filter((p) => p && isRipe(p, now)).map((p) => p.crop);
+  if (!ripe.length) return "푹 자고 일어났어요. 오늘도 같이 놀아요!";
+  const crop = ripe.sort((a, b) => (TIER_RANK[FARM.crops[b].tier] || 0) - (TIER_RANK[FARM.crops[a].tier] || 0))[0];
+  return `${withSubject(FARM.crops[crop].name)} 다 익었어요! 같이 볼래요?`;
+}
+
 const ICONS = {
+  str: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9.5 22 20 9.5h-6.8z"/></svg>`,
+  int: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>`,
+  agi: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5h4.5l7 7-7 7H2l7-7zM10.5 5H15l7 7-7 7h-4.5l7-7z"/></svg>`,
+  cha: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z"/></svg>`,
   feed: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.5h17c-.4 4.7-3.9 8-8.5 8s-8.1-3.3-8.5-8z"/><path d="M8.5 19.3h7"/><path d="M6.6 11.4c.5-2.9 2.9-4.8 5.4-4.8s4.9 1.9 5.4 4.8"/><path d="M15.5 3.2l-3 7.8M18.8 4.6l-4.6 6.6"/></svg>`,
   play: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M6.4 5.6c2.6 3.4 2.6 9.4 0 12.8M17.6 5.6c-2.6 3.4-2.6 9.4 0 12.8"/></svg>`,
   sleep: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.6 4.4A8 8 0 1 0 19.6 16 6.4 6.4 0 0 1 15.6 4.4z"/><path d="M17.2 3.6h3.4l-3.4 4h3.4"/></svg>`,
@@ -34,6 +67,8 @@ const ICONS = {
   lock: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
 };
 
+const TOGGLE = KINDS.filter((k) => k.toggle);
+
 export const THEMES = [
   { id: "classic", name: "클래식", color: "#141B2B" },
   { id: "8bit", name: "8비트", color: "#1d2b53" },
@@ -45,18 +80,29 @@ export function themeOf(value) {
   return THEMES.find((t) => t.id === value) || THEMES[0];
 }
 
-// Demo mascot: default horse. Pass mascot:"sheep" (or use ?mascot=sheep / cookie via public/app.js).
+// The 자개 previews were redrawn with the gold sun, so their cached copies need a new URL.
+const THUMB_V = { najeon: "?v=2" };
+
+// Each kind's 8-bit sprites and world previews, set wherever data-mascot names it, so a theme keeps one rule per frame.
+export const KIND_CSS = `${KINDS.map(({ id }) => {
+  const px = ["", "-away", "-closed", "-happy", "-munch", "-yawn"].map((pose) => `--px${pose}: url("/themes/px/${id}${pose}-px.png");`);
+  const thumbs = THEMES.map((t) => `--thumb-${t.id}: url("/themes/thumbs/${t.id}-${id}.webp${THUMB_V[t.id] || ""}");`);
+  return `[data-mascot="${id}"] { ${[...px, ...thumbs].join(" ")} }`;
+}).join("\n")}\n`;
+
+// Any kind in the manifest; anything else reads as 말.
 function mascotKind(mascot) {
-  return mascot === "sheep" ? "sheep" : "horse";
+  return kindOf(mascot).id;
 }
 
-function petMarkup({ waving = false, away = false, lonely = false, mascot = "horse", faces = true } = {}) {
+function petMarkup({ waving = false, away = false, lonely = false, mascot = DEFAULT_KIND, faces = true, stats = "" } = {}) {
   const kind = mascotKind(mascot);
   const front = `/mascot-${kind}-512-v3.png`;
   const awaySrc = `/mascot-${kind}-away-512-v3.png`;
+  const statsAttr = stats ? ` data-stats="${escapeHtml(stats)}"` : "";
   if (away) {
     const awayAlt = "다정한 친구가 등을 보이고 있어요";
-    return `<div class="pet pet-away" data-pet="away" role="img" aria-label="${awayAlt}">
+    return `<div class="pet pet-away" data-pet="away"${statsAttr} role="img" aria-label="${awayAlt}">
       <span class="pet-motion">
         <img class="pet-frame is-show" src="${awaySrc}" width="220" height="220" alt="" decoding="async" draggable="false">
       </span>
@@ -71,7 +117,7 @@ function petMarkup({ waving = false, away = false, lonely = false, mascot = "hor
     ? [face("blink", `/mascot-${kind}-closed-512.webp`), face("react", `/mascot-${kind}-happy-512.webp`), face("sleepy", front),
       face("munch", `/mascot-${kind}-munch-512.webp`), face("yawn", `/mascot-${kind}-yawn-512.webp`), face("away", awaySrc)]
     : ["blink", "react", "sleepy"].map((name) => `<img class="pet-frame" data-frame="${name}" src="${front}" width="220" height="220" alt="" aria-hidden="true" decoding="async" draggable="false">`);
-  return `<div class="pet${enterClass}${lonelyClass}" data-pet="alive">
+  return `<div class="pet${enterClass}${lonelyClass}" data-pet="alive"${statsAttr}>
       <button type="button" class="pet-hit" aria-label="${alt}">
         <span class="pet-motion">
           <img class="pet-frame is-show" data-frame="canon" src="${front}" width="220" height="220" alt="${alt}" decoding="async" draggable="false">
@@ -151,8 +197,35 @@ function xpPercent(pet) {
 }
 
 function keyBar({ level, pct, left }) {
-  return `<p class="level-line"><span class="level-badge" aria-label="Lv. ${level}">${level}</span>
-      <span class="xp-bar" role="img" aria-label="다음 단계까지 ${left}"><span class="xp-fill" data-xp="${pct}"></span></span></p>`;
+  const next = nextUnlock(level);
+  return `<p class="level-line"><button type="button" class="level-open" data-open="stats" aria-haspopup="dialog" aria-label="능력치 보기, Lv. ${level}"><span class="level-badge" aria-label="Lv. ${level}">${level}</span>
+      <span class="xp-bar" role="img" aria-label="다음 단계까지 ${left}"><span class="xp-fill" data-xp="${pct}"></span></span></button><span class="level-next" data-level-next data-unlocks="${escapeHtml(JSON.stringify(UNLOCKS))}"${next ? "" : " hidden"}>${next}</span></p>`;
+}
+
+const STAT_JOBS = { str: "기 모으기에서 더 높이", int: "텃밭 경험치 더 많이", agi: "달리기에서 더 빨리", cha: "버스 코인 더 많이" };
+// A 별밤 레전더리's best stat, fully trained, fills the bar; a pending boost shows as a tag instead.
+const STAT_BAR_MAX = 120;
+
+const animalName = (kind) => kindOf(kind).name;
+
+export function statsData(sheet) {
+  return JSON.stringify(Object.fromEntries(STAT_KEYS.map((k) => [k, { total: sheet[k].total, bonus: sheet[k].bonus, boost: sheet[k].boost }])));
+}
+
+function statCard({ kind, edition, sheet }, owner) {
+  const rows = STAT_KEYS.map((k) => {
+    const s = sheet[k];
+    return `<li class="st-row" data-stat="${k}">
+          <span class="st-icon">${ICONS[k]}</span><span class="st-label">${STAT_NAMES[k]}</span>
+          <span class="st-bar" role="img" aria-label="${STAT_NAMES[k]} ${s.total}" data-base="${s.base}" data-plus="${s.plus}" data-trained="${s.trained}"><i class="st-base"></i><i class="st-plus"></i><i class="st-trained"></i></span>
+          <b class="st-total">${s.total}</b><span class="st-boost"${s.boost ? "" : " hidden"}>+${s.boost}</span>
+          <small class="st-job">${STAT_JOBS[k]}</small>
+        </li>`;
+  }).join("");
+  const name = Object.hasOwn(EDITIONS, edition) ? edition : "classic";
+  return sheetHtml("stats", "능력치", `<p class="st-who"><b class="st-animal" data-stat-animal>${animalName(kind)}</b><span class="st-edition is-${name}">${EDITIONS[name].name}</span></p>
+      <ul class="st-list" data-max="${STAT_BAR_MAX}">${rows}</ul>${owner ? `
+      <button type="button" class="st-snack" data-stat-farm>텃밭에서 간식 주기</button>` : ""}`);
 }
 
 function petStats(pet) {
@@ -220,7 +293,7 @@ export function giftCollection(found = [], today = null) {
 
 const LOCKED_GAMES = ["낚시", "풍선 사냥"];
 
-function arcadeSheet(pet, found = [], mascot = "horse") {
+function arcadeSheet(pet, found = [], mascot = DEFAULT_KIND) {
   const left = Number(pet?.arcadeLeft) || 0;
   const pips = Array.from({ length: 3 }, (_, i) => `<i class="g-pip${i < 3 - left ? " is-used" : ""}"></i>`).join("");
   const have = new Set(found);
@@ -262,20 +335,24 @@ function metDay(row) {
   return Number.isFinite(t) ? seoulDayKey(t) : "";
 }
 
-function demoPanel(uid, row) {
+const DEMO_EDITIONS = [["classic", "클래식"], ["rare", "레어"], ["legendary", "레전더리"]];
+
+// The admin chips' panel: every animal and every edition, then the replays and resets.
+function demoPanel(uid, row, kind, edition) {
+  // A kind without its own opening video skips it; the button comes back when the panel picks one that has it.
   const reveal = row?.pet_name
-    ? `<button type="button" data-reveal-replay data-met="${metDay(row)}">영상 다시 보기</button>`
+    ? `<button type="button" data-reveal-replay data-met="${metDay(row)}"${kindOf(kind).reveal ? "" : " hidden"}>영상 다시 보기</button>`
     : "";
+  const kinds = KINDS.map((k) => `<button type="button" class="mascot-tog${k.id === kind ? " is-active" : ""}" data-mascot="${k.id}" aria-label="${k.name} 친구" aria-pressed="${k.id === kind}">
+          <img src="/mascot-${k.id}-512-v3.png" width="40" height="40" alt="" loading="lazy" decoding="async" draggable="false"><span>${k.name}</span>
+        </button>`).join("\n        ");
+  const editions = DEMO_EDITIONS.map(([id, name]) => `<button type="button" data-edition="${id}" aria-pressed="${id === edition}">${name}</button>`).join("");
   return `<div class="demo-sheet" data-demo-panel role="dialog" aria-modal="true" aria-label="데모" hidden>
     <div class="demo-card">
       <aside class="mascot-toggle" data-demo-switch role="group" aria-label="친구 바꾸기">
-        <button type="button" class="mascot-tog" data-mascot="horse" aria-label="말 친구" aria-pressed="false">
-          <img src="/mascot-horse-512-v3.png" width="56" height="56" alt="" decoding="async" draggable="false">
-        </button>
-        <button type="button" class="mascot-tog" data-mascot="sheep" aria-label="양 친구" aria-pressed="false">
-          <img src="/mascot-sheep-512-v3.png" width="56" height="56" alt="" decoding="async" draggable="false">
-        </button>
+        ${kinds}
       </aside>
+      <div class="demo-tier" data-demo-edition role="group" aria-label="등급 바꾸기">${editions}</div>
       <button type="button" data-demo-replay>처음 인사 다시 보기</button>
       ${reveal}${row?.pet_name ? `
       <form action="/demo/care-reset" method="post" data-demo-care>
@@ -306,25 +383,18 @@ function farmAttrs(farm) {
   return ` data-farm-dot="${farm.dot ? 1 : 0}" data-farm-now="${farm.now}"${next}${visit}`;
 }
 
-export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = "horse", wake = false, morning = false, asleep = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, meet = false, theme = "classic", farm = null } = {}) {
+export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = DEFAULT_KIND, wake = false, morning = false, asleep = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, meet = false, theme = "classic", farm = null, owner = false, card = null, edition = "classic" } = {}) {
   const look = themeOf(theme);
   const title = escapeHtml(row?.pet_name || "새 친구");
   const timeEl = timeLine ? `<p class="time-line" data-time-line></p>` : "";
   const celebrateAttr = celebrate === "claim" || celebrate === "named" || celebrate === "milestone" || celebrate === "levelup" || celebrate === "reunion" || celebrate === "rare" || celebrate === "special"
     ? ` data-celebrate="${celebrate}"`
     : "";
-  const kind = mascot === "sheep" ? "sheep" : "horse";
-  const horsePressed = kind === "horse" ? "true" : "false";
-  const sheepPressed = kind === "sheep" ? "true" : "false";
-  const horseActive = kind === "horse" ? " is-active" : "";
-  const sheepActive = kind === "sheep" ? " is-active" : "";
-  const toggle = `<aside class="mascot-toggle" data-mascot-toggle role="group" aria-label="친구 바꾸기">
-    <button type="button" class="mascot-tog${horseActive}" data-mascot="horse" aria-label="말 친구" aria-pressed="${horsePressed}">
-      <img src="/mascot-horse-512-v3.png" width="32" height="32" alt="" decoding="async" draggable="false">
-    </button>
-    <button type="button" class="mascot-tog${sheepActive}" data-mascot="sheep" aria-label="양 친구" aria-pressed="${sheepPressed}">
-      <img src="/mascot-sheep-512-v3.png" width="32" height="32" alt="" decoding="async" draggable="false">
-    </button>
+  const kind = mascotKind(row?.kind || mascot);
+  const toggle = `<aside class="mascot-toggle" data-mascot-toggle${owner ? ' data-owner="1"' : ""} role="group" aria-label="친구 바꾸기">
+    ${TOGGLE.map((k) => `<button type="button" class="mascot-tog${k.id === kind ? " is-active" : ""}" data-mascot="${k.id}" aria-label="${k.name} 친구" aria-pressed="${k.id === kind}">
+      <img src="/mascot-${k.id}-512-v3.png" width="32" height="32" alt="" decoding="async" draggable="false">
+    </button>`).join("\n    ")}
   </aside>`;
   const pin = level ? `<span class="level-pin">Lv. ${level}</span>` : "";
   const topEnd = dock
@@ -342,7 +412,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
   return `<!doctype html>
 <html lang="ko" data-mascot="${kind}"${themed ? ` data-theme="${look.id}"` : ""}>
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8">${row?.kind ? `\n  <meta name="pet-kind" content="${kind}">` : ""}
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="${look.color}">
   <meta name="color-scheme" content="light dark">
@@ -350,9 +420,10 @@ export function page(row, content, { waving = false, away = false, lonely = fals
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"></noscript>
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/kinds.css">
   <link rel="stylesheet" href="/mascot-toggle.css">${themed ? `
   <link rel="stylesheet" href="/themes/${look.id}.css">` : ""}
-  <script src="/mascot-boot.js"></script>
+  <script src="/mascot-boot.js" data-mascots="${TOGGLE.map((k) => k.id).join(" ")}" data-reveals="${KINDS.filter((k) => k.reveal).map((k) => k.id).join(" ")}"></script>
   <script src="/app.js" defer></script>
 </head>
 <body${bodyClass ? ` class="${bodyClass}"` : ""}${farmAttrs(farm)}${celebrateAttr}${wake ? " data-wake" : ""}${morning ? " data-morning" : ""}${asleep ? " data-asleep" : ""}>
@@ -369,7 +440,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
     </section>
     <div class="window${away ? " is-away" : ""}" data-window>
       ${SKY}
-      ${petMarkup({ waving, away, lonely, mascot: kind, faces: Boolean(row) })}
+      ${petMarkup({ waving, away, lonely, mascot: kind, faces: Boolean(row), stats: card ? statsData(card.sheet) : "" })}
     </div>
     ${dialogBox}
     ${stats}
@@ -377,8 +448,8 @@ export function page(row, content, { waving = false, away = false, lonely = fals
     ${dock}
     <footer${demo ? " data-demo-hold" : ""}>토닥이면 깨어나는 작은 친구</footer>
   </main>
-  ${sheets}${dock ? themeSheet(look.id) : ""}
-  ${demo ? demoPanel(demo, row) : ""}
+  ${sheets}${card ? statCard(card, owner) : ""}${dock ? themeSheet(look.id) : ""}
+  ${demo ? demoPanel(demo, row, kind, edition) : ""}
 </body>
 </html>`;
 }
@@ -403,17 +474,23 @@ function talkBar(name) {
   </form>`;
 }
 
+// The farm fills the list from its own view whenever it opens the shop.
+const SHOP = sheetHtml("shop", "씨앗 가게", `<p class="shop-purse"><span class="shop-coins" data-shop-coins></span><span class="shop-bag" data-shop-bag></span></p>
+      <ul class="shop-list" data-shop-list></ul>`);
+
 function homeExtras(row, pet, found, mascot, talk) {
   return {
     dock: dockHtml({ gift: Boolean(pet?.gift), want: pet?.want, meals: pet?.meals, plays: pet?.plays, uid: row.uid, combo: pet?.combo, later: pet?.comboLaterLine, arcadeLeft: pet?.arcadeLeft, giBest: pet?.giBest, farmDot: Boolean(pet?.farm?.dot) }),
     sheets: arcadeSheet(pet, found, mascot)
       + sheetHtml("gifts", "선물함", giftCollection(found, pet?.gift || null))
       + sheetHtml("record", "우리 기록", recordSheet(row, pet))
+      + SHOP
       + (talk ? talkBar(row.pet_name) : ""),
   };
 }
 
-export function petPage(row, code = null, { celebrate = "", pet = null, mascot = "horse", demo = "", found = [], theme = "classic", talk = false, ask = "", guest = false } = {}) {
+export function petPage(row, code = null, { celebrate = "", pet = null, mascot = DEFAULT_KIND, demo = "", found = [], theme = "classic", talk = false, ask = "", guest = false, card = null } = {}) {
+  mascot = row.kind || mascot;
   const firstMeet = celebrate === "claim" || celebrate === "named";
   let greeting = row.pet_name
     ? (firstMeet
@@ -421,6 +498,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
       : `다시 만나서 반가워요, ${escapeHtml(row.pet_name)}!`)
     : "안녕하세요! 찾아와 줘서 정말 기뻐요.";
   if (pet?.morning || pet?.asleep) greeting = "쿨쿨… 쿨쿨…";
+  else if (pet?.awayLine) greeting = escapeHtml(pet.awayLine);
   else if (ask) greeting = escapeHtml(ask);
   const recovery = code && !guest ? keyCard(code) : "";
   const prompt = row.pet_name ? "" : `<form action="/name" method="post" class="name-form" data-met="${metDay(row)}">
@@ -451,13 +529,14 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
     `${recovery}${prompt}`,
     {
       waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet, mascot, wake: Boolean(code), morning: Boolean(pet?.morning), asleep: Boolean(pet?.asleep), demo,
-      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, meet: !row.pet_name, theme, farm: row.pet_name ? pet?.farm : null, ...extras,
+      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, meet: !row.pet_name, theme, farm: row.pet_name ? pet?.farm : null, owner: Boolean(row.pet_name), card: row.pet_name ? card : null, edition: card?.edition, ...extras,
     },
   );
 }
 
-export function strangerPage(row, message = "", { mascot = "horse", demo = "", theme = "classic" } = {}) {
-  return page(row, `${message ? `<p class="notice" role="alert">${escapeHtml(message)}</p>` : ""}
+export function strangerPage(row, message = "", { mascot = DEFAULT_KIND, demo = "", theme = "classic", card = null } = {}) {
+  const peek = card ? `<button type="button" class="ghost stat-peek" data-open="stats" aria-haspopup="dialog">${animalName(card.kind)} 친구의 능력치</button>` : "";
+  return page(row, `${message ? `<p class="notice" role="alert">${escapeHtml(message)}</p>` : ""}${peek}
     <button type="button" id="claim-toggle" class="ghost" aria-expanded="${Boolean(message)}" aria-controls="claim-form">제가 주인이에요</button>
     <form action="/claim" method="post" id="claim-form" ${message ? "" : "hidden"}>
       <input type="hidden" name="uid" value="${escapeHtml(row.uid)}">
@@ -465,7 +544,7 @@ export function strangerPage(row, message = "", { mascot = "horse", demo = "", t
       <input id="code" name="code" required autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="claim-help">
       <p id="claim-help">처음 만났을 때 적어둔 안심 코드를 넣어주세요.</p>
       <button type="submit" class="primary">내 친구를 데려올래요!</button>
-    </form>`, { away: true, mascot, demo, theme, dialog: `<p class="intro">이 작은 친구는 이미 주인이 있어요.</p>` });
+    </form>`, { away: true, mascot, demo, theme, card, edition: card?.edition, dialog: `<p class="intro">이 작은 친구는 이미 주인이 있어요.</p>` });
 }
 
 export const fakeUids = ["04AAAAAAAAAAA1", "04BBBBBBBBBBB2", "04CCCCCCCCCCC3"];
@@ -474,7 +553,7 @@ const PREVIEW_KINDS = new Set(["claim", "levelup", "reunion", "milestone", "gift
 const PREVIEW_TIERS = new Set(["common", "special", "rare"]);
 const PREVIEW_REASONS = new Set(["cooldown", "cap", "stale"]);
 
-export function previewPetPage({ kind, count, tier = "common", reason = "", mascot = "horse", theme = "classic" } = {}) {
+export function previewPetPage({ kind, count, tier = "common", reason = "", mascot = DEFAULT_KIND, theme = "classic" } = {}) {
   const n = Number(count);
   const row = {
     uid: "04PREVIEW00001",
@@ -517,6 +596,7 @@ export function previewPetPage({ kind, count, tier = "common", reason = "", masc
     "",
     {
       timeLine: true, celebrate: visual, countHtml, lonely: kind === "lonely", mascot, theme,
+      card: { kind: mascot, edition: "classic", sheet: statSheet(parseStats(""), mascot, "classic") },
       dialog: `<p class="intro">${greeting}</p>${momentsHtml}${giftHtml}`, speaker: row.pet_name,
       stats: `<section class="pet-stats" aria-label="돌봄 상태">${stats}</section>`, level,
       dock: dockHtml({ gift: showGift, arcadeLeft: 3 }),

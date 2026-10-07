@@ -6,7 +6,7 @@ const T0 = Date.parse("2026-05-01T10:00:00+09:00");
 const fresh = () => ({ arcadeDay: null, arcadePlays: 0, giBest: 0 });
 const after = (s, out) => ({ ...s, arcadeDay: out.arcadeDay, arcadePlays: out.arcadePlays, giBest: out.best });
 
-test("the first 3 plays of a Seoul day give XP, the rest are for fun", () => {
+test("the first 3 plays of a Seoul day give 15 XP, the rest are for fun", () => {
   let s = fresh();
   const gains = [];
   for (let i = 0; i < 5; i++) {
@@ -14,8 +14,13 @@ test("the first 3 plays of a Seoul day give XP, the rest are for fun", () => {
     gains.push(out.xpGain);
     s = after(s, out);
   }
-  assert.deepEqual(gains, [5, 5, 5, 0, 0]);
+  assert.deepEqual(gains, [15, 15, 15, 0, 0]);
   assert.equal(xpPlaysLeft(s, T0), 0);
+});
+
+test("the height cap leaves room for a full 힘 bonus", () => {
+  assert.deepEqual(ARCADE, { xpPlays: 3, xpPerPlay: 15, maxHeight: 14375 });
+  assert.equal(ARCADE.maxHeight, (12500 * 115) / 100);
 });
 
 test("plays reset at Seoul midnight, not at UTC midnight", () => {

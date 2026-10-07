@@ -1,31 +1,36 @@
-/* Dad demo: horse↔sheep corner toggle. Persist localStorage+cookie. binding.js untouched. */
+/* Dad demo: the 말/양 corner toggle and the admin panel's 12 animals. Persist localStorage+cookie. binding.js untouched. */
 (function mascotDemoToggle() {
   const KEY = "pokkey-mascot";
   const MAX_AGE = String(400 * 24 * 60 * 60);
+  const KINDS = (document.querySelector("script[data-mascots]")?.dataset.mascots || "").split(" ");
 
   function readKind() {
+    const saved = document.querySelector('meta[name="pet-kind"]');
+    if (saved) return saved.content;
     try {
       const params = new URLSearchParams(window.location.search);
       const q = params.get("mascot");
-      if (q === "sheep" || q === "horse") return q;
+      if (KINDS.includes(q)) return q;
     } catch (_) { /* ignore */ }
     try {
       const ls = localStorage.getItem(KEY);
-      if (ls === "sheep" || ls === "horse") return ls;
+      if (KINDS.includes(ls)) return ls;
     } catch (_) { /* ignore */ }
     try {
-      const m = document.cookie.match(/(?:^|; )mascot=(sheep|horse)(?:;|$)/);
-      if (m) return m[1];
+      const m = document.cookie.match(/(?:^|; )mascot=([a-z]+)(?:;|$)/);
+      if (m && KINDS.includes(m[1])) return m[1];
     } catch (_) { /* ignore */ }
-    const htmlKind = document.documentElement.getAttribute("data-mascot");
-    return htmlKind === "sheep" ? "sheep" : "horse";
+    return document.documentElement.getAttribute("data-mascot");
   }
 
   function persist(kind) {
-    try { localStorage.setItem(KEY, kind); } catch (_) { /* ignore */ }
-    try {
-      document.cookie = "mascot=" + kind + ";path=/;max-age=" + MAX_AGE + ";samesite=lax";
-    } catch (_) { /* ignore */ }
+    // A kind off the switch lives on the pet only, so this phone keeps its own 말 or 양.
+    if (KINDS.includes(kind)) {
+      try { localStorage.setItem(KEY, kind); } catch (_) { /* ignore */ }
+      try {
+        document.cookie = "mascot=" + kind + ";path=/;max-age=" + MAX_AGE + ";samesite=lax";
+      } catch (_) { /* ignore */ }
+    }
     // Drop sticky ?mascot= so it can't fight the toggle on the next read/navigation.
     try {
       const url = new URL(window.location.href);
@@ -38,7 +43,7 @@
   }
 
   function frameSrc(img, kind) {
-    return (img.getAttribute("src") || "").replace(/mascot-(?:horse|sheep)-/, `mascot-${kind}-`);
+    return (img.getAttribute("src") || "").replace(/mascot-[a-z]+-/, `mascot-${kind}-`);
   }
 
   function applyArt(kind) {
@@ -69,29 +74,81 @@
     window.setTimeout(() => pet.classList.remove("is-press"), 700);
   }
 
+  // The owner's own page also saves the animal on the server; anyone else's toggle stays in this browser.
+  function saveKind(next) {
+    const dock = document.querySelector(".dock[data-care-uid]");
+    if (!dock || !document.querySelector("[data-mascot-toggle][data-owner]")) return;
+    fetch("/kind", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: dock.dataset.careUid, kind: next }),
+      credentials: "same-origin",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((reply) => {
+        if (!reply?.ok) return;
+        paintStats(reply.stats);
+        const animal = document.querySelector("[data-stat-animal]");
+        if (animal) animal.textContent = reply.name;
+      })
+      .catch(() => {});
+  }
+
+  // The admin panel saves any of the 12 on the pet, named or not; a refusal puts the old animal back.
+  function saveDemoKind(next, was) {
+    const back = () => {
+      if (kind !== next) return;
+      kind = was;
+      applyArt(was);
+    };
+    fetch("/demo/kind", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: document.querySelector("[data-demo-panel] input[name=uid]")?.value, kind: next }),
+      credentials: "same-origin",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((reply) => {
+        if (!reply?.ok) return back();
+        persist(next);
+        paintStats(reply.stats);
+        const animal = document.querySelector("[data-stat-animal]");
+        if (animal) animal.textContent = reply.name;
+        const replay = document.querySelector("[data-reveal-replay]");
+        if (replay) replay.hidden = !revealKind();
+        armReveal();
+      })
+      .catch(back);
+  }
+
   let kind = readKind();
   persist(kind);
   applyArt(kind);
 
   let skipClick = false;
 
-  function swapTo(next) {
-    if (next !== "horse" && next !== "sheep") return;
+  function swapTo(btn) {
+    const next = btn.getAttribute("data-mascot");
+    const picker = Boolean(btn.closest("[data-demo-switch]"));
+    if (!picker && !KINDS.includes(next)) return;
     if (next === kind) {
       bouncePet();
       return;
     }
+    const was = kind;
     kind = next;
-    persist(kind);
+    if (!picker) persist(kind);
     applyArt(kind); // swap FIRST so the squash is of the new pet
     bouncePet(); // same tick — one continuous motion
+    if (picker) saveDemoKind(kind, was);
+    else saveKind(kind);
   }
 
   function onPointerDown(event) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     skipClick = true;
     try { event.currentTarget.setPointerCapture(event.pointerId); } catch (_) { /* ignore */ }
-    swapTo(event.currentTarget.getAttribute("data-mascot"));
+    swapTo(event.currentTarget);
   }
 
   function onClick(event) {
@@ -100,7 +157,7 @@
       event.preventDefault();
       return;
     }
-    swapTo(event.currentTarget.getAttribute("data-mascot"));
+    swapTo(event.currentTarget);
   }
 
   document.querySelectorAll(".mascot-tog").forEach((btn) => {
@@ -782,7 +839,7 @@ function currentPetSrc(pet) {
   const shown = pet?.querySelector(".pet-frame.is-show");
   // A theme can swap the art with content:url, so read what is on screen.
   const art = shown ? /^url\("?(.+?)"?\)$/.exec(getComputedStyle(shown).content) : null;
-  return art?.[1] || shown?.getAttribute("src") || "/mascot-horse-512-v3.png";
+  return art?.[1] || shown?.getAttribute("src") || `/mascot-${document.documentElement.dataset.mascot}-512-v3.png`;
 }
 
 function runEvolutionGlow({ onComplete } = {}) {
@@ -1551,7 +1608,7 @@ if (themeSheet) {
   }
 
   function prepare(id) {
-    const kind = root.dataset.mascot === "sheep" ? "sheep" : "horse";
+    const kind = root.dataset.mascot;
     const key = `${id}:${kind}`;
     if (!ready.has(key)) {
       const css = id === "classic" ? Promise.resolve(true) : sheetLink(`/themes/${id}.css`);
@@ -2072,6 +2129,9 @@ const care = (function careLoop() {
     meals = reply.meals;
     dock.dataset.plays = String(reply.plays);
     plays = reply.plays;
+    paintStats(reply.stats);
+    // After the beat's own line, so the two never talk over each other.
+    trainedPop(reply.trained, 1600);
   }
 
   function post(act) {
@@ -2743,7 +2803,7 @@ const care = (function careLoop() {
     if (id) press(id);
   });
   if (owner) window.addEventListener("load", () => preload(world()), { once: true });
-  return { morning, doze, opened: open, restyle, hold, release, dance, busy: screenBusy, blocked: () => screenBusy(true), hearts: tweenHearts, fx: { say, sparkles, cheer, box, move, sound, voice } };
+  return { morning, doze, opened: open, restyle, hold, release, dance, busy: screenBusy, blocked: () => screenBusy(true), hearts: tweenHearts, sync: settle, fx: { say, sparkles, cheer, box, move, sound, voice } };
 })();
 
 function percent(r) {
@@ -2785,7 +2845,113 @@ function paintLevel(r) {
     void line.offsetWidth;
     line.classList.add("is-growing");
   }
+  document.querySelector(".level-open")?.setAttribute("aria-label", `능력치 보기, Lv. ${r.level}`);
+  const unlock = document.querySelector("[data-level-next]");
+  if (unlock) {
+    let next = "";
+    try { next = JSON.parse(unlock.dataset.unlocks || "{}")[r.level] || ""; } catch { /* keep it empty */ }
+    unlock.textContent = next;
+    unlock.hidden = !next;
+  }
 }
+
+/* Stats: the card from the level line, the bonuses the games read, and the little lines when a stat grows. */
+const STAT_WORDS = { str: "힘", int: "지능", agi: "민첩", cha: "매력" };
+
+function petStats() {
+  try {
+    return JSON.parse(document.querySelector(".pet[data-stats]")?.dataset.stats || "null");
+  } catch {
+    return null;
+  }
+}
+
+const statBonus = (key) => Number(petStats()?.[key]?.bonus) || 0;
+
+// Each bar's base, edition and trained parts as shares of the card's full bar; `grow` starts them from empty.
+function fillBars(grow = false) {
+  const list = document.querySelector(".st-list");
+  if (!list) return;
+  const max = Number(list.dataset.max) || 120;
+  list.querySelectorAll(".st-bar").forEach((bar) => {
+    const segmented = document.documentElement.dataset.theme === "8bit";
+    const total = ["base", "plus", "trained"].reduce((sum, part) => sum + (Number(bar.dataset[part]) || 0), 0);
+    for (const part of ["base", "plus", "trained"]) {
+      const el = bar.querySelector(`.st-${part}`);
+      if (!el) continue;
+      const value = segmented ? (part === "base" ? Math.round(Math.min(1, total / max) * 18) / 18 : 0) : (Number(bar.dataset[part]) || 0) / max;
+      const width = `${Math.max(0, Math.min(100, value * 100))}%`;
+      if (grow && !segmented && !prefersReducedMotion()) {
+        el.style.transition = "none";
+        el.style.width = "0%";
+        void el.offsetWidth;
+        el.style.transition = "";
+      }
+      el.style.width = width;
+    }
+  });
+}
+
+// A reply's stat sheet repaints the card and the stats the games and popups read.
+function paintStats(sheet) {
+  if (!sheet?.str) return;
+  const holder = document.querySelector(".pet[data-stats]");
+  if (holder) holder.dataset.stats = JSON.stringify(Object.fromEntries(Object.entries(sheet).map(([k, s]) => [k, { total: s.total, bonus: s.bonus, boost: s.boost }])));
+  for (const [k, s] of Object.entries(sheet)) {
+    const row = document.querySelector(`.st-row[data-stat="${k}"]`);
+    if (!row) continue;
+    row.querySelector(".st-total").textContent = String(s.total);
+    const bar = row.querySelector(".st-bar");
+    bar.dataset.base = String(s.base);
+    bar.dataset.plus = String(s.plus);
+    bar.dataset.trained = String(s.trained);
+    bar.setAttribute("aria-label", `${STAT_WORDS[k]} ${s.total}`);
+    const tag = row.querySelector(".st-boost");
+    tag.textContent = `+${s.boost}`;
+    tag.hidden = !s.boost;
+  }
+  fillBars();
+}
+
+// Short lines that float up over the window one at a time; a game on screen holds them until the pet is home.
+const pops = [];
+function statPop(text, near = null) {
+  pops.push({ text, near });
+  if (pops.length === 1) nextPop();
+}
+function nextPop() {
+  const pop = pops[0];
+  if (!pop) return;
+  if (document.documentElement.classList.contains("g-on") || document.hidden) {
+    window.setTimeout(nextPop, 400);
+    return;
+  }
+  const box = (pop.near?.isConnected && pop.near.getClientRects().length ? pop.near : document.querySelector("[data-window]"))?.getBoundingClientRect();
+  const el = document.createElement("p");
+  el.className = "stat-pop";
+  el.setAttribute("role", "status");
+  el.textContent = pop.text;
+  el.style.left = `${box ? box.left + box.width / 2 : window.innerWidth / 2}px`;
+  el.style.top = `${box ? (pop.near ? box.top : box.top + box.height * 0.28) : window.innerHeight / 3}px`;
+  document.body.appendChild(el);
+  const done = () => {
+    el.remove();
+    pops.shift();
+    nextPop();
+  };
+  const frames = prefersReducedMotion()
+    ? [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }]
+    : [{ transform: "translate(-50%, 6px) scale(.6)", opacity: 0 }, { transform: "translate(-50%, -6px) scale(1.12)", opacity: 1, offset: 0.18 }, { transform: "translate(-50%, -12px) scale(1)", opacity: 1, offset: 0.75 }, { transform: "translate(-50%, -30px) scale(1)", opacity: 0 }];
+  el.animate(frames, { duration: 1500, easing: "ease-out" }).finished.then(done, done);
+}
+
+function trainedPop(trained, delay = 0) {
+  if (!trained?.gained || !STAT_WORDS[trained.stat]) return;
+  window.setTimeout(() => statPop(`${STAT_WORDS[trained.stat]} +1!`), delay);
+}
+
+fillBars();
+document.querySelectorAll('[data-open="stats"]').forEach((button) => button.addEventListener("click", () => fillBars(true)));
 
 /* Tap combo: plushie taps in a row play a hello, the world's trick, then the secret move; the key counts them. */
 const combo = (function tapCombo() {
@@ -3587,6 +3753,8 @@ const arcade = (function arcadeRoom() {
     paintLeft(r.xpLeft);
     dock.dataset.giBest = String(r.best);
     paintLevel(r);
+    paintStats(r.stats);
+    trainedPop(r.trained);
   }
 
   function post(height) {
@@ -3618,6 +3786,7 @@ const arcade = (function arcadeRoom() {
     buzz,
     still: () => prefersReducedMotion(),
     drone,
+    bonus: statBonus,
     onLaunch: (height) => post(height),
   };
 
@@ -3770,6 +3939,7 @@ const racing = (function raceRoom() {
     still: () => prefersReducedMotion(),
     sfx: (name, options) => playSfx(name, options),
     buzz: (pattern) => tryVibrate(pattern),
+    bonus: statBonus,
     async finish(rival, won) {
       const run = ++posted;
       try {
@@ -3786,6 +3956,8 @@ const racing = (function raceRoom() {
         sheet.querySelector("[data-arcade-today] b").textContent = r.xpLeft ? `${r.xpLeft}번 남았어요` : "다 했어요!";
         button.classList.toggle("has-new", sheet.querySelector("[data-open-gifts]").classList.contains("has-new") || r.xpLeft > 0);
         paintLevel(r);
+        paintStats(r.stats);
+        trainedPop(r.trained);
         return r;
       } catch { return null; }
     },
@@ -3811,7 +3983,7 @@ const racing = (function raceRoom() {
     root.classList.add("g-on", "r-on");
     combo.sink(() => g.tap("nfc"));
     let out = "quit";
-    try { out = await g.play(mode, state, root.dataset.mascot === "sheep" ? "sheep" : "horse"); }
+    try { out = await g.play(mode, state, root.dataset.mascot); }
     finally {
       combo.sink(null);
       combo.end();
@@ -3892,12 +4064,23 @@ const farm = (function farmRoom() {
   };
   const world = () => root.dataset.theme || "classic";
   const kit = () => (world() === "8bit" ? "chip" : "soft");
+  // The basket row under the field, there before the stage is measured: the stage fills its crops, the coins open the shop.
+  const row = document.createElement("div");
+  row.className = "f-basket";
+  row.setAttribute("role", "group");
+  row.setAttribute("aria-label", "바구니");
+  row.innerHTML = '<div class="fb-list"></div><button type="button" class="fb-coins" aria-haspopup="dialog"><i class="f-coin-ic" aria-hidden="true"></i><b>0</b><span class="fb-shop" hidden>가게</span></button>';
+  win.after(row);
+  const coinsBtn = row.querySelector(".fb-coins");
+  const shop = document.querySelector('[data-sheet="shop"]');
+  let art = (name) => `/game/art/farm/${name}.svg`;
   let game = null;
   let ready = null;
   let retry = 0;
   let opening = false;
   let isOpen = false;
   let harvesting = false;
+  let buying = false;
   let acting = Promise.resolve();
   let cookieTimer = 0;
   let dotTimer = 0;
@@ -3947,6 +4130,24 @@ const farm = (function farmRoom() {
         el.animate([{ transform: "scale(1)" }, { transform: "scale(1.45)" }, { transform: "scale(1)" }], { duration: 480, easing: "cubic-bezier(.3,1.4,.5,1)" });
       }
     },
+    basket: row,
+    coinBox: () => coinsBtn,
+    coins(n, gain = 0) {
+      coinsBtn.querySelector("b").textContent = String(n);
+      coinsBtn.setAttribute("aria-label", `코인 ${n}개${view?.shopOpen ? ", 씨앗 가게 열기" : ""}`);
+      if (gain <= 0) return;
+      statPop(`+${gain} 코인`, coinsBtn);
+      if (!prefersReducedMotion()) coinsBtn.animate([{ transform: "scale(1)" }, { transform: "scale(1.18)" }, { transform: "scale(1)" }], { duration: 420, easing: "cubic-bezier(.3,1.4,.5,1)" });
+    },
+    act: (act, body) => pantry(act, body),
+    // A snack or a bus that leveled the pet up: an open plants the new plots with the usual show.
+    acted(r) {
+      if (!r.leveledUp) return;
+      acting = acting.then(() => post("open")).then(({ reply }) => {
+        if (reply) after(reply);
+        if (reply && isOpen && ready) ready.grew(reply);
+      }).catch(() => {});
+    },
   };
 
   function prepare() {
@@ -3957,7 +4158,10 @@ const farm = (function farmRoom() {
           retry += 1;
           throw error;
         }))
-        .then((m) => m.createFarm(api));
+        .then((m) => {
+          art = m.artUrl;
+          return m.createFarm(api);
+        });
       game = made;
       made.then((g) => {
         if (game === made) ready = g;
@@ -3975,11 +4179,11 @@ const farm = (function farmRoom() {
     for (const mood of ["happy", "excited", "ask", "munch"]) loadSfx(cryName(mood, world()));
   }
 
-  function post(act, plot) {
+  function post(act, extra = {}) {
     return fetch("/farm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(plot === undefined ? { uid, act } : { uid, act, plot }),
+      body: JSON.stringify({ uid, act, ...extra }),
       credentials: "same-origin",
     })
       .then((res) => res.json().catch(() => null).then((reply) => ({ status: res.status, reply: reply?.ok ? reply : null })))
@@ -3988,9 +4192,78 @@ const farm = (function farmRoom() {
         if (out.reply) {
           view = out.reply.farm;
           clock = { server: view.now, at: performance.now() };
+          coinsBtn.querySelector(".fb-shop").hidden = !view.shopOpen;
+          coinsBtn.classList.toggle("is-shop", Boolean(view.shopOpen));
         }
         return out;
       });
+  }
+
+  // Every farm reply carries the pet's stats; a snack eaten as 밥 also carries the dock's care state.
+  function after(r) {
+    paintStats(r.stats);
+    trainedPop(r.trained);
+    if (r.want !== undefined) care.sync(r);
+  }
+
+  // 먹이기, 버스로 보내기 and 사기 wait their turn behind any pick; a refusal redraws the farm from the server.
+  function pantry(act, body) {
+    const next = acting.then(() => post(act, body));
+    acting = next.catch(() => {});
+    return next.then((out) => {
+      if (out.reply) after(out.reply);
+      else resync(out.status);
+      return out;
+    });
+  }
+
+  function resync(status) {
+    acting = acting.then(() => post("open")).then(({ status: again, reply }) => {
+      if (!reply) {
+        failed(again || status);
+        return;
+      }
+      after(reply);
+      if (isOpen && ready) ready.redraw(reply.farm);
+      if (sheetOpen === shop) paintShop();
+      care.fx.say("앗, 바구니가 바뀌었어요. 다시 해 볼까요?");
+    }).catch(() => {});
+  }
+
+  function paintShop() {
+    if (!shop || !view?.shop) return;
+    shop.querySelector("[data-shop-coins]").innerHTML = `<i class="f-coin-ic" aria-hidden="true"></i><b>${view.coins}</b> 코인`;
+    shop.querySelector("[data-shop-bag]").textContent = `씨앗 주머니 ${view.bag.length}개`;
+    shop.querySelector("[data-shop-list]").innerHTML = view.shop.map((s) => `<li class="shop-row${s.locked ? " is-locked" : ""}">
+          <img src="${art(`item-${s.crop}`)}" alt="">
+          <span class="shop-name"><b>${s.name} 씨앗</b><small>${s.locked ? s.reason : "심으면 쑥쑥 자라요"}</small></span>
+          <button type="button" class="shop-buy" data-buy="${s.crop}" aria-label="${s.name} 씨앗, ${s.price}코인${s.locked ? `, ${s.reason}` : ""}"${s.locked ? " disabled" : ""}><i class="f-coin-ic" aria-hidden="true"></i>${s.price}</button>
+        </li>`).join("");
+  }
+
+  // The bought seed hops out of its row and drops into the 씨앗 주머니.
+  function dropSeed(from, crop) {
+    const bag = shop.querySelector("[data-shop-bag]");
+    const a = from.getBoundingClientRect();
+    const b = bag.getBoundingClientRect();
+    const seed = document.createElement("img");
+    seed.className = "shop-drop";
+    seed.src = art(`item-${crop}`);
+    seed.alt = "";
+    seed.style.left = `${a.left + a.width / 2}px`;
+    seed.style.top = `${a.top + a.height / 2}px`;
+    document.body.appendChild(seed);
+    playSfx(`farm-${kit()}-pop`);
+    const dx = b.left + 12 - (a.left + a.width / 2);
+    const dy = b.top + b.height / 2 - (a.top + a.height / 2);
+    const frames = prefersReducedMotion()
+      ? [{ opacity: 1 }, { opacity: 0 }]
+      : [{ transform: "translate(-50%, -50%) scale(1)" }, { transform: `translate(calc(-50% + ${dx * 0.55}px), calc(-50% + ${dy - 46}px)) scale(1.2)`, offset: 0.5 }, { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.45)`, opacity: 0.85 }];
+    return seed.animate(frames, { duration: 700, easing: "ease-in-out" }).finished.catch(() => {}).then(() => {
+      seed.remove();
+      playSfx(`care-${kit()}-drop`, { gain: 0.7 });
+      if (!prefersReducedMotion()) bag.animate([{ transform: "scale(1)" }, { transform: "scale(1.16)" }, { transform: "scale(1)" }], { duration: 320 });
+    });
   }
 
   // The page-load harvest finds this cookie on the next plushie tap; every /t clears it.
@@ -4055,7 +4328,6 @@ const farm = (function farmRoom() {
   function onScreen(event) {
     if (!ready || !isOpen || event.target.closest?.("button, .f-card")) return;
     const box = win.getBoundingClientRect();
-    if (ready.loadAt(event.clientX - box.left, event.clientY - box.top)) return;
     drag = { id: event.pointerId, x: event.clientX - box.left, y: event.clientY - box.top, moved: false };
     win.setPointerCapture(event.pointerId);
     screenAt(drag.x, drag.y, true);
@@ -4084,8 +4356,9 @@ const farm = (function farmRoom() {
   function pick(plot) {
     if (picking.has(plot) || harvesting) return;
     picking.add(plot);
-    acting = acting.then(() => post("pick", plot)).then(({ status, reply }) => {
+    acting = acting.then(() => post("pick", { plot })).then(({ status, reply }) => {
       picking.delete(plot);
+      if (reply) after(reply);
       if (!isOpen || !ready) {
         if (reply) flush(reply);
         return;
@@ -4104,6 +4377,7 @@ const farm = (function farmRoom() {
     ready.knock();
     acting = acting.then(() => post("harvest")).then(({ status, reply }) => {
       harvesting = false;
+      if (reply) after(reply);
       if (!isOpen || !ready) {
         if (reply) flush(reply);
         return;
@@ -4177,6 +4451,7 @@ const farm = (function farmRoom() {
         // A page opened by a plushie tap stays silent until it is touched, so the show waits for that touch.
         return st.promptTouch().then(() => {
           if (!isOpen || st !== ready) return undefined;
+          trainedPop(r.trained);
           return st.harvest(r).then(() => flush(r));
         });
       }).catch((error) => broken(error, r));
@@ -4220,6 +4495,7 @@ const farm = (function farmRoom() {
         return;
       }
       if (reply.created) first = reply;
+      after(reply);
       if (isOpen || document.hidden || careHold.asleep || petBusy() || sheetOpen || st !== ready) return;
       const r = first ? { ...first, farm: reply.farm, hearts: reply.hearts } : reply;
       enter(st, r, first ? "tutorial" : "open").then(() => {
@@ -4270,6 +4546,39 @@ const farm = (function farmRoom() {
   }
 
   button.addEventListener("click", open);
+  coinsBtn.addEventListener("click", () => {
+    if (!isOpen || !view) return;
+    playSfx(`care-${kit()}-press`);
+    buzz(10);
+    if (!view.shopOpen) {
+      care.fx.say("씨앗 가게는 Lv 3부터 열려요");
+      return;
+    }
+    if (ready?.busy || sheetOpen) return;
+    paintShop();
+    openSheet("shop", coinsBtn);
+  });
+  shop?.addEventListener("click", (event) => {
+    const buy = event.target.closest("[data-buy]");
+    if (!buy || buy.disabled || buying || !isOpen) return;
+    buying = true;
+    buy.disabled = true;
+    playSfx(`care-${kit()}-press`);
+    pantry("buy", { crop: buy.dataset.buy }).then(({ reply }) => {
+      buying = false;
+      if (!reply) return;
+      ready?.bought(reply);
+      dropSeed(buy, reply.crop);
+      paintShop();
+    });
+  });
+  // The card's 텃밭에서 간식 주기 goes straight to the basket.
+  document.querySelector("[data-stat-farm]")?.addEventListener("click", () => {
+    closeSheet();
+    window.setTimeout(() => {
+      if (!isOpen) open();
+    }, prefersReducedMotion() ? 0 : 320);
+  });
   window.addEventListener("resize", () => {
     window.clearTimeout(fitTimer);
     fitTimer = window.setTimeout(function fit() {
@@ -5138,14 +5447,18 @@ function revealDate(day) {
   return day.replaceAll("-", ". ");
 }
 
+// The kinds with their own opening video, as the server listed them; the rest name their pet without one.
+const REVEALS = (document.querySelector("script[data-reveals]")?.dataset.reveals || "").split(" ");
+
 function revealKind() {
-  return document.documentElement.dataset.mascot === "sheep" ? "sheep" : "horse";
+  const kind = document.documentElement.dataset.mascot;
+  return REVEALS.includes(kind) ? kind : "";
 }
 
 const nameForm = document.querySelector(".name-form");
 
 function armReveal() {
-  if (nameForm && !prefersReducedMotion()) reveal.prepare(revealKind());
+  if (nameForm && revealKind() && !prefersReducedMotion()) reveal.prepare(revealKind());
 }
 
 // The key card pushes the form below the fold; bring it up under the code unless the user already scrolled.
@@ -5162,7 +5475,7 @@ function frameNameForm() {
 nameForm?.addEventListener("submit", (event) => {
   const name = nameForm.elements.name.value.trim();
   const size = Array.from(name).length;
-  if (!size || size > 24 || prefersReducedMotion()) return;
+  if (!size || size > 24 || prefersReducedMotion() || !revealKind()) return;
   event.preventDefault();
   const uid = nameForm.elements.uid.value;
   const saved = fetch("/name", {
@@ -5206,7 +5519,7 @@ if (demoSheet && demoHold) {
   function openDemo() {
     tryVibrate(15);
     loadSfx(cryName());
-    if (replayReveal) reveal.prepare(revealKind());
+    if (replayReveal && revealKind()) reveal.prepare(revealKind());
     pinDemo();
     demoSheet.hidden = false;
     void demoSheet.offsetWidth;
@@ -5227,6 +5540,8 @@ if (demoSheet && demoHold) {
   demoHold.addEventListener("pointerdown", (event) => {
     // The panel's replays would land on top of a game.
     if (document.documentElement.classList.contains("g-on") || document.documentElement.classList.contains("f-on")) return;
+    // The picker's art loads while the finger holds.
+    demoSheet.querySelectorAll('img[loading="lazy"]').forEach((img) => { img.loading = "eager"; });
     holdAt = [event.clientX, event.clientY];
     window.clearTimeout(holdTimer);
     holdTimer = window.setTimeout(() => {
@@ -5268,6 +5583,28 @@ if (demoSheet && demoHold) {
       onEnd: () => reveal.close(),
     });
   });
+  // The edition row saves on the pet and repaints the stat card in place.
+  const editions = demoSheet.querySelectorAll("[data-edition]");
+  editions.forEach((btn) => btn.addEventListener("click", () => {
+    fetch("/demo/edition", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: demoSheet.querySelector("input[name=uid]")?.value, edition: btn.dataset.edition }),
+      credentials: "same-origin",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((reply) => {
+        if (!reply?.ok) return;
+        editions.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+        paintStats(reply.stats);
+        const tag = document.querySelector(".st-edition");
+        if (tag) {
+          tag.className = `st-edition is-${reply.edition}`;
+          tag.textContent = reply.name;
+        }
+      })
+      .catch(() => {});
+  }));
   demoSheet.querySelector("[data-demo-fresh]")?.addEventListener("submit", () => {
     try {
       sessionStorage.removeItem(claimSeenKey(pageUid()));

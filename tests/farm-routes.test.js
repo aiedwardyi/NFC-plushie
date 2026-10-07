@@ -7,7 +7,9 @@ import { createApp } from "../src/app.js";
 import { openDatabase } from "../src/db.js";
 import { FARM, createFarm, parseFarm } from "../src/farm.js";
 import { fakeUids } from "../src/pages.js";
+import { xpForLevel } from "../src/pet.js";
 import { hash } from "../src/secrets.js";
+import { parseStats, statSheet } from "../src/stats.js";
 
 const [A, B] = fakeUids;
 const T0 = Date.parse("2026-05-01T10:00:00+09:00");
@@ -81,6 +83,9 @@ async function farm(ctx, jar, act, extra = {}) {
 
 const stateOf = (ctx, uid = A) => parseFarm(ctx.row(uid).farm);
 const crops = (f) => f.plots.map((p) => p && p.crop);
+const stock = (ctx, over) => ctx.set("farm = ?", JSON.stringify({ ...stateOf(ctx), ...over }));
+const statsOf = (ctx) => parseStats(ctx.row().stats);
+const NEXT_DAY = 14 * 60 * MIN + MIN;
 
 test("the first open plants the starter packet, and only once", async (t) => {
   const ctx = await setup(t);
@@ -89,6 +94,8 @@ test("the first open plants the starter packet, and only once", async (t) => {
   const first = await farm(ctx, jar, "open");
   assert.equal(first.status, 200);
   const plot = (i, crop, name, quick, ripeAt, eta, left, clock = "timed") => ({ plot: i, crop, name, quick, at: T0, ripeAt, ripe: false, clock, eta, left });
+  const shop = [["lettuce", "상추", 5, 3], ["potato", "감자", 5, 3], ["carrot", "당근", 10, 3], ["tomato", "토마토", 10, 3], ["sweet", "고구마", 30, 4], ["melon", "수박", 30, 5], ["gold", "황금 감자", 200, 6]]
+    .map(([crop, name, price, lv]) => ({ crop, name, price, locked: true, reason: `Lv ${lv}부터` }));
   assert.deepEqual(first.body, {
     ok: true,
     act: "open",
@@ -102,12 +109,15 @@ test("the first open plants the starter packet, and only once", async (t) => {
     ],
     opened: [],
     seeds: [],
+    coinsGain: 0,
+    bused: [],
     xpGain: 0,
     level: 1,
     leveledUp: false,
     xpInto: 0,
     xpSpan: 100,
     hearts: 10,
+    stats: statSheet(parseStats(""), "horse", "classic"),
     farm: {
       now: T0,
       plots: [
@@ -123,6 +133,10 @@ test("the first open plants the starter packet, and only once", async (t) => {
       bag: ["potato"],
       harvested: 0,
       golden: 0,
+      pantry: [],
+      coins: 0,
+      shopOpen: false,
+      shop,
     },
   });
   assert.deepEqual(stateOf(ctx), createFarm(T0));
@@ -304,6 +318,24 @@ test("corrupt farm JSON never breaks a visit or the farm", async (t) => {
   }
   const open = await farm(ctx, jar, "open");
   assert.deepEqual([open.status, open.body.created], [200, true]);
+});
+
+test("an old v1 farm row keeps its field and bag and plays on as v2", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  const v1 = { ...createFarm(T0), v: 1, bag: ["carrot"], harvested: 4 };
+  delete v1.pantry;
+  delete v1.coins;
+  delete v1.day;
+  ctx.set("farm = ?", JSON.stringify(v1));
+  ctx.advance(MIN);
+  const out = await farm(ctx, jar, "harvest");
+  assert.equal(out.status, 200);
+  assert.deepEqual(out.body.picked.map((p) => p.crop), ["sprout"]);
+  assert.deepEqual([out.body.farm.pantry, out.body.farm.coins, out.body.farm.harvested], [["sprout"], 0, 5]);
+  const saved = stateOf(ctx);
+  assert.deepEqual(saved.plots.slice(1), v1.plots.slice(1));
+  assert.deepEqual([JSON.parse(ctx.row().farm).v, crops(saved)[0], saved.bag], [2, "carrot", []]);
 });
 
 test("a pre-farm database gains the farm column as no farm", async (t) => {
@@ -524,4 +556,245 @@ test("the dev ripen route ripens every plot, and only outside production", async
   assert.deepEqual(out.body.picked.map((p) => p.crop), FARM.starter);
   const prod = await setup(t, { production: true });
   assert.equal((await ripen(prod)).status, 404);
+});
+
+test("feeding takes one crop, sets its boost and saves it", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await farm(ctx, jar, "open");
+  await ctx.request("/care", { jar, body: { uid: A, act: "feed" } });
+  stock(ctx, { pantry: ["carrot", "potato", "carrot"] });
+  const out = await farm(ctx, jar, "feed", { crop: "carrot" });
+  assert.equal(out.status, 200);
+  assert.deepEqual([out.body.act, out.body.crop, out.body.xpGain, out.body.meal], ["feed", "carrot", 10, false]);
+  assert.deepEqual(out.body.boost, { stat: "agi", amount: 10, set: true });
+  assert.deepEqual(out.body.farm.pantry, ["potato", "carrot"]);
+  assert.deepEqual(out.body.stats.agi, { base: 70, plus: 0, trained: 0, boost: 10, total: 80, bonus: 6.7 });
+  assert.deepEqual([out.body.level, out.body.leveledUp, out.body.xpInto, out.body.xpSpan], [1, false, 10, 100]);
+  assert.deepEqual([statsOf(ctx).boost.agi, stateOf(ctx).pantry, ctx.row().xp], [10, ["potato", "carrot"], 10]);
+  const again = await farm(ctx, jar, "feed", { crop: "carrot" });
+  assert.deepEqual([again.body.boost, again.body.stats.agi.boost, again.body.farm.pantry], [{ stat: "agi", amount: 10, set: false }, 10, ["potato"]]);
+});
+
+test("황금 감자 sets every boost a stat doesn't have yet", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await farm(ctx, jar, "open");
+  stock(ctx, { pantry: ["potato", "gold"] });
+  await farm(ctx, jar, "feed", { crop: "potato" });
+  const out = await farm(ctx, jar, "feed", { crop: "gold" });
+  assert.deepEqual(out.body.boost, { stat: "all", amount: 20, set: true });
+  assert.deepEqual(["str", "int", "agi", "cha"].map((k) => out.body.stats[k].boost), [10, 20, 20, 20]);
+});
+
+test("a crop that isn't in the pantry can't be fed, and two feeds race for one crop once", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await farm(ctx, jar, "open");
+  stock(ctx, { pantry: ["carrot"] });
+  const before = ctx.row();
+  assert.deepEqual(await farm(ctx, jar, "feed", { crop: "potato" }), { status: 409, body: { ok: false } });
+  assert.deepEqual(ctx.row(), before);
+  const both = await Promise.all([farm(ctx, jar, "feed", { crop: "carrot" }), farm(ctx, jar, "feed", { crop: "carrot" })]);
+  assert.deepEqual(both.map((r) => r.status).sort(), [200, 409]);
+  assert.deepEqual([stateOf(ctx).pantry, stateOf(ctx).day.feeds, ctx.row().xp], [[], 1, 10]);
+});
+
+test("the 4th feed of a Seoul day pays no XP; the next Seoul day pays again", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await farm(ctx, jar, "open");
+  stock(ctx, { pantry: Array(6).fill("lettuce") });
+  const gains = [];
+  for (let i = 0; i < 4; i++) gains.push((await farm(ctx, jar, "feed", { crop: "lettuce" })).body.xpGain);
+  assert.deepEqual(gains, [10, 10, 10, 0]);
+  assert.equal(ctx.row().xp, 30);
+  ctx.advance(NEXT_DAY);
+  const next = await farm(ctx, jar, "feed", { crop: "lettuce" });
+  assert.deepEqual([next.body.xpGain, stateOf(ctx).day], [10, { key: "2026-05-02", feeds: 1, sent: 0 }]);
+});
+
+test("feeding a hungry pet also counts as its 밥", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await farm(ctx, jar, "open");
+  stock(ctx, { pantry: ["potato", "potato"] });
+  ctx.set("mood_value = 50, mood_updated_at = ?", T0);
+  const out = await farm(ctx, jar, "feed", { crop: "potato" });
+  assert.deepEqual([out.body.meal, out.body.hearts], [true, 7]);
+  assert.deepEqual([out.body.want, out.body.meals, out.body.plays, out.body.lonely], ["play", 1, 0, false]);
+  assert.deepEqual([ctx.row().fed_at, ctx.row().meals, ctx.row().mood_value], [T0, 1, 70]);
+  ctx.advance(MIN);
+  const full = await farm(ctx, jar, "feed", { crop: "potato" });
+  assert.deepEqual([full.body.meal, full.body.want, full.body.meals], [false, "play", 1]);
+  assert.deepEqual([ctx.row().fed_at, ctx.row().meals, ctx.row().mood_value], [T0, 1, 70]);
+});
+
+test("feeding at night is a snack, not 밥", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await farm(ctx, jar, "open");
+  stock(ctx, { pantry: ["potato"] });
+  ctx.advance(12 * 60 * MIN);
+  const out = await farm(ctx, jar, "feed", { crop: "potato" });
+  assert.deepEqual([out.status, out.body.meal, out.body.xpGain], [200, false, 10]);
+  assert.equal(ctx.row().fed_at, null);
+});
+
+test("the bus pays coins and XP for the first 6 crops of a Seoul day", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await farm(ctx, jar, "open");
+  stock(ctx, { pantry: [...Array(8).fill("potato"), "carrot"] });
+  const first = await farm(ctx, jar, "send", { crops: Array(5).fill("potato") });
+  assert.deepEqual([first.status, first.body.act, first.body.xpGain, first.body.coinsGain], [200, "send", 25, 27]);
+  const second = await farm(ctx, jar, "send", { crops: ["potato", "carrot", "potato"] });
+  assert.deepEqual([second.body.xpGain, second.body.coinsGain, second.body.farm.coins], [5, 16, 43]);
+  assert.deepEqual([second.body.farm.pantry, ctx.row().xp, stateOf(ctx).coins], [["potato"], 30, 43]);
+  ctx.advance(NEXT_DAY);
+  assert.equal((await farm(ctx, jar, "send", { crops: ["potato"] })).body.xpGain, 5);
+});
+
+test("a legendary 양 sends 2 감자 for 12 coins and spends a 매력 boost", async (t) => {
+  const ctx = await setup(t, { legendaryUids: [A] });
+  const { jar } = await meet(ctx, A, "Mochi");
+  ctx.set("kind = 'sheep'");
+  await farm(ctx, jar, "open");
+  stock(ctx, { pantry: ["potato", "potato", "tomato", "potato", "potato"] });
+  const out = await farm(ctx, jar, "send", { crops: ["potato", "potato"] });
+  assert.deepEqual([out.body.stats.cha.total, out.body.stats.cha.bonus, out.body.coinsGain], [90, 8.3, 12]);
+  await farm(ctx, jar, "feed", { crop: "tomato" });
+  assert.equal(statsOf(ctx).boost.cha, 10);
+  const boosted = await farm(ctx, jar, "send", { crops: ["potato", "potato"] });
+  assert.deepEqual([boosted.body.coinsGain, boosted.body.stats.cha.boost, statsOf(ctx).boost.cha], [12, 0, 0]);
+});
+
+test("a boosted 매력 sends for more", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await farm(ctx, jar, "open");
+  stock(ctx, { pantry: ["tomato", "sweet", "sweet"] });
+  await farm(ctx, jar, "feed", { crop: "tomato" });
+  const out = await farm(ctx, jar, "send", { crops: ["sweet"] });
+  assert.deepEqual([out.body.coinsGain, out.body.stats.cha.boost], [17, 0]);
+  assert.equal((await farm(ctx, jar, "send", { crops: ["sweet"] })).body.coinsGain, 16);
+});
+
+test("a second identical send finds the pantry empty and changes nothing", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await farm(ctx, jar, "open");
+  stock(ctx, { pantry: ["potato", "potato"] });
+  const both = await Promise.all([farm(ctx, jar, "send", { crops: ["potato", "potato"] }), farm(ctx, jar, "send", { crops: ["potato", "potato"] })]);
+  assert.deepEqual(both.map((r) => r.status).sort(), [200, 409]);
+  const after = ctx.row();
+  assert.deepEqual([stateOf(ctx).pantry, stateOf(ctx).coins, after.xp], [[], 11, 10]);
+  assert.equal((await farm(ctx, jar, "send", { crops: ["potato"] })).status, 409);
+  assert.deepEqual(ctx.row(), after);
+});
+
+test("the seed shop opens at Lv 3 and spends coins it has", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await farm(ctx, jar, "open");
+  stock(ctx, { coins: 10 });
+  const closed = ctx.row();
+  assert.deepEqual(await farm(ctx, jar, "buy", { crop: "carrot" }), { status: 409, body: { ok: false } });
+  assert.deepEqual(ctx.row(), closed);
+  ctx.set("xp = ?", xpForLevel(3));
+  const out = await farm(ctx, jar, "buy", { crop: "carrot" });
+  assert.deepEqual([out.status, out.body.act, out.body.crop, out.body.price, out.body.xpGain], [200, "buy", "carrot", 10, 0]);
+  assert.deepEqual([out.body.farm.coins, out.body.farm.bag, out.body.farm.shopOpen], [0, ["potato", "carrot"], true]);
+  assert.deepEqual([stateOf(ctx).coins, stateOf(ctx).bag], [0, ["potato", "carrot"]]);
+  assert.equal((await farm(ctx, jar, "buy", { crop: "lettuce" })).status, 409);
+  ctx.set("xp = ?", xpForLevel(5));
+  stock(ctx, { coins: 500 });
+  assert.equal((await farm(ctx, jar, "buy", { crop: "gold" })).status, 409);
+  ctx.set("xp = ?", xpForLevel(6));
+  assert.deepEqual((await farm(ctx, jar, "buy", { crop: "gold" })).body.farm.coins, 300);
+  stock(ctx, { bag: Array(9).fill("potato") });
+  const full = ctx.row();
+  assert.equal((await farm(ctx, jar, "buy", { crop: "lettuce" })).status, 409);
+  assert.deepEqual(ctx.row(), full);
+});
+
+test("rapid buys never spend coins below zero", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await farm(ctx, jar, "open");
+  ctx.set("xp = ?", xpForLevel(3));
+  stock(ctx, { coins: 15, bag: [] });
+  const buys = await Promise.all(Array.from({ length: 3 }, () => farm(ctx, jar, "buy", { crop: "carrot" })));
+  assert.deepEqual(buys.map((r) => r.status).sort(), [200, 409, 409]);
+  assert.deepEqual([stateOf(ctx).coins, stateOf(ctx).bag], [5, ["carrot"]]);
+});
+
+test("a harvest trains 지능 once a Seoul day and spends a 지능 boost", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await farm(ctx, jar, "open");
+  stock(ctx, { pantry: ["lettuce"] });
+  await farm(ctx, jar, "feed", { crop: "lettuce" });
+  const early = await farm(ctx, jar, "harvest");
+  assert.deepEqual([early.body.picked, early.body.trained, early.body.stats.int.boost], [[], { stat: "int", gained: 0 }, 10]);
+  ctx.advance(MIN);
+  const out = await farm(ctx, jar, "harvest");
+  assert.deepEqual(out.body.picked.map((p) => p.crop), ["sprout"]);
+  assert.deepEqual([out.body.xpGain, out.body.trained], [41, { stat: "int", gained: 1 }]);
+  assert.deepEqual([out.body.stats.int.trained, out.body.stats.int.boost, out.body.stats.int.total], [1, 0, 41]);
+  assert.deepEqual([statsOf(ctx).trained.int, statsOf(ctx).trainedDay.int, statsOf(ctx).boost.int], [1, "2026-05-01", 0]);
+  ctx.advance(4 * MIN);
+  const again = await farm(ctx, jar, "pick", { plot: 1 });
+  assert.deepEqual([again.body.picked.length, again.body.trained, again.body.xpGain], [1, { stat: "int", gained: 0 }, 2]);
+  ctx.set("farm = ?", JSON.stringify({ ...stateOf(ctx), plots: stateOf(ctx).plots.map((p) => p && { ...p, at: p.at - 2 * 24 * 60 * MIN }) }));
+  ctx.advance(NEXT_DAY);
+  assert.deepEqual((await farm(ctx, jar, "harvest")).body.trained, { stat: "int", gained: 1 });
+  assert.equal(statsOf(ctx).trained.int, 2);
+});
+
+test("a full pantry sends the extras on the bus and says so", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await farm(ctx, jar, "open");
+  stock(ctx, { pantry: Array(11).fill("lettuce") });
+  ctx.advance(30 * MIN);
+  const out = await farm(ctx, jar, "harvest");
+  assert.deepEqual(out.body.picked.map((p) => p.crop), ["sprout", "lettuce", "potato"]);
+  assert.deepEqual([out.body.bused, out.body.coinsGain, out.body.farm.coins], [["lettuce", "potato"], 11, 11]);
+  assert.deepEqual(out.body.farm.pantry, [...Array(11).fill("lettuce"), "sprout"]);
+  assert.deepEqual([stateOf(ctx).pantry.length, stateOf(ctx).coins], [12, 11]);
+});
+
+test("bad pantry requests are refused and write nothing", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  for (const [act, extra] of [["feed", { crop: "potato" }], ["send", { crops: ["potato"] }], ["buy", { crop: "potato" }]]) {
+    assert.equal((await farm(ctx, jar, act, extra)).status, 409, act);
+  }
+  assert.equal(ctx.row().farm, null);
+  await farm(ctx, jar, "open");
+  ctx.set("xp = ?", xpForLevel(6));
+  stock(ctx, { pantry: ["potato", "carrot"], coins: 999 });
+  const before = ctx.row();
+  for (const body of [
+    { act: "feed" }, { act: "feed", crop: "rock" }, { act: "feed", crop: "__proto__" }, { act: "feed", crop: ["potato"] },
+    { act: "buy" }, { act: "buy", crop: "hasOwnProperty" },
+    { act: "send" }, { act: "send", crops: "potato" }, { act: "send", crops: [] }, { act: "send", crops: Array(13).fill("potato") },
+    { act: "send", crops: ["potato", "rock"] }, { act: "send", crops: ["potato", 3] }, { act: "send", crops: { 0: "potato", length: 1 } },
+  ]) {
+    const res = await ctx.request("/farm", { jar, body: { uid: A, ...body } });
+    assert.deepEqual([res.status, JSON.parse(res.html)], [400, { ok: false }], JSON.stringify(body));
+  }
+  for (const who of [{}, { owner_token: "nope" }]) {
+    for (const [act, extra] of [["feed", { crop: "potato" }], ["send", { crops: ["potato"] }], ["buy", { crop: "potato" }]]) {
+      assert.deepEqual(await farm(ctx, who, act, extra), { status: 403, body: { ok: false } }, act);
+    }
+  }
+  assert.deepEqual(ctx.row(), before);
+  await ctx.request("/care", { jar, body: { uid: A, act: "sleep" } });
+  const asleep = ctx.row();
+  for (const [act, extra] of [["feed", { crop: "potato" }], ["send", { crops: ["potato"] }], ["buy", { crop: "potato" }]]) {
+    assert.deepEqual(await farm(ctx, jar, act, extra), { status: 409, body: { ok: false } }, act);
+  }
+  assert.deepEqual(ctx.row(), asleep);
 });

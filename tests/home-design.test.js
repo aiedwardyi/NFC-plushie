@@ -155,11 +155,19 @@ test("first meet has the live nameplate and key card hooks but no dock", async (
   assert.doesNotMatch(first.html, /data-care|class="dock"|data-sheet=|data-tile=/);
 });
 
-test("stranger page has no dock, sheets or collection", async (t) => {
+test("the owner home carries an empty 씨앗 가게 sheet for the farm to fill", async (t) => {
+  const { request, jar } = await named(t);
+  const home = await request(`/t?uid=${A}`, { jar });
+  assert.match(home.html, /<div class="sheet" data-sheet="shop" role="dialog" aria-modal="true" aria-labelledby="sheet-shop-title" hidden>[\s\S]*?<h2 id="sheet-shop-title">씨앗 가게<\/h2>[\s\S]*?<ul class="shop-list" data-shop-list><\/ul>/);
+  assert.doesNotMatch((await request(`/t?uid=${A}`)).html, /data-sheet="shop"/);
+});
+
+test("stranger page has no dock, owner sheets or collection, only the stat card", async (t) => {
   const { request } = await named(t);
   const stranger = await request(`/t?uid=${A}`);
   assert.match(stranger.html, /이미 주인이 있어요/);
-  assert.doesNotMatch(stranger.html, /data-care|class="dock"|data-sheet=|data-tile=|level-pin|gift-tally/);
+  assert.doesNotMatch(stranger.html, /data-care|class="dock"|data-sheet="(?!stats")|data-tile=|level-pin|gift-tally/);
+  assert.match(stranger.html, /<div class="sheet" data-sheet="stats" role="dialog"/);
 });
 
 test("the dock runs the arcade, the three care verbs, then the farm", async (t) => {
@@ -205,6 +213,7 @@ test("the 텃밭 dot goes out once the farm is open and growing", async (t) => {
 for (const kind of ["horse", "sheep"]) {
   test(`the ${kind} pet carries every face frame`, async (t) => {
     const { request, jar } = await named(t);
+    assert.equal((await request("/kind", { jar, body: { uid: A, kind } })).status, 200);
     const home = await request(`/t?uid=${A}`, { jar: { ...jar, mascot: kind } });
     const frames = home.html.match(/<img class="pet-frame[^>]*>/g);
     const srcOf = (img) => img.match(/ src="([^"]+)"/)[1];

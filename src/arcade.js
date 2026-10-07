@@ -1,6 +1,8 @@
+import { KIND_IDS } from "../public/kinds.js";
 import { seoulDayKey } from "./pet.js";
 
-export const ARCADE = { xpPlays: 3, xpPerPlay: 5, maxHeight: 12500 };
+// 12500 m is a full charge; the top 힘 bonus adds 15%.
+export const ARCADE = { xpPlays: 3, xpPerPlay: 15, maxHeight: 14375 };
 
 export function arcadeToday(state, now) {
   return state.arcadeDay === seoulDayKey(now) ? state.arcadePlays : 0;
@@ -26,7 +28,7 @@ export function applyPlay(state, height, now) {
 export function raceState(text) {
   let data;
   try { data = JSON.parse(text); } catch { data = null; }
-  return Object.fromEntries(["horse", "sheep"].map((kind) => {
+  return Object.fromEntries(KIND_IDS.map((kind) => {
     const r = data?.[kind];
     const best = Number.isInteger(r?.best) ? Math.max(0, Math.min(20, r.best)) : 0;
     return [kind, { level: Math.min(20, best + 1), best }];
