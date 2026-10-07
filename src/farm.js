@@ -196,6 +196,46 @@ export function harvestFarm(farm, xp, now, bonus) {
   return tend(farm, xp, now, farm.plots.map((_, i) => i), bonus);
 }
 
+// The day's feed and bus counts start over at Seoul midnight.
+function today(farm, now) {
+  const key = seoulDayKey(now);
+  return farm.day.key === key ? { ...farm.day } : { ...newDay(), key };
+}
+
+export function feedCrop(farm, crop, now) {
+  const i = farm.pantry.indexOf(crop);
+  if (i < 0) return null;
+  const f = structuredClone(farm);
+  f.pantry.splice(i, 1);
+  f.day = today(farm, now);
+  f.day.feeds += 1;
+  const xpGain = f.day.feeds <= FARM.daily.feedXpTimes ? FARM.daily.feedXp : 0;
+  return { farm: f, crop, xpGain, snack: { ...FARM.crops[crop].snack } };
+}
+
+export function sendCrops(farm, crops, chaBonus, now) {
+  const f = structuredClone(farm);
+  for (const crop of crops) {
+    const i = f.pantry.indexOf(crop);
+    if (i < 0) return null;
+    f.pantry.splice(i, 1);
+  }
+  f.day = today(farm, now);
+  const paid = Math.max(0, Math.min(crops.length, FARM.daily.sendXpCrops - f.day.sent));
+  f.day.sent += crops.length;
+  const coinsGain = busCoins(crops, chaBonus);
+  f.coins += coinsGain;
+  return { farm: f, coinsGain, xpGain: paid * FARM.daily.sendXp };
+}
+
+export function buySeed(farm, crop, level) {
+  if (!isCrop(crop) || !FARM.crops[crop].price || seedLock(farm, crop, level)) return null;
+  const f = structuredClone(farm);
+  f.coins -= FARM.crops[crop].price;
+  f.bag.push(crop);
+  return { farm: f, price: FARM.crops[crop].price };
+}
+
 export function nextRipeAt(farm, now) {
   const times = farm.plots.filter((p) => p && !isRipe(p, now)).map(ripeAt);
   return times.length ? Math.min(...times) : null;

@@ -9,10 +9,10 @@ import { PET, applyTap, currentMood, levelForXp, parseTapUid, seoulDayKey, xpPro
 import { applyCare, careWant, mealsNow, playsNow } from "./care.js";
 import { comboNext, comboTap } from "./combo.js";
 import { ARCADE, applyPlay, applyRace, raceState, xpPlaysLeft } from "./arcade.js";
-import { FARM, addGiftSeeds, farmDot, farmView, giftSeeds, harvestFarm, nextRipeAt, openFarm, parseFarm, pickPlot, ripenFarm } from "./farm.js";
+import { FARM, addGiftSeeds, buySeed, farmDot, farmView, feedCrop, giftSeeds, harvestFarm, nextRipeAt, openFarm, parseFarm, pickPlot, ripenFarm, sendCrops } from "./farm.js";
 import { devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
 import { mountTalk, purgeTalk, takeQuestion } from "./chat.js";
-import { editionOf, parseStats, statSheet } from "./stats.js";
+import { STAT_KEYS, editionOf, parseStats, setBoost, statSheet, train, useBoost } from "./stats.js";
 
 const cookieAge = 400 * 24 * 60 * 60 * 1000;
 const cooldown = 15 * 60 * 1000;
@@ -20,8 +20,11 @@ const skipAge = 2 * 60 * 1000;
 const validUid = (uid) => typeof uid === "string" && /^[0-9A-F]{14}$/.test(uid);
 const CARE_ACTS = ["feed", "play", "sleep"];
 const validHeight = (h) => Number.isInteger(h) && h % 10 === 0 && h >= 0 && h <= ARCADE.maxHeight;
-const FARM_ACTS = ["open", "pick", "harvest"];
+const FARM_ACTS = ["open", "pick", "harvest", "feed", "send", "buy"];
+const PANTRY_ACTS = ["feed", "send", "buy"];
 const validPlot = (p) => Number.isInteger(p) && p >= 0 && p < FARM.plots;
+const validCrop = (id) => typeof id === "string" && Object.hasOwn(FARM.crops, id);
+const validCrops = (a) => Array.isArray(a) && a.length >= 1 && a.length <= FARM.pantryMax && a.every(validCrop);
 const KINDS = ["horse", "sheep"];
 const parseDemoUids = (raw) => String(raw || "").split(",").map((s) => s.trim().toUpperCase()).filter(validUid);
 
@@ -159,7 +162,19 @@ export function createApp({ db, decisions = binding, production = process.env.NO
 
   const getRow = (uid) => db.prepare("SELECT * FROM plushies WHERE uid = ?").get(uid) || null;
   const editions = { rare: rareUids, legendary: legendaryUids };
-  const sheetOf = (row, kind) => statSheet(parseStats(row.stats), kind, editionOf(row.uid, editions));
+  const sheetOf = (uid, stats, kind) => statSheet(stats, kind, editionOf(uid, editions));
+  // The saved animal wins over this browser's toggle.
+  const animalOf = (row, req) => row.kind || req.demoMascot || "horse";
+
+  // One care beat's write, for 밥 놀이 잠 and for a hungry pet's farm snack.
+  function saveCare(uid, out, t) {
+    const c = out.care;
+    if (out.beat !== "stash" && out.beat !== "mumble") {
+      db.prepare("UPDATE plushies SET fed_at = ?, meals = ?, played_at = ?, plays = ?, slept_at = ? WHERE uid = ?")
+        .run(c.fedAt, c.meals, c.playedAt, c.plays, c.sleptAt, uid);
+    }
+    if (out.gain > 0) db.prepare("UPDATE plushies SET mood_value = ?, mood_updated_at = ? WHERE uid = ?").run(out.moodAfter, t, uid);
+  }
   const setOwner = (res, token) => res.cookie("owner_token", token, {
     httpOnly: true, sameSite: "lax", secure: production, maxAge: cookieAge, path: "/",
   });
@@ -254,33 +269,86 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     };
   }
 
-  // One farm action on a named, awake pet; null when there is no farm to pick from.
-  function tendFarm(uid, row, act, plot, t) {
-    const farm = parseFarm(row.farm);
-    if (!farm && act !== "open") return null;
+  // Saves a farm action's field, XP and stats, then answers like /arcade with the field and the stat sheet.
+  function farmReply(uid, row, act, farm, xpGain, stats, animal, t, extra) {
     const xp = row.xp ?? 0;
-    const out = act === "open" ? openFarm(farm, xp, t) : act === "pick" ? pickPlot(farm, xp, t, plot) : harvestFarm(farm, xp, t);
-    db.prepare("UPDATE plushies SET farm = ?, xp = ? WHERE uid = ?").run(JSON.stringify(out.farm), out.xpAfter, uid);
-    if (out.picked.some((p) => p.crop === "gold")) {
-      db.prepare("UPDATE plushies SET mood_value = ?, mood_updated_at = ? WHERE uid = ?").run(PET.moodMax, t, uid);
-    }
-    const after = xpProgress(out.xpAfter);
+    const xpAfter = xp + xpGain;
+    db.prepare("UPDATE plushies SET farm = ?, xp = ?, stats = ? WHERE uid = ?").run(JSON.stringify(farm), xpAfter, JSON.stringify(stats), uid);
+    const after = xpProgress(xpAfter);
     return {
       ok: true,
       act,
+      ...extra,
+      xpGain,
+      level: after.level,
+      leveledUp: levelForXp(xpAfter) > levelForXp(xp),
+      xpInto: after.into,
+      xpSpan: after.span,
+      hearts: heartHalves(currentMood(petState(getRow(uid), t), t)),
+      farm: farmView(farm, after.level, t),
+      stats: sheetOf(uid, stats, animal),
+    };
+  }
+
+  // One farm action on a named, awake pet; null when there is no farm to pick from.
+  function tendFarm(uid, row, act, plot, t, animal) {
+    const farm = parseFarm(row.farm);
+    if (!farm && act !== "open") return null;
+    const xp = row.xp ?? 0;
+    let stats = parseStats(row.stats);
+    const sheet = sheetOf(uid, stats, animal);
+    const bonus = { intBonus: sheet.int.bonus, chaBonus: sheet.cha.bonus };
+    const out = act === "open" ? openFarm(farm, xp, t, bonus) : act === "pick" ? pickPlot(farm, xp, t, plot, bonus) : harvestFarm(farm, xp, t, bonus);
+    let gained = 0;
+    if (out.picked.length) {
+      ({ stats, gained } = train(stats, "int", t));
+      stats = useBoost(stats, "int").stats;
+    }
+    if (out.bused.length) stats = useBoost(stats, "cha").stats;
+    if (out.picked.some((p) => p.crop === "gold")) {
+      db.prepare("UPDATE plushies SET mood_value = ?, mood_updated_at = ? WHERE uid = ?").run(PET.moodMax, t, uid);
+    }
+    return farmReply(uid, row, act, out.farm, out.xpGain, stats, animal, t, {
       created: out.created,
       picked: out.picked,
       planted: out.planted,
       opened: out.opened,
       seeds: out.seeds,
-      xpGain: out.xpGain,
-      level: after.level,
-      leveledUp: levelForXp(out.xpAfter) > levelForXp(xp),
-      xpInto: after.into,
-      xpSpan: after.span,
-      hearts: heartHalves(currentMood(petState(getRow(uid), t), t)),
-      farm: farmView(out.farm, after.level, t),
-    };
+      coinsGain: out.coinsGain,
+      bused: out.bused,
+      ...(act === "open" ? {} : { trained: { stat: "int", gained } }),
+    });
+  }
+
+  // Feed a pantry crop, send crops on the bus or buy a seed; null when the crop, the room or the coins aren't there.
+  function pantryFarm(uid, row, { act, crop, crops }, t, animal) {
+    const farm = parseFarm(row.farm);
+    if (!farm) return null;
+    let stats = parseStats(row.stats);
+    if (act === "feed") {
+      const out = feedCrop(farm, crop, t);
+      if (!out) return null;
+      const { stat, amount } = out.snack;
+      let set = false;
+      for (const key of stat === "all" ? STAT_KEYS : [stat]) {
+        const boosted = setBoost(stats, key, amount);
+        stats = boosted.stats;
+        set ||= boosted.set;
+      }
+      // A hungry pet takes the crop as its 밥 too.
+      const st = petState(row, t);
+      const meal = careWant(st, t) === "feed";
+      if (meal) saveCare(uid, applyCare(st, "feed", t), t);
+      return farmReply(uid, row, act, out.farm, out.xpGain, stats, animal, t, { crop, boost: { stat, amount, set }, meal });
+    }
+    if (act === "send") {
+      const out = sendCrops(farm, crops, sheetOf(uid, stats, animal).cha.bonus, t);
+      if (!out) return null;
+      return farmReply(uid, row, act, out.farm, out.xpGain, useBoost(stats, "cha").stats, animal, t, { crops, coinsGain: out.coinsGain });
+    }
+    const out = buySeed(farm, crop, levelForXp(row.xp ?? 0));
+    if (!out) return null;
+    return farmReply(uid, row, act, out.farm, 0, stats, animal, t, { crop, price: out.price });
   }
 
   app.get("/health", (req, res) => res.type("text").send("ok"));
@@ -357,7 +425,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         else if (!visual && mile) visual = "milestone";
         else if (!visual && out.rewarded && out.gift && out.gift.tier === "rare") visual = "rare";
         else if (!visual && out.rewarded && out.gift && out.gift.tier === "special") visual = "special";
-        const visit = farmAt === serial && !morning && parseFarm(fresh.farm) ? tendFarm(serial, fresh, "harvest", null, t) : null;
+        const visit = farmAt === serial && !morning && parseFarm(fresh.farm) ? tendFarm(serial, fresh, "harvest", null, t, animalOf(fresh, req)) : null;
         // A celebration, a morning or a farm visit takes the whole visit; a stale reload is not a tap.
         let combo = 0;
         if (morning || visual || visit) {
@@ -408,13 +476,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const t = now();
       const st = petState(row, t);
       const out = applyCare(st, act, t);
-      const c = out.care;
-      if (out.beat !== "stash" && out.beat !== "mumble") {
-        db.prepare("UPDATE plushies SET fed_at = ?, meals = ?, played_at = ?, plays = ?, slept_at = ? WHERE uid = ?")
-          .run(c.fedAt, c.meals, c.playedAt, c.plays, c.sleptAt, uid);
-      }
-      if (out.gain > 0) db.prepare("UPDATE plushies SET mood_value = ?, mood_updated_at = ? WHERE uid = ?").run(out.moodAfter, t, uid);
-      const after = { ...st, ...c };
+      saveCare(uid, out, t);
+      const after = { ...st, ...out.care };
       return {
         ok: true,
         beat: out.beat,
@@ -542,13 +605,16 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   });
 
   app.post("/farm", (req, res) => {
-    const { uid, act, plot } = req.body || {};
-    if (!validUid(uid) || !FARM_ACTS.includes(act) || (act === "pick" && !validPlot(plot))) return res.status(400).json({ ok: false });
+    const { uid, act, plot, crop, crops } = req.body || {};
+    if (!validUid(uid) || !FARM_ACTS.includes(act) || (act === "pick" && !validPlot(plot))
+      || ((act === "feed" || act === "buy") && !validCrop(crop)) || (act === "send" && !validCrops(crops))) return res.status(400).json({ ok: false });
     const reply = db.transaction(() => {
       const row = getRow(uid);
       if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row.pet_name) return 403;
       if (row.slept_at !== null) return 409;
-      return tendFarm(uid, row, act, plot, now()) || 409;
+      const animal = animalOf(row, req);
+      const out = PANTRY_ACTS.includes(act) ? pantryFarm(uid, row, { act, crop, crops }, now(), animal) : tendFarm(uid, row, act, plot, now(), animal);
+      return out || 409;
     })();
     if (typeof reply === "number") return res.status(reply).json({ ok: false });
     res.json(reply);
@@ -561,7 +627,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const row = getRow(uid);
       if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row.pet_name) return null;
       db.prepare("UPDATE plushies SET kind = ? WHERE uid = ?").run(kind, uid);
-      return { ok: true, kind, stats: sheetOf(row, kind) };
+      return { ok: true, kind, stats: sheetOf(uid, parseStats(row.stats), kind) };
     })();
     if (!reply) return res.status(403).json({ ok: false });
     res.json(reply);

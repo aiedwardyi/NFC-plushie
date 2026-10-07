@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { FARM, addGiftSeeds, addSeeds, createFarm, etaWords, farmDot, farmView, giftSeeds, harvestFarm, isRipe, nextRipeAt, openFarm, parseFarm, pickPlot, plotsFor, ripeAt, ripenFarm } from "../src/farm.js";
+import { FARM, addGiftSeeds, addSeeds, buySeed, createFarm, etaWords, farmDot, farmView, feedCrop, giftSeeds, harvestFarm, isRipe, nextRipeAt, openFarm, parseFarm, pickPlot, plotsFor, ripeAt, ripenFarm, sendCrops } from "../src/farm.js";
 import { xpForLevel } from "../src/pet.js";
 
 const MIN = 60 * 1000;
@@ -345,4 +345,68 @@ test("the view shows the pantry, coins and the seed shop from Lv 3", () => {
   assert.deepEqual([...new Set(full.shop.map((s) => s.reason))], ["씨앗 주머니가 가득해요"]);
   assert.deepEqual(farmView(farm, 3, T0).pantry, farm.pantry);
   assert.notEqual(farmView(farm, 3, T0).pantry, farm.pantry);
+});
+
+test("feeding takes one crop from the pantry and gives its snack", () => {
+  const farm = blank({ pantry: ["carrot", "potato", "carrot"] });
+  const out = feedCrop(farm, "carrot", T0);
+  assert.deepEqual([out.crop, out.xpGain, out.snack], ["carrot", 10, { stat: "agi", amount: 10 }]);
+  assert.deepEqual([out.farm.pantry, out.farm.day], [["potato", "carrot"], { key: "2026-05-01", feeds: 1, sent: 0 }]);
+  assert.deepEqual(farm.pantry, ["carrot", "potato", "carrot"]);
+  assert.deepEqual(feedCrop(blank({ pantry: ["gold"] }), "gold", T0).snack, { stat: "all", amount: 20 });
+  for (const crop of ["tomato", "rock", "__proto__", undefined]) assert.equal(feedCrop(farm, crop, T0), null, String(crop));
+});
+
+test("the first 3 feeds of a Seoul day give XP, again after Seoul midnight", () => {
+  const late = seoul("2026-05-01T23:50:00");
+  const early = seoul("2026-05-02T00:05:00");
+  assert.equal(new Date(late).getUTCDate(), new Date(early).getUTCDate());
+  let farm = blank({ pantry: Array(6).fill("lettuce") });
+  const gains = [];
+  for (let i = 0; i < 4; i++) {
+    const out = feedCrop(farm, "lettuce", late + i * 1000);
+    gains.push(out.xpGain);
+    farm = out.farm;
+  }
+  assert.deepEqual(gains, [10, 10, 10, 0]);
+  const next = feedCrop(farm, "lettuce", early);
+  assert.deepEqual([next.xpGain, next.farm.day], [10, { key: "2026-05-02", feeds: 1, sent: 0 }]);
+});
+
+test("the bus takes only crops in the pantry, counting each one", () => {
+  const farm = blank({ pantry: ["potato", "carrot", "potato", "gold"], coins: 4 });
+  const out = sendCrops(farm, ["potato", "gold", "potato"], 0, T0);
+  assert.deepEqual([out.farm.pantry, out.coinsGain, out.farm.coins, out.xpGain], [["carrot"], 60, 64, 15]);
+  assert.equal(sendCrops(farm, ["potato", "potato", "potato"], 0, T0), null);
+  assert.equal(sendCrops(farm, ["tomato"], 0, T0), null);
+  assert.equal(sendCrops(farm, ["potato", "rock"], 0, T0), null);
+  assert.deepEqual(farm.pantry, ["potato", "carrot", "potato", "gold"]);
+  assert.equal(sendCrops(blank({ pantry: ["potato", "potato"] }), ["potato", "potato"], 8.3, T0).coinsGain, 12);
+});
+
+test("the bus pays XP for the first 6 crops of a Seoul day", () => {
+  let farm = blank({ pantry: Array(12).fill("lettuce") });
+  const first = sendCrops(farm, Array(4).fill("lettuce"), 0, T0);
+  const second = sendCrops(first.farm, Array(4).fill("lettuce"), 0, T0 + 1000);
+  assert.deepEqual([first.xpGain, second.xpGain, second.farm.day.sent], [20, 10, 8]);
+  assert.equal(sendCrops(second.farm, ["lettuce"], 0, T0 + 2000).xpGain, 0);
+  farm = sendCrops(second.farm, ["lettuce"], 0, seoul("2026-05-02T00:00:00")).farm;
+  assert.deepEqual(farm.day, { key: "2026-05-02", feeds: 0, sent: 1 });
+});
+
+test("seeds sell from Lv 3 to whoever has the coins and the room", () => {
+  const farm = blank({ coins: 10, bag: ["potato"] });
+  const out = buySeed(farm, "carrot", 3);
+  assert.deepEqual([out.price, out.farm.coins, out.farm.bag], [10, 0, ["potato", "carrot"]]);
+  assert.deepEqual([farm.coins, farm.bag], [10, ["potato"]]);
+  assert.equal(buySeed(farm, "carrot", 2), null);
+  assert.equal(buySeed(farm, "lettuce", 2), null);
+  assert.equal(buySeed(farm, "sweet", 3), null);
+  assert.equal(buySeed(farm, "sprout", 9), null);
+  assert.equal(buySeed(farm, "rock", 9), null);
+  assert.equal(buySeed(blank({ coins: 9 }), "carrot", 3), null);
+  assert.equal(buySeed(blank({ coins: 999 }), "gold", 5), null);
+  assert.deepEqual(buySeed(blank({ coins: 999 }), "gold", 6).farm.bag, ["gold"]);
+  assert.equal(buySeed(blank({ coins: 999, bag: Array(9).fill("potato") }), "lettuce", 9), null);
+  assert.equal(buySeed(blank({ coins: 999, bag: Array(8).fill("potato") }), "lettuce", 9).farm.bag.length, 9);
 });
