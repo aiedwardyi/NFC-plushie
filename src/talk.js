@@ -4,12 +4,13 @@ import { kakaoTransit } from "./transit.js";
 // Everything provider-specific lives here; callers see plain { ok, text, sources, stop, usage, ms } and { ok, changes } shapes.
 
 export const MODELS = {
+  "claude-haiku-5-5": { input: 0.1, output: 0.5, params: { thinking: { type: "adaptive" }, output_config: { effort: "low" } } },
   "claude-haiku-4-5": { input: 1, output: 5, params: {} },
   "claude-sonnet-5-5": { input: 2, output: 10, params: { thinking: { type: "between_tools" }, output_config: { effort: "low" } } },
 };
-export const NOTEBOOK_MODEL = "claude-haiku-4-5";
+export const NOTEBOOK_MODEL = "claude-haiku-5-5";
 export const SEARCH_USD = 0.01;
-const REPLY_TOKENS = 600;
+const REPLY_TOKENS = 1000;
 const NOTEBOOK_TOKENS = 1024;
 const SEARCH_TOOL = {
   type: "web_search_20250305",
@@ -180,12 +181,14 @@ export function anthropicTalk({ apiKey, model, Client = Anthropic, transit = nul
     async notebook({ system, prompt, signal }) {
       const started = performance.now();
       try {
+        const { params } = MODELS[NOTEBOOK_MODEL];
         const res = await client.messages.create({
           model: NOTEBOOK_MODEL,
           max_tokens: NOTEBOOK_TOKENS,
           system,
           messages: [{ role: "user", content: prompt }],
-          output_config: { format: { type: "json_schema", schema: NOTEBOOK_SCHEMA } },
+          ...params,
+          output_config: { ...params.output_config, format: { type: "json_schema", schema: NOTEBOOK_SCHEMA } },
         }, { signal });
         return { ...readNotebook(res), usage: usageOf(res.usage), ms: Math.round(performance.now() - started) };
       } catch (error) {
@@ -255,7 +258,7 @@ export function talkFromEnv(env, production, { Client = Anthropic } = {}) {
     const ms = Number.parseInt(env.TALK_FAKE_MS, 10);
     return { provider: fakeTalk({ delayMs: ms >= 0 ? ms : 600 }), uids };
   }
-  const model = env.TALK_MODEL || "claude-haiku-4-5";
+  const model = env.TALK_MODEL || "claude-haiku-5-5";
   if (!env.ANTHROPIC_API_KEY || !MODELS[model]) return null;
   const transit = env.KAKAO_REST_KEY ? kakaoTransit({ key: env.KAKAO_REST_KEY }) : null;
   return { provider: anthropicTalk({ apiKey: env.ANTHROPIC_API_KEY, model, Client, transit }), uids };
