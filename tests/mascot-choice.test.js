@@ -31,6 +31,7 @@ function page({ saved = null, preference = "horse", query = "", picker = false }
     localStorage: { getItem: () => stored, setItem: (_, value) => { stored = value; } },
     fetch: async () => ({ ok: true, json: async () => ({ ok: true, stats: {} }) }),
     paintStats() {},
+    armReveal() {},
   });
   return { choice: () => ({ cookie, stored, art }), click: (kind) => clicks.get(kind)(), url: () => href };
 }
