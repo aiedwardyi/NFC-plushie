@@ -170,14 +170,16 @@ test("a pick before naming is kept when the pet gets its name", async (t) => {
   assert.deepEqual([ctx.row().kind, ctx.row().edition], ["dragon", "legendary"]);
 });
 
-test("the opening video replay shows only for a kind with its own video", async (t) => {
+test("every pet with its own opening video gets the replay, and the page lists them", async (t) => {
   const ctx = await setup(t);
   const jar = await meet(ctx, A, "Mochi");
-  const horse = await home(ctx, jar);
-  assert.match(horse, /<button type="button" data-reveal-replay data-met="[\d-]+">영상 다시 보기<\/button>/);
-  assert.match(horse, /<script src="\/mascot-boot\.js" data-mascots="horse sheep" data-reveals="horse sheep"><\/script>/);
-  await post(ctx, "/demo/kind", jar, { uid: A, kind: "monkey" });
-  assert.match(await home(ctx, jar), /<button type="button" data-reveal-replay data-met="[\d-]+" hidden>영상 다시 보기<\/button>/);
+  const reveals = KINDS.filter((k) => k.reveal).map((k) => k.id);
+  assert.deepEqual(reveals, KIND_IDS);
+  assert.match(await home(ctx, jar), new RegExp(`<script src="/mascot-boot\\.js" data-mascots="horse sheep" data-reveals="${reveals.join(" ")}"></script>`));
+  for (const kind of KINDS) {
+    await post(ctx, "/demo/kind", jar, { uid: A, kind: kind.id });
+    assert.match(await home(ctx, jar), new RegExp(`<button type="button" data-reveal-replay data-met="[\\d-]+"${kind.reveal ? "" : " hidden"}>영상 다시 보기</button>`), kind.id);
+  }
 });
 
 test("the fresh start forgets the animal and the edition", async (t) => {
