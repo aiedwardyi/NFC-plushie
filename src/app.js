@@ -484,6 +484,13 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const st = petState(row, t);
       const out = applyCare(st, act, t);
       saveCare(uid, out, t);
+      // The day's first real care trains 매력; a stash or a mumble changes nothing.
+      let stats = parseStats(row.stats);
+      let gained = 0;
+      if (out.beat !== "stash" && out.beat !== "mumble") {
+        ({ stats, gained } = train(stats, "cha", t));
+        if (gained) db.prepare("UPDATE plushies SET stats = ? WHERE uid = ?").run(JSON.stringify(stats), uid);
+      }
       const after = { ...st, ...out.care };
       return {
         ok: true,
@@ -494,6 +501,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         want: careWant(after, t),
         meals: mealsNow(after, t),
         plays: playsNow(after, t),
+        trained: { stat: "cha", gained },
+        stats: sheetOf(uid, stats, animalOf(row, req)),
       };
     })();
     if (!reply) return res.status(403).json({ ok: false });

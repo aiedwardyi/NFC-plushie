@@ -6,10 +6,12 @@ import Database from "better-sqlite3";
 import { createApp } from "../src/app.js";
 import { openDatabase } from "../src/db.js";
 import { fakeUids } from "../src/pages.js";
+import { parseStats } from "../src/stats.js";
 
 const [A, B] = fakeUids;
 const T0 = Date.parse("2026-05-01T10:00:00+09:00");
 const MIN = 60 * 1000;
+const NEXT_DAY = 14 * 60 * MIN + MIN;
 
 function updateJar(jar, setCookies) {
   for (const sc of setCookies || []) {
@@ -87,18 +89,19 @@ test("owner feeds: full, nibble, then a stash that writes nothing", async (t) =>
   ctx.db.prepare("UPDATE plushies SET mood_value = 10, mood_updated_at = ? WHERE uid = ?").run(T0, A);
   const one = await care(ctx, jar, "feed");
   assert.equal(one.status, 200);
-  assert.deepEqual(one.body, { ok: true, beat: "full", gain: 20, hearts: 3, lonely: true, want: "play", meals: 1, plays: 0 });
+  assert.deepEqual({ ...one.body, stats: null }, { ok: true, beat: "full", gain: 20, hearts: 3, lonely: true, want: "play", meals: 1, plays: 0, trained: { stat: "cha", gained: 1 }, stats: null });
+  assert.deepEqual(one.body.stats.cha, { base: 60, plus: 0, trained: 1, boost: 0, total: 61, bonus: 3.5 });
   assert.deepEqual(careCols(ctx.row()), [T0, 1, null, 0, null]);
   assert.deepEqual([ctx.row().mood_value, ctx.row().mood_updated_at], [30, T0]);
   ctx.advance(MIN);
   const two = await care(ctx, jar, "feed");
-  assert.deepEqual(two.body, { ok: true, beat: "nibble", gain: 10, hearts: 4, lonely: false, want: "play", meals: 2, plays: 0 });
+  assert.deepEqual({ ...two.body, stats: null }, { ok: true, beat: "nibble", gain: 10, hearts: 4, lonely: false, want: "play", meals: 2, plays: 0, trained: { stat: "cha", gained: 0 }, stats: null });
   assert.deepEqual(careCols(ctx.row()), [T0 + MIN, 2, null, 0, null]);
   assert.deepEqual([ctx.row().mood_value, ctx.row().mood_updated_at], [40, T0 + MIN]);
   ctx.advance(MIN);
   const before = ctx.row();
   const three = await care(ctx, jar, "feed");
-  assert.deepEqual(three.body, { ok: true, beat: "stash", gain: 0, hearts: 4, lonely: false, want: "play", meals: 2, plays: 0 });
+  assert.deepEqual({ ...three.body, stats: null }, { ok: true, beat: "stash", gain: 0, hearts: 4, lonely: false, want: "play", meals: 2, plays: 0, trained: { stat: "cha", gained: 0 }, stats: null });
   assert.deepEqual(ctx.row(), before);
   const played = await care(ctx, jar, "play");
   assert.deepEqual([played.body.beat, played.body.gain, played.body.want], ["play", 20, null]);
@@ -215,6 +218,33 @@ test("care never grants XP", async (t) => {
   const { jar } = await meet(ctx, A, "Mochi");
   for (const act of ["feed", "feed", "play", "play", "sleep"]) await care(ctx, jar, act);
   assert.equal(ctx.row().xp, 0);
+});
+
+test("the first care of a Seoul day trains 매력 +1", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  const first = await care(ctx, jar, "play");
+  assert.deepEqual([first.body.trained, first.body.stats.cha.trained], [{ stat: "cha", gained: 1 }, 1]);
+  for (const act of ["feed", "play", "feed"]) assert.deepEqual((await care(ctx, jar, act)).body.trained, { stat: "cha", gained: 0 }, act);
+  assert.deepEqual([parseStats(ctx.row().stats).trained.cha, parseStats(ctx.row().stats).trainedDay.cha], [1, "2026-05-01"]);
+  ctx.advance(NEXT_DAY);
+  const next = await care(ctx, jar, "feed");
+  assert.deepEqual([next.body.beat, next.body.trained, next.body.stats.cha.total], ["full", { stat: "cha", gained: 1 }, 62]);
+  assert.equal(ctx.row().xp, 0);
+});
+
+test("a mumble trains nothing; the morning's first real care does", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  assert.deepEqual((await care(ctx, jar, "sleep")).body.trained, { stat: "cha", gained: 1 });
+  ctx.advance(NEXT_DAY);
+  const before = ctx.row();
+  const mumble = await care(ctx, jar, "play");
+  assert.deepEqual([mumble.body.beat, mumble.body.trained, mumble.body.stats.cha.trained], ["mumble", { stat: "cha", gained: 0 }, 1]);
+  assert.deepEqual(ctx.row(), before);
+  await ctx.request(`/t?uid=${A}`, { jar });
+  assert.deepEqual((await care(ctx, jar, "play")).body.trained, { stat: "cha", gained: 1 });
+  assert.equal(parseStats(ctx.row().stats).trained.cha, 2);
 });
 
 test("a pre-care database gains the care columns as never fed, never played, awake", async (t) => {
