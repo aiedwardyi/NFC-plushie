@@ -113,11 +113,11 @@ export function createFarm(now) {
 }
 
 export function addSeeds(bag, seeds, front = false) {
-  const out = front ? [...seeds, ...bag] : [...bag, ...seeds];
-  for (let i = out.length - 1; out.length > FARM.bagMax && i >= 0; i--) {
-    if (out[i] !== "gold") out.splice(i, 1);
+  const added = [];
+  for (const crop of seeds) {
+    if (crop === "gold" || bag.length + added.length < FARM.bagMax) added.push(crop);
   }
-  return out;
+  return front ? [...added, ...bag] : [...bag, ...added];
 }
 
 export function giftSeeds(tier, level, rng) {
@@ -134,10 +134,11 @@ export function giftSeeds(tier, level, rng) {
 }
 
 export function addGiftSeeds(farm, seeds) {
+  const bag = addSeeds(farm.bag, seeds);
   return {
     ...farm,
-    bag: addSeeds(farm.bag, seeds),
-    arrived: [...farm.arrived, ...seeds.map((crop) => ({ crop, from: "gift" }))].slice(-FARM.bagMax),
+    bag,
+    arrived: [...farm.arrived, ...bag.slice(farm.bag.length).map((crop) => ({ crop, from: "gift" }))].slice(-FARM.bagMax),
   };
 }
 
@@ -162,9 +163,11 @@ function tend(farm, xp, now, picks, { intBonus = 0, chaBonus = 0 } = {}) {
   const opened = [];
   for (let i = plotsFor(f.unlockedTo); i < plotsFor(level); i++) opened.push(i);
   const unlocked = Object.keys(FARM.crops).filter((id) => FARM.crops[id].level > f.unlockedTo && FARM.crops[id].level <= level);
-  f.bag = addSeeds(f.bag, unlocked, true);
+  const bag = addSeeds(f.bag, unlocked, true);
+  const added = bag.slice(0, bag.length - f.bag.length);
+  f.bag = bag;
   f.unlockedTo = Math.max(f.unlockedTo, level);
-  const seeds = [...f.arrived, ...unlocked.map((crop) => ({ crop, from: "unlock" }))];
+  const seeds = [...f.arrived, ...added.map((crop) => ({ crop, from: "unlock" }))];
   f.arrived = [];
   const planted = [];
   const emptied = new Set(picked.map((p) => p.plot));

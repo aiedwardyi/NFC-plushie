@@ -281,7 +281,8 @@ test("a rare gift brings 황금 감자 even into a full bag", async (t) => {
   ctx.set("next_gift_tier = 'rare'");
   ctx.set("farm = ?", JSON.stringify({ ...stateOf(ctx), bag: Array(9).fill("tomato") }));
   await ctx.request(`/t?uid=${A}`, { jar });
-  assert.deepEqual(stateOf(ctx).bag, [...Array(8).fill("tomato"), "gold"]);
+  assert.deepEqual(stateOf(ctx).bag, [...Array(9).fill("tomato"), "gold"]);
+  assert.deepEqual(stateOf(ctx).arrived, [{ crop: "gold", from: "gift" }]);
 });
 
 test("a level-up from a home tap leaves plot 5 empty until open plants it", async (t) => {

@@ -110,7 +110,6 @@
       .then((res) => (res.ok ? res.json() : null))
       .then((reply) => {
         if (!reply?.ok) return back();
-        persist(next);
         paintStats(reply.stats);
         const animal = document.querySelector("[data-stat-animal]");
         if (animal) animal.textContent = reply.name;
@@ -121,7 +120,8 @@
   }
 
   let kind = readKind();
-  persist(kind);
+  const choice = new URLSearchParams(window.location.search).get("mascot");
+  if (KINDS.includes(choice)) persist(choice);
   applyArt(kind);
 
   let skipClick = false;
@@ -130,13 +130,13 @@
     const next = btn.getAttribute("data-mascot");
     const picker = Boolean(btn.closest("[data-demo-switch]"));
     if (!picker && !KINDS.includes(next)) return;
+    if (!picker) persist(next);
     if (next === kind) {
       bouncePet();
       return;
     }
     const was = kind;
     kind = next;
-    if (!picker) persist(kind);
     applyArt(kind); // swap FIRST so the squash is of the new pet
     bouncePet(); // same tick — one continuous motion
     if (picker) saveDemoKind(kind, was);

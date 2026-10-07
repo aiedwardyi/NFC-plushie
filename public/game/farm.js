@@ -2248,7 +2248,7 @@ export async function createFarm(api) {
       sleep();
     },
     get busy() {
-      return showing;
+      return showing || acting;
     },
     destroy() {
       if (built) cut();

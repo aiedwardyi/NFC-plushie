@@ -165,13 +165,44 @@ test("gift seeds follow the tier and the pet's level", () => {
   assert.deepEqual(out.farm.arrived, []);
 });
 
-test("the bag holds 9 and drops from the tail, never 황금 감자", () => {
+test("the bag keeps every seed and admits free seeds only while there is room, except 황금 감자", () => {
   const p = (n) => Array(n).fill("potato");
   assert.deepEqual(addSeeds([...p(7), "gold"], ["lettuce", "carrot"]), [...p(7), "gold", "lettuce"]);
-  assert.deepEqual(addSeeds([...p(8), "gold"], ["gold"]), [...p(7), "gold", "gold"]);
-  assert.deepEqual(addSeeds(p(9), ["carrot"], true), ["carrot", ...p(8)]);
+  assert.deepEqual(addSeeds([...p(8), "gold"], ["gold"]), [...p(8), "gold", "gold"]);
+  assert.deepEqual(addSeeds(p(9), ["carrot"], true), p(9));
   assert.deepEqual(addSeeds(Array(9).fill("gold"), ["gold", "lettuce"]), Array(10).fill("gold"));
   assert.deepEqual(addSeeds(["tomato"], ["carrot", "sweet"], true), ["carrot", "sweet", "tomato"]);
+  assert.deepEqual(addSeeds(p(10), ["carrot", "gold", "gold"], true), ["gold", "gold", ...p(10)]);
+  assert.deepEqual(addSeeds(p(8), ["gold", "carrot"], true), ["gold", ...p(8)]);
+});
+
+test("a full paid bag survives a level unlock with its coins unchanged", () => {
+  let farm = blank({ plots: Array(6).fill(plant("potato", T0)), unlockedTo: 3, coins: 100 });
+  for (let i = 0; i < FARM.bagMax; i++) farm = buySeed(farm, i % 2 ? "carrot" : "tomato", 3).farm;
+  const out = openFarm(farm, xpForLevel(4), T0);
+  assert.deepEqual(out.farm.bag, farm.bag);
+  assert.equal(out.farm.coins, 10);
+  assert.deepEqual(out.seeds, []);
+  assert.equal(out.farm.unlockedTo, 4);
+});
+
+test("unlock notices name only the seeds that fit", () => {
+  const bag = Array(8).fill("potato");
+  const out = openFarm(blank({ plots: Array(6).fill(plant("potato", T0)), bag, unlockedTo: 3 }), xpForLevel(5), T0);
+  assert.deepEqual(out.farm.bag, ["sweet", ...bag]);
+  assert.deepEqual(out.seeds, [{ crop: "sweet", from: "unlock" }]);
+  assert.deepEqual(openFarm(out.farm, xpForLevel(5), T0).seeds, []);
+});
+
+test("gift notices name only admitted seeds and gold never displaces a seed", () => {
+  for (const size of [8, 9, 10]) {
+    const bag = Array(size).fill("tomato");
+    const farm = addGiftSeeds(blank({ bag }), ["carrot", "gold", "lettuce", "gold"]);
+    const added = size === 8 ? ["carrot", "gold", "gold"] : ["gold", "gold"];
+    assert.deepEqual(farm.bag, [...bag, ...added]);
+    assert.deepEqual(farm.arrived, added.map((crop) => ({ crop, from: "gift" })));
+    assert.deepEqual(bag, Array(size).fill("tomato"));
+  }
 });
 
 test("pick takes only a ripe plot", () => {
