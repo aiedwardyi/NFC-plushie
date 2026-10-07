@@ -1076,7 +1076,7 @@ function wakeAudio() {
   }
 }
 
-// A hidden page stays silent: a game the hiding ended still types its goodbye line.
+// Hidden pages stay silent: leaving mid-game still types the pet's goodbye line.
 function blip() {
   if (!audio || audio.state !== "running" || document.hidden) return;
   const t = audio.currentTime;
@@ -1172,6 +1172,7 @@ function sfxOut() {
 }
 
 function playSfx(name, { rate = 1, gain = 1 } = {}) {
+  if (document.hidden) return;
   const asked = performance.now();
   ensureAudio(() => {
     sfxBuffer(name).then((buffer) => {
