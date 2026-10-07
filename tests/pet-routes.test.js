@@ -24,11 +24,11 @@ function updateJar(jar, setCookies) {
   }
 }
 
-async function setup(t) {
+async function setup(t, options = {}) {
   const dir = mkdtempSync(join(process.cwd(), ".test-data-"));
   const db = openDatabase(dir);
   let time = T0;
-  const server = createApp({ db, now: () => time, rng: () => 0 }).listen(0, "localhost");
+  const server = createApp({ db, now: () => time, rng: () => 0, ...options }).listen(0, "localhost");
   await new Promise((resolve) => server.once("listening", resolve));
   t.after(async () => {
     await new Promise((resolve) => server.close(resolve));
@@ -519,4 +519,133 @@ test("first-claim greeting uses first-meeting copy", async (t) => {
   const skip = await request(`/t?uid=${A}`, { jar });
   assert.match(skip.html, /만나서 반가워요, Mochi!/);
   assert.doesNotMatch(skip.html, /다시 만나서 반가워요/);
+});
+
+const DAY = 24 * 60 * MIN;
+const statCardOf = (html) => html.match(/<div class="sheet" data-sheet="stats"[\s\S]*?<\/section>\s*<\/div>/)?.[0] || "";
+const totalsOf = (card) => [...card.matchAll(/<b class="st-total">(\d+)<\/b>/g)].map((m) => Number(m[1]));
+const petStatsOf = (html) => JSON.parse(html.match(/<div class="pet[^"]*" data-pet="(?:alive|away)" data-stats="([^"]+)"/)[1].replaceAll("&quot;", '"'));
+const introOf = (html) => html.match(/<p class="intro"[^>]*>([^<]*)<\/p>/)[1];
+const dialogOf = (html) => html.match(/<section class="dialog"[\s\S]*?<\/section>/)[0];
+const setA = (ctx, sql, ...args) => ctx.db.prepare(`UPDATE plushies SET ${sql} WHERE uid = ?`).run(...args, A);
+const GUILT = /외로|왜 안|슬펐|미워/;
+
+test("the stat card shows a 포근 클래식 말 at 50/40/70/60, closed until asked", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  const home = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.match(home.html, /<div class="sheet" data-sheet="stats" role="dialog" aria-modal="true" aria-labelledby="sheet-stats-title" hidden>/);
+  const card = statCardOf(home.html);
+  assert.match(card, /<h2 id="sheet-stats-title">능력치<\/h2>/);
+  assert.match(card, /<b class="st-animal" data-stat-animal>말<\/b><span class="st-edition is-classic">포근 클래식<\/span>/);
+  assert.deepEqual(totalsOf(card), [50, 40, 70, 60]);
+  assert.deepEqual([...card.matchAll(/<span class="st-label">([^<]+)<\/span>/g)].map((m) => m[1]), ["힘", "지능", "민첩", "매력"]);
+  assert.deepEqual([...card.matchAll(/<small class="st-job">([^<]+)<\/small>/g)].map((m) => m[1]), ["기 모으기에서 더 높이", "텃밭 경험치 더 많이", "달리기에서 더 빨리", "버스 코인 더 많이"]);
+  assert.match(card, /data-stat="agi">\s*<span class="st-label">민첩<\/span>\s*<span class="st-bar" role="img" aria-label="민첩 70" data-base="70" data-plus="0" data-trained="0">/);
+  assert.equal((card.match(/<span class="st-boost" hidden>/g) || []).length, 4);
+  assert.match(card, /<button type="button" class="st-snack" data-stat-farm>텃밭에서 간식 주기<\/button>/);
+  assert.match(home.html, /<button type="button" class="level-open" data-open="stats" aria-haspopup="dialog" aria-label="능력치 보기, Lv\. 1">/);
+  assert.deepEqual(petStatsOf(home.html), { str: { total: 50, bonus: 1.7, boost: 0 }, int: { total: 40, bonus: 0, boost: 0 }, agi: { total: 70, bonus: 5, boost: 0 }, cha: { total: 60, bonus: 3.3, boost: 0 } });
+  const sheep = await ctx.request(`/t?uid=${A}&view=1`, { jar: { ...jar, mascot: "sheep" } });
+  assert.deepEqual(totalsOf(statCardOf(sheep.html)), [50, 40, 70, 60]);
+});
+
+test("a RARE 말 shows 금실 레어 at 60/50/80/70 with its training and a pending boost", async (t) => {
+  const ctx = await setup(t, { rareUids: [A] });
+  const { jar } = await meet(ctx, A, "Mochi");
+  setA(ctx, "stats = ?", JSON.stringify({ v: 1, trained: { cha: 3 }, boost: { agi: 10 } }));
+  const home = await ctx.request(`/t?uid=${A}&view=1`, { jar });
+  const card = statCardOf(home.html);
+  assert.match(card, /<span class="st-edition is-rare">금실 레어<\/span>/);
+  assert.deepEqual(totalsOf(card), [60, 50, 90, 73]);
+  assert.match(card, /data-stat="agi">[\s\S]*?<b class="st-total">90<\/b><span class="st-boost">\+10<\/span>/);
+  assert.match(card, /data-base="60" data-plus="10" data-trained="3"/);
+  assert.deepEqual(petStatsOf(home.html).agi, { total: 90, bonus: 8.3, boost: 10 });
+  setA(ctx, "stats = NULL");
+  assert.deepEqual(totalsOf(statCardOf((await ctx.request(`/t?uid=${A}&view=1`, { jar })).html)), [60, 50, 80, 70]);
+});
+
+test("the level line names the next unlock until Lv 6", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  const next = async (xp) => {
+    setA(ctx, "xp = ?", xp);
+    return (await ctx.request(`/t?uid=${A}&view=1`, { jar })).html.match(/<span class="level-next" data-level-next data-unlocks="[^"]*"( hidden)?>([^<]*)<\/span>/);
+  };
+  assert.equal((await next(0))[2], "Lv 2: 당근");
+  const two = await next(100);
+  assert.deepEqual([two[1], two[2]], [undefined, "Lv 3: 토마토 + 씨앗 가게"]);
+  assert.equal((await next(700))[2], "Lv 6: 황금 감자 씨앗");
+  const six = await next(1000);
+  assert.deepEqual([six[1], six[2]], [" hidden", ""]);
+  const unlocks = JSON.parse((await ctx.request(`/t?uid=${A}&view=1`, { jar })).html.match(/data-unlocks="([^"]*)"/)[1].replaceAll("&quot;", '"'));
+  assert.deepEqual(unlocks, { 1: "Lv 2: 당근", 2: "Lv 3: 토마토 + 씨앗 가게", 3: "Lv 4: 고구마", 4: "Lv 5: 수박", 5: "Lv 6: 황금 감자 씨앗" });
+});
+
+test("after a missed day, the first line says what ripened, never guilt", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  setA(ctx, "farm = ?", JSON.stringify({ v: 2, plots: [{ crop: "carrot", at: T0, quick: false }, null, null, null, null, null], bag: [], tasted: ["carrot"], unlockedTo: 2, arrived: [], harvested: 0, golden: 0, pantry: [], coins: 0, day: { key: null, feeds: 0, sent: 0 } }));
+  ctx.advance(2 * DAY + 9 * 60 * MIN);
+  const tap = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.match(tap.html, /data-rewarded="1"/);
+  assert.equal(introOf(tap.html), "당근이 다 익었어요! 같이 볼래요?");
+  assert.doesNotMatch(dialogOf(tap.html), GUILT);
+  assert.doesNotMatch(tap.html, /다시 만나서 반가워요/);
+  const again = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.equal(introOf(again.html), "다시 만나서 반가워요, Mochi!");
+});
+
+test("after a missed day with nothing ripe, the pet napped; one day apart keeps the usual hello", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  ctx.advance(DAY + 9 * 60 * MIN);
+  assert.equal(introOf((await ctx.request(`/t?uid=${A}`, { jar })).html), "다시 만나서 반가워요, Mochi!");
+  ctx.advance(2 * DAY);
+  const view = await ctx.request(`/t?uid=${A}&view=1`, { jar });
+  assert.equal(introOf(view.html), "다시 만나서 반가워요, Mochi!");
+  const tap = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.equal(introOf(tap.html), "푹 자고 일어났어요. 오늘도 같이 놀아요!");
+  assert.doesNotMatch(dialogOf(tap.html), GUILT);
+});
+
+test("the away line takes the reunion's words but keeps its jump", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  setA(ctx, "mood_value = 20, mood_updated_at = ?", T0);
+  ctx.advance(3 * DAY + 9 * 60 * MIN);
+  const tap = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.match(tap.html, /data-reunion="1"/);
+  assert.match(tap.html, /data-celebrate="reunion"/);
+  assert.equal(introOf(tap.html), "푹 자고 일어났어요. 오늘도 같이 놀아요!");
+  assert.doesNotMatch(tap.html, /보고 싶었어요|is-reunion"/);
+  assert.doesNotMatch(dialogOf(tap.html), GUILT);
+});
+
+test("a morning after a missed day keeps its own wake line", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  await ctx.request("/care", { jar, body: { uid: A, act: "sleep" } });
+  ctx.advance(2 * DAY + 9 * 60 * MIN);
+  const morning = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.match(morning.html, /data-morning/);
+  assert.equal(introOf(morning.html), "쿨쿨… 쿨쿨…");
+});
+
+test("a stranger sees the stat card without the owner's buttons", async (t) => {
+  const ctx = await setup(t, { legendaryUids: [A] });
+  await meet(ctx, A, "Mochi");
+  setA(ctx, "kind = 'sheep'");
+  for (const jar of [{}, { owner_token: "nope", mascot: "horse" }]) {
+    const stranger = await ctx.request(`/t?uid=${A}`, { jar });
+    assert.match(stranger.html, /이미 주인이 있어요/);
+    const card = statCardOf(stranger.html);
+    assert.match(card, /<b class="st-animal" data-stat-animal>양<\/b><span class="st-edition is-legendary">별밤 레전더리<\/span>/);
+    assert.deepEqual(totalsOf(card), [70, 80, 60, 90]);
+    assert.match(stranger.html, /<button type="button" class="ghost stat-peek" data-open="stats" aria-haspopup="dialog">양 친구의 능력치<\/button>/);
+    assert.doesNotMatch(stranger.html, /data-stat-farm|data-care|data-owner|data-farm|level-open|class="dock"/);
+  }
+  const claim = await ctx.request("/claim", { body: { uid: A, code: "WRONG1" } });
+  assert.equal(claim.status, 403);
+  assert.deepEqual(totalsOf(statCardOf(claim.html)), [70, 80, 60, 90]);
 });

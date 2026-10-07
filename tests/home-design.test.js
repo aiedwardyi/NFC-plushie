@@ -155,11 +155,12 @@ test("first meet has the live nameplate and key card hooks but no dock", async (
   assert.doesNotMatch(first.html, /data-care|class="dock"|data-sheet=|data-tile=/);
 });
 
-test("stranger page has no dock, sheets or collection", async (t) => {
+test("stranger page has no dock, owner sheets or collection, only the stat card", async (t) => {
   const { request } = await named(t);
   const stranger = await request(`/t?uid=${A}`);
   assert.match(stranger.html, /이미 주인이 있어요/);
-  assert.doesNotMatch(stranger.html, /data-care|class="dock"|data-sheet=|data-tile=|level-pin|gift-tally/);
+  assert.doesNotMatch(stranger.html, /data-care|class="dock"|data-sheet="(?!stats")|data-tile=|level-pin|gift-tally/);
+  assert.match(stranger.html, /<div class="sheet" data-sheet="stats" role="dialog"/);
 });
 
 test("the dock runs the arcade, the three care verbs, then the farm", async (t) => {

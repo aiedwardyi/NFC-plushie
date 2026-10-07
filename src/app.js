@@ -10,7 +10,7 @@ import { applyCare, careWant, mealsNow, playsNow } from "./care.js";
 import { comboNext, comboTap } from "./combo.js";
 import { ARCADE, applyPlay, applyRace, raceState, xpPlaysLeft } from "./arcade.js";
 import { FARM, addGiftSeeds, buySeed, farmDot, farmView, feedCrop, giftSeeds, harvestFarm, nextRipeAt, openFarm, parseFarm, pickPlot, ripenFarm, sendCrops } from "./farm.js";
-import { devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
+import { awayLine, devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
 import { mountTalk, purgeTalk, takeQuestion } from "./chat.js";
 import { STAT_KEYS, editionOf, parseStats, setBoost, statSheet, train, useBoost } from "./stats.js";
 
@@ -27,6 +27,7 @@ const validCrop = (id) => typeof id === "string" && Object.hasOwn(FARM.crops, id
 const validCrops = (a) => Array.isArray(a) && a.length >= 1 && a.length <= FARM.pantryMax && a.every(validCrop);
 const KINDS = ["horse", "sheep"];
 const parseDemoUids = (raw) => String(raw || "").split(",").map((s) => s.trim().toUpperCase()).filter(validUid);
+const daysApart = (from, to) => (Date.parse(to) - Date.parse(from)) / (24 * 60 * 60 * 1000);
 
 const STALE_LINE = "폰을 진짜 저한테 톡 대 주세요!";
 const COOLDOWN_LINE = "방금 토닥여 줘서 기분 좋아요! 조금 있다가 또 토닥여 주세요.";
@@ -165,6 +166,10 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   const sheetOf = (uid, stats, kind) => statSheet(stats, kind, editionOf(uid, editions));
   // The saved animal wins over this browser's toggle.
   const animalOf = (row, req) => row.kind || req.demoMascot || "horse";
+  const cardOf = (row, req) => {
+    const kind = animalOf(row, req);
+    return { kind, edition: editionOf(row.uid, editions), sheet: sheetOf(row.uid, parseStats(row.stats), kind) };
+  };
 
   // One care beat's write, for 밥 놀이 잠 and for a hungry pet's farm snack.
   function saveCare(uid, out, t) {
@@ -254,7 +259,9 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       // The key says 한 번 더 톡!, so a combo page saves the line for after the key runs out.
       comboLaterLine: out.rewarded || extra.morning || !(extra.combo > 0) ? "" : (UNREWARDED_LINES[out.reason] || ""),
       lonelyLine: !out.rewarded && moodAfter <= PET.moodLonelyAt ? LONELY_LINE : "",
-      reunionLine: out.rewarded && out.reunion ? REUNION_LINE : "",
+      // The away line already speaks for the time apart, so the reunion keeps its jump but not its line.
+      reunionLine: out.rewarded && out.reunion && !extra.away ? REUNION_LINE : "",
+      awayLine: extra.away || "",
       want: careWant(care, t) || "",
       meals: mealsNow(care, t),
       plays: playsNow(care, t),
@@ -410,7 +417,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           const skipped = getRow(serial);
           const asleep = view && Boolean(skipped.pet_name) && skipped.slept_at !== null;
           const pet = petView(skipped, petState(skipped, t), { rewarded: false }, t, { morning, asleep, view });
-          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found), theme, talk: talks(serial) }) };
+          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found), theme, talk: talks(serial), card: cardOf(skipped, req) }) };
         }
         if (!afterTap.pet_name) {
           raiseMirror();
@@ -425,6 +432,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         let extra = null;
         if (out.rewarded) extra = writePetReward(serial, st, out, getRow(serial), t, today);
         const fresh = getRow(serial);
+        // The day's first tap after a missed Seoul day opens with what happened meanwhile; a morning has its own wake line.
+        const away = out.rewarded && out.newActiveDay && !morning && daysApart(st.lastActiveDay, today) >= 2 ? awayLine(parseFarm(fresh.farm), t) : "";
         const mile = milestoneLine(fresh.tap_count);
         let visual = flash;
         if (!visual && out.rewarded && out.leveledUp) visual = "levelup";
@@ -446,10 +455,10 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           combo = c.combo;
         }
         // A follow-up waits for a visit with nothing to celebrate.
-        const ask = talks(serial) && !visual && !morning && !visit && combo <= 1 ? takeQuestion(db, serial, today) : "";
-        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo, visit, farmRow: visit ? getRow(serial) : fresh }), demo, found: parseFound(fresh.gift_found), theme, talk: talks(serial), ask }) };
+        const ask = talks(serial) && !visual && !morning && !visit && !away && combo <= 1 ? takeQuestion(db, serial, today) : "";
+        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo, visit, away, farmRow: visit ? getRow(serial) : fresh }), demo, found: parseFound(fresh.gift_found), theme, talk: talks(serial), ask, card: cardOf(getRow(serial), req) }) };
       }
-      if (state === "STRANGER") return { html: strangerPage(row, "", { demo, theme }) };
+      if (state === "STRANGER") return { html: strangerPage(row, "", { demo, theme, card: cardOf(row, req) }) };
       throw new Error("Invalid binding result");
     })();
     if (result.token) setOwner(res, result.token);
@@ -461,7 +470,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     if (!validUid(uid)) return invalidUid(req, res);
     const row = getRow(uid);
     if (!decisions.canRename(row, req.cookies.owner_token || null, hash)) {
-      return res.status(403).send(row ? strangerPage(row, "", { theme: req.theme }) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>", { theme: req.theme }));
+      return res.status(403).send(row ? strangerPage(row, "", { theme: req.theme, card: cardOf(row, req) }) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>", { theme: req.theme }));
     }
     const trimmed = typeof name === "string" ? name.trim() : "";
     if (!trimmed || Array.from(trimmed).length > 24) {
@@ -685,7 +694,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       return res.redirect(303, `/t?uid=${uid}`);
     }
     const demo = demoUids.includes(uid) ? uid : "";
-    res.status(result.status).send(result.row ? strangerPage(result.row, result.message, { demo, theme: req.theme }) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>", { theme: req.theme }));
+    res.status(result.status).send(result.row ? strangerPage(result.row, result.message, { demo, theme: req.theme, card: cardOf(result.row, req) }) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>", { theme: req.theme }));
   });
 
   if (demoUids.length) {
