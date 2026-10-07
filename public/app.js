@@ -2840,11 +2840,14 @@ function fillBars(grow = false) {
   if (!list) return;
   const max = Number(list.dataset.max) || 120;
   list.querySelectorAll(".st-bar").forEach((bar) => {
+    const segmented = document.documentElement.dataset.theme === "8bit";
+    const total = ["base", "plus", "trained"].reduce((sum, part) => sum + (Number(bar.dataset[part]) || 0), 0);
     for (const part of ["base", "plus", "trained"]) {
       const el = bar.querySelector(`.st-${part}`);
       if (!el) continue;
-      const width = `${Math.max(0, Math.min(100, ((Number(bar.dataset[part]) || 0) / max) * 100))}%`;
-      if (grow && !prefersReducedMotion()) {
+      const value = segmented ? (part === "base" ? Math.round(Math.min(1, total / max) * 18) / 18 : 0) : (Number(bar.dataset[part]) || 0) / max;
+      const width = `${Math.max(0, Math.min(100, value * 100))}%`;
+      if (grow && !segmented && !prefersReducedMotion()) {
         el.style.transition = "none";
         el.style.width = "0%";
         void el.offsetWidth;

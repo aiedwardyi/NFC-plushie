@@ -1299,16 +1299,17 @@ button.tile:active { transform: translateY(2px); }
 .st-who {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  margin: -4px 0 14px;
+  margin: 0 0 12px;
 }
 .st-animal {
-  font-size: 1.375rem;
+  font-size: 1.75rem;
   font-weight: 900;
   color: var(--cream);
 }
 .st-edition {
-  padding: 3px 10px;
+  padding: 5px 12px;
   border-radius: 999px;
   font-size: .8125rem;
   font-weight: 800;
@@ -1316,61 +1317,83 @@ button.tile:active { transform: translateY(2px); }
   background: var(--cream);
 }
 /* The edition stays real gold in every world: the themes remap --gold. */
-.st-edition.is-rare { color: #4a2c20; background: linear-gradient(180deg, #ffe7a3, #e2b04a); }
+.st-edition.is-rare { color: #4a2c20; background: linear-gradient(135deg, #fceab2, #e2b252); }
 .st-edition.is-legendary {
-  color: var(--gold-light);
+  color: #f3e2a8;
   background: linear-gradient(135deg, #2e2a66, #18264f);
-  box-shadow: inset 0 0 0 1.5px var(--gold-light), 0 0 14px rgba(241, 214, 140, 0.35);
+  box-shadow: inset 0 0 0 1px #e2c27a, 0 0 14px rgba(226, 194, 122, .2);
 }
 .st-list {
   display: grid;
-  gap: 14px;
+  gap: 8px;
   margin: 0 0 4px;
   padding: 0;
   list-style: none;
 }
 .st-row {
   display: grid;
-  grid-template-columns: 2.6rem minmax(0, 1fr) 2.2rem 2.6rem;
-  grid-template-areas: "label bar total boost" ". job job job";
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  grid-template-areas: "icon label total boost" "icon job job job" "bar bar bar bar";
   align-items: center;
   column-gap: 8px;
-  row-gap: 3px;
+  row-gap: 2px;
+  padding: 8px 12px 10px;
+  border-radius: 16px;
+  background: linear-gradient(110deg, color-mix(in srgb, var(--st) 12%, transparent), transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--st) 25%, transparent);
 }
-.st-label { grid-area: label; font-size: 1rem; font-weight: 800; color: var(--cream); }
+.st-row[data-stat="str"] { --st: #e4694f; --st-light: #f5a38c; }
+.st-row[data-stat="int"] { --st: #6c7fd8; --st-light: #a9b5f0; }
+.st-row[data-stat="agi"] { --st: #35a887; --st-light: #86d6bd; }
+.st-row[data-stat="cha"] { --st: #e0719a; --st-light: #f3afc7; }
+.st-icon {
+  grid-area: icon;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 36px;
+  border-radius: 10px;
+  color: var(--st-light);
+  background: color-mix(in srgb, var(--st) 18%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--st-light) 20%, transparent);
+}
+.st-icon svg { width: 22px; height: 22px; fill: currentColor; }
+.st-label { grid-area: label; font-size: .9375rem; font-weight: 800; color: var(--cream); }
 .st-bar {
   grid-area: bar;
   display: flex;
   height: 12px;
+  margin-top: 6px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(8, 11, 19, 0.6);
-  box-shadow: inset 0 0 0 1.5px rgba(241, 214, 140, 0.3);
+  background: rgba(8, 11, 19, .45);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .25);
 }
 .st-bar i { display: block; flex: none; width: 0; height: 100%; transition: width .7s var(--ease-out); }
-.st-bar .st-base { background: var(--cream); }
-.st-bar .st-plus { background: linear-gradient(180deg, #ffe7a3, #e2b04a); transition-delay: .14s; }
-.st-bar .st-trained { background: #8fd18a; transition-delay: .28s; }
+.st-bar .st-base { background: linear-gradient(90deg, var(--st-light), var(--st)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35); }
+.st-bar .st-plus { background: linear-gradient(90deg, #d9982b, #f2c451, #ffe9a8); box-shadow: inset 1px 0 0 #fff0be, inset 0 1px 0 #fff0be; transition-delay: .14s; }
+.st-bar .st-trained { background: repeating-linear-gradient(115deg, #8fd18a 0 4px, #b7e5a8 4px 6px); transition-delay: .28s; }
 .st-total {
   grid-area: total;
   text-align: right;
-  font-size: 1.125rem;
+  font-size: 1.375rem;
   font-weight: 900;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
-  color: var(--cream);
+  color: var(--st-light);
 }
 .st-boost {
   grid-area: boost;
   justify-self: start;
-  padding: 1px 7px;
+  padding: 2px 7px;
   border-radius: 999px;
   font-size: .75rem;
   font-weight: 900;
   color: #4a2c20;
-  background: #ffe7a3;
-  box-shadow: 0 0 10px rgba(255, 220, 130, 0.55);
+  background: linear-gradient(135deg, #fceab2, #e2b252);
+  box-shadow: 0 2px 6px rgba(214, 165, 70, .25);
 }
-.st-job { grid-area: job; margin: 0; font-size: .8125rem; font-weight: 600; color: var(--muted); }
+.st-job { grid-area: job; margin: 0; font-size: .75rem; font-weight: 600; color: color-mix(in srgb, var(--cream) 76%, var(--navy2)); }
 .st-snack { margin-top: 18px; }
 .stat-peek { margin-top: 0; }
 

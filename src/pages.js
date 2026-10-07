@@ -46,6 +46,10 @@ export function awayLine(farm, now) {
 }
 
 const ICONS = {
+  str: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9.5 22 20 9.5h-6.8z"/></svg>`,
+  int: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>`,
+  agi: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5h4.5l7 7-7 7H2l7-7zM10.5 5H15l7 7-7 7h-4.5l7-7z"/></svg>`,
+  cha: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5C6.4 16.9 2.5 13.4 2.5 9.3 2.5 6.4 4.8 4.5 7.4 4.5c1.9 0 3.5 1 4.6 2.7 1.1-1.7 2.7-2.7 4.6-2.7 2.6 0 4.9 1.9 4.9 4.8 0 4.1-3.9 7.6-9.5 11.2z"/></svg>`,
   feed: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.5h17c-.4 4.7-3.9 8-8.5 8s-8.1-3.3-8.5-8z"/><path d="M8.5 19.3h7"/><path d="M6.6 11.4c.5-2.9 2.9-4.8 5.4-4.8s4.9 1.9 5.4 4.8"/><path d="M15.5 3.2l-3 7.8M18.8 4.6l-4.6 6.6"/></svg>`,
   play: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M6.4 5.6c2.6 3.4 2.6 9.4 0 12.8M17.6 5.6c-2.6 3.4-2.6 9.4 0 12.8"/></svg>`,
   sleep: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.6 4.4A8 8 0 1 0 19.6 16 6.4 6.4 0 0 1 15.6 4.4z"/><path d="M17.2 3.6h3.4l-3.4 4h3.4"/></svg>`,
@@ -199,7 +203,7 @@ function statCard({ kind, edition, sheet }, owner) {
   const rows = STAT_KEYS.map((k) => {
     const s = sheet[k];
     return `<li class="st-row" data-stat="${k}">
-          <span class="st-label">${STAT_NAMES[k]}</span>
+          <span class="st-icon">${ICONS[k]}</span><span class="st-label">${STAT_NAMES[k]}</span>
           <span class="st-bar" role="img" aria-label="${STAT_NAMES[k]} ${s.total}" data-base="${s.base}" data-plus="${s.plus}" data-trained="${s.trained}"><i class="st-base"></i><i class="st-plus"></i><i class="st-trained"></i></span>
           <b class="st-total">${s.total}</b><span class="st-boost"${s.boost ? "" : " hidden"}>+${s.boost}</span>
           <small class="st-job">${STAT_JOBS[k]}</small>

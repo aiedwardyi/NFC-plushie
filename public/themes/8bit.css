@@ -610,6 +610,8 @@ html[data-theme="8bit"] .g-timer, html[data-theme="8bit"] .g-timer i, html[data-
 html[data-theme="8bit"] .g-fill { background: repeating-linear-gradient(0deg, #ffec27 0 6px, #ffa300 6px 8px); }
 
 /* Stats, the basket row and the 씨앗 가게: square corners, hard pixel edges, the PICO-8 palette */
+html[data-theme="8bit"] .st-row,
+html[data-theme="8bit"] .st-icon,
 html[data-theme="8bit"] .st-edition,
 html[data-theme="8bit"] .st-boost,
 html[data-theme="8bit"] .st-bar,
@@ -620,9 +622,27 @@ html[data-theme="8bit"] .g-bonus,
 html[data-theme="8bit"] .level-line .level-open:focus-visible { border-radius: 0; }
 html[data-theme="8bit"] .st-edition.is-rare { color: var(--ink); background: var(--gold-light); }
 html[data-theme="8bit"] .st-edition.is-legendary { color: var(--gold-light); background: var(--ink); box-shadow: inset 0 0 0 2px var(--gold-light); }
-html[data-theme="8bit"] .st-bar { background: var(--ink); box-shadow: 0 0 0 2px var(--cream); }
-html[data-theme="8bit"] .st-bar .st-plus { background: var(--gold-light); }
-html[data-theme="8bit"] .st-bar .st-trained { background: var(--grass); }
+html[data-theme="8bit"] .st-row { background: none; box-shadow: none; }
+html[data-theme="8bit"] .st-icon { background: none; box-shadow: none; }
+html[data-theme="8bit"] .st-row[data-stat="str"] { --st: #ff004d; --st-light: #ffa300; }
+html[data-theme="8bit"] .st-row[data-stat="int"] { --st: #83769c; --st-light: #29adff; }
+html[data-theme="8bit"] .st-row[data-stat="agi"] { --st: #008751; --st-light: #00e436; }
+html[data-theme="8bit"] .st-row[data-stat="cha"] { --st: #ff77a8; --st-light: #ff77a8; }
+html[data-theme="8bit"] .st-bar .st-base { background: linear-gradient(var(--st-light), var(--st-light)); box-shadow: none; }
+html[data-theme="8bit"] .st-bar i { transition: none; }
+html[data-theme="8bit"] .st-bar {
+  height: 12px;
+  margin: 6px 2px 0;
+  transform: skewX(-14deg);
+  background:
+    linear-gradient(var(--st-light), var(--st-light)) top / 100% 1px no-repeat,
+    linear-gradient(var(--st-light), var(--st-light)) bottom / 100% 1px no-repeat,
+    linear-gradient(90deg, var(--st-light) 0 1px, transparent 1px calc(100% - 4px), var(--st-light) calc(100% - 4px) calc(100% - 3px), transparent calc(100% - 3px)) left / calc(100% / 18) 100% repeat-x;
+  mask: linear-gradient(90deg, #000 0 calc(100% - 3px), transparent calc(100% - 3px)) left / calc(100% / 18) 100% repeat-x;
+  box-shadow: none;
+}
+html[data-theme="8bit"] .st-bar .st-plus,
+html[data-theme="8bit"] .st-bar .st-trained { background: var(--st-light); box-shadow: none; }
 html[data-theme="8bit"] .st-boost { color: var(--ink); background: var(--gold-light); box-shadow: none; }
 html[data-theme="8bit"] .stat-pop {
   border-radius: 0;

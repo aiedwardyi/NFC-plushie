@@ -308,7 +308,10 @@ html[data-theme="najeon"] .g-result .g-again { background: linear-gradient(135de
 /* Stats, the basket row and the 씨앗 가게 on black lacquer: pearl text, real gold for the edition */
 html[data-theme="najeon"] .st-animal,
 html[data-theme="najeon"] .shop-name b { font-family: "Gowun Batang", serif; }
-html[data-theme="najeon"] .st-bar { box-shadow: inset 0 0 0 1.5px var(--pearl-dim); }
+html[data-theme="najeon"] .st-row { border-radius: 4px; background: linear-gradient(110deg, color-mix(in srgb, var(--st-light) 10%, #0c0c10), #0c0c10); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--st-light) 40%, transparent); }
+html[data-theme="najeon"] .st-icon { border-radius: 4px; }
+html[data-theme="najeon"] .st-bar { box-shadow: inset 0 0 0 1px rgba(233, 231, 239, .2); }
+html[data-theme="najeon"] .st-bar .st-base { background: linear-gradient(100deg, var(--st), var(--st-light) 45%, #e6dff0 65%, var(--st-light)); }
 html[data-theme="najeon"] .st-bar .st-trained { background: #8fd6c0; }
 html[data-theme="najeon"] .st-edition.is-legendary { color: #f3e2a8; box-shadow: inset 0 0 0 1.5px #e2c27a, 0 0 14px rgba(226, 194, 122, 0.35); }
 html[data-theme="najeon"] .shop-row { box-shadow: inset 0 0 0 1.5px rgba(233, 231, 239, 0.2); }

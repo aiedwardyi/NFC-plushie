@@ -557,7 +557,7 @@ test("the stat card shows a 포근 클래식 말 at 50/40/70/60, closed until as
   assert.deepEqual(totalsOf(card), [50, 40, 70, 60]);
   assert.deepEqual([...card.matchAll(/<span class="st-label">([^<]+)<\/span>/g)].map((m) => m[1]), ["힘", "지능", "민첩", "매력"]);
   assert.deepEqual([...card.matchAll(/<small class="st-job">([^<]+)<\/small>/g)].map((m) => m[1]), ["기 모으기에서 더 높이", "텃밭 경험치 더 많이", "달리기에서 더 빨리", "버스 코인 더 많이"]);
-  assert.match(card, /data-stat="agi">\s*<span class="st-label">민첩<\/span>\s*<span class="st-bar" role="img" aria-label="민첩 70" data-base="70" data-plus="0" data-trained="0">/);
+  assert.match(card, /data-stat="agi">\s*<span class="st-icon">[\s\S]*?<\/span><span class="st-label">민첩<\/span>\s*<span class="st-bar" role="img" aria-label="민첩 70" data-base="70" data-plus="0" data-trained="0">/);
   assert.equal((card.match(/<span class="st-boost" hidden>/g) || []).length, 4);
   assert.match(card, /<button type="button" class="st-snack" data-stat-farm>텃밭에서 간식 주기<\/button>/);
   assert.match(home.html, /<button type="button" class="level-open" data-open="stats" aria-haspopup="dialog" aria-label="능력치 보기, Lv\. 1">/);
