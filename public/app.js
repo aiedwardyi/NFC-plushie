@@ -116,6 +116,7 @@
         if (animal) animal.textContent = reply.name;
         const replay = document.querySelector("[data-reveal-replay]");
         if (replay) replay.hidden = !revealKind();
+        armReveal();
       })
       .catch(back);
   }
