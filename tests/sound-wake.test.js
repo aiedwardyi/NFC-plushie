@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const read = (path) => readFileSync(new URL(`../public/${path}`, import.meta.url), "utf8");
+const read = (path) => readFileSync(new URL(`../public/${path}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 test("every touch wakes sound again, a finger from its lift, and a pause is asked back on screen", () => {
   const app = read("app.js");
