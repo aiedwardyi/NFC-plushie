@@ -4412,6 +4412,7 @@ const farm = (function farmRoom() {
     sources = null;
     buttons?.remove();
     buttons = null;
+    linked = null;
   }
 
   // Someone else has the speech line now.

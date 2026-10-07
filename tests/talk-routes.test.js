@@ -208,6 +208,14 @@ test("a [지도] reply carries a Naver Map link: the tag leaves the line, the tu
   await ctx.app.locals.talkIdle();
   assert.equal(ctx.db.prepare("SELECT reply FROM talk_turns WHERE uid = ?").get(A).reply, "을지면옥 여기 있어요! [지도:을지면옥 을지로]");
   assert.equal(ctx.provider.notebooks[0].prompt.includes("[지도"), false);
+  ctx.provider.replyWith = async () => ({ ok: true, stop: "end_turn", text: "[춤] 여기 있어요! [지도:을지면옥]", sources: [], usage: { input: 900, output: 30, searches: 0 }, ms: 5 });
+  assert.deepEqual((await say(ctx, jar, "춤추고 링크도 줘")).body, {
+    ok: true,
+    text: "여기 있어요!",
+    sources: [],
+    links: [{ kind: "map", title: "을지면옥", url: "https://map.naver.com/p/search/%EC%9D%84%EC%A7%80%EB%A9%B4%EC%98%A5" }],
+    action: "dance",
+  });
 });
 
 test("link tags: Naver map or search, two at most, the line keeps only words", () => {
