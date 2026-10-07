@@ -169,6 +169,17 @@ test("a phone's reload (view=1) shows the pet and is no tap", async (t) => {
   assert.equal(ctx.row().tap_count, 11);
 });
 
+test("a phone's reload (view=1) before naming keeps the plain naming page", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A);
+  const before = ctx.row();
+  const view = await ctx.request(`/t?uid=${A}&view=1`, { jar });
+  assert.equal(view.status, 200);
+  assert.match(view.html, /name="name"/);
+  assert.doesNotMatch(view.html, /data-pet-state|Lv\. 1/);
+  assert.deepEqual(ctx.row(), before);
+});
+
 test("the 7th eligible tap in a Seoul day hits the daily cap", async (t) => {
   const ctx = await setup(t);
   const { jar } = await meet(ctx, A, "Mochi");

@@ -324,7 +324,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         // The owner's next visit after 잠 wakes the pet; strangers and reloads never do.
         const morning = !view && Boolean(afterTap.pet_name) && afterTap.slept_at !== null;
         if (morning) db.prepare("UPDATE plushies SET slept_at = NULL WHERE uid = ?").run(serial);
-        if (skip || view) {
+        if (skip || (view && afterTap.pet_name)) {
           if (skip) clearSkip(res);
           raiseMirror();
           const skipped = getRow(serial);

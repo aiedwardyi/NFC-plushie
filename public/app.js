@@ -155,11 +155,13 @@ const careHold = { busy: false, asleep: false, touch: null };
 // Where the phone reads the plushie: iPhones at the top edge, Android phones on the back; a desk page wakes on a reload.
 const TAP_SPOT = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) ? "top"
   : /Android/.test(navigator.userAgent) || (navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches) ? "back" : "desk";
-// On a phone only the plushie taps: the page marks its own address view=1, so a reload or a restored tab is a quiet visit.
-if (TAP_SPOT !== "desk" && window.location.pathname === "/t") {
+// On a phone only the plushie taps: the page marks its own address view=1, so a reload or a restored tab is a quiet visit; a desk drops the mark so F5 still taps.
+if (window.location.pathname === "/t") {
   const url = new URL(window.location.href);
-  if (url.searchParams.has("uid") && url.searchParams.get("view") !== "1") {
-    url.searchParams.set("view", "1");
+  const quiet = TAP_SPOT !== "desk";
+  if (url.searchParams.has("uid") && (url.searchParams.get("view") === "1") !== quiet) {
+    if (quiet) url.searchParams.set("view", "1");
+    else url.searchParams.delete("view");
     window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
   }
 }
