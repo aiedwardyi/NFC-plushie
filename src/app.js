@@ -240,6 +240,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       meals: mealsNow(care, t),
       plays: playsNow(care, t),
       morning: Boolean(extra.morning),
+      asleep: Boolean(extra.asleep),
+      view: Boolean(extra.view),
       combo: extra.combo || 0,
       arcadeLeft: xpPlaysLeft(care, t),
       giBest: care.giBest,
@@ -308,9 +310,10 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         return { html: petPage(getRow(serial), code, { celebrate: "claim", demo, theme, guest }), token: guest ? null : token };
       }
       if (state === "OWNER") {
-        // The skip cookie marks the redirect after /name or /claim, not a tap.
+        // The skip cookie marks the redirect after /name or /claim, not a tap; view=1 is a phone page's own reload.
         const skip = req.cookies.pet_skip === serial;
-        if (!skip) db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ? WHERE uid = ?").run(stamp, serial);
+        const view = !skip && req.query.view === "1";
+        if (!skip && !view) db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ? WHERE uid = ?").run(stamp, serial);
         const afterTap = getRow(serial);
         const raiseMirror = () => {
           if (counter !== null && (afterTap.last_counter === null || counter > afterTap.last_counter)) {
@@ -318,14 +321,15 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           }
         };
         const flash = takeCelebrate(req, res);
-        // The owner's next visit after 잠 wakes the pet; strangers never do.
-        const morning = Boolean(afterTap.pet_name) && afterTap.slept_at !== null;
+        // The owner's next visit after 잠 wakes the pet; strangers and reloads never do.
+        const morning = !view && Boolean(afterTap.pet_name) && afterTap.slept_at !== null;
         if (morning) db.prepare("UPDATE plushies SET slept_at = NULL WHERE uid = ?").run(serial);
-        if (skip) {
-          clearSkip(res);
+        if (skip || (view && afterTap.pet_name)) {
+          if (skip) clearSkip(res);
           raiseMirror();
           const skipped = getRow(serial);
-          const pet = petView(skipped, petState(skipped, t), { rewarded: false }, t, { morning });
+          const asleep = view && Boolean(skipped.pet_name) && skipped.slept_at !== null;
+          const pet = petView(skipped, petState(skipped, t), { rewarded: false }, t, { morning, asleep, view });
           return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found), theme, talk: talks(serial) }) };
         }
         if (!afterTap.pet_name) {

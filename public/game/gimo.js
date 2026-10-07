@@ -112,15 +112,21 @@ export async function createGimo(api) {
   const pick = (table) => table[w] || table.classic;
 
   /* ---------- sound and buzz ---------- */
+  // A paused run keeps each timer's time left and sets it again on resume.
   const timers = new Set();
-  function later(fn, ms) {
-    const id = setTimeout(() => {
-      timers.delete(id);
-      fn();
-    }, ms);
-    timers.add(id);
-    return id;
+  function arm(t) {
+    t.at = performance.now();
+    t.id = setTimeout(() => {
+      timers.delete(t);
+      t.fn();
+    }, t.left);
   }
+  function later(fn, ms) {
+    const t = { fn, left: ms, at: 0, id: 0 };
+    timers.add(t);
+    arm(t);
+  }
+  const nap = (ms) => new Promise((res) => later(res, ms));
   const play = (name, o = {}) => {
     if (o.at) later(() => api.sfx(name, { rate: o.rate, gain: o.gain }), o.at);
     else api.sfx(name, { rate: o.rate, gain: o.gain });
@@ -575,6 +581,8 @@ export async function createGimo(api) {
   }
 
   function frame(tk) {
+    // Paused, the stage still draws its last frame but nothing moves.
+    if (paused) return;
     if (samples) samples.push(tk.deltaMS);
     const dt = Math.min(0.05, tk.deltaMS / 1000);
     const t = performance.now() / 1000;
@@ -777,6 +785,7 @@ export async function createGimo(api) {
   let mode = "nfc";
   let hintEl = null;
   let reply = null;
+  let paused = null;
   const face = (n) => { S.pet.texture = T.pet[n] || T.pet.canon; };
   const say = (text) => api.say(text);
 
@@ -837,8 +846,9 @@ export async function createGimo(api) {
     if (!live) return;
     live.dead = true;
     live = null;
-    for (const id of timers) clearTimeout(id);
+    for (const t of timers) clearTimeout(t.id);
     timers.clear();
+    paused = null;
     cancelAnimationFrame(heightTween);
     api.drone.stop();
     for (const el of doms) {
@@ -907,14 +917,14 @@ export async function createGimo(api) {
     await hold(tween(520, (k) => { S.petC.y = floorY - Math.sin(k * Math.PI) * petSize * 0.1; }, E.lin));
     say(pick(mode === "nfc" ? LINES.ready : LINES.readyScreen));
     face("canon");
-    await hold(wait(620));
+    await hold(nap(620));
     samples = [];
     for (const n of [3, 2, 1]) {
       bigText(n);
       game("count");
       buzz(8);
       zoomV += 0.9;
-      await hold(wait(560));
+      await hold(nap(560));
     }
     const ms = samples.sort((a, b) => a - b);
     if (ms.length > 4 && ms[Math.floor(ms.length / 2)] > 20) lowFx = true;
@@ -960,7 +970,42 @@ export async function createGimo(api) {
     if (nfc && !px) game("thump");
   }
 
+  // The page hiding stops a countdown or a charge where it stands; the next tap plays on and is not counted.
+  function pause() {
+    if (paused || (phase !== "ready" && phase !== "charge")) return;
+    const now = performance.now();
+    for (const t of timers) {
+      clearTimeout(t.id);
+      t.left = Math.max(0, t.left - (now - t.at));
+    }
+    const anims = [...doms].flatMap((el) => el.getAnimations({ subtree: true })).filter((a) => a.playState === "running");
+    anims.forEach((a) => a.pause());
+    const chip = domAdd("g-pause", `<b>잠깐 멈췄어요</b><small>${mode === "nfc" ? "인형이나 화면을" : "화면을"} 톡 하면 이어서 해요</small>`);
+    chip.setAttribute("role", "status");
+    paused = { phase, anims, chip };
+    phase = "paused";
+    api.drone.stop();
+  }
+
+  function resume() {
+    const p = paused;
+    paused = null;
+    p.chip.remove();
+    doms.delete(p.chip);
+    phase = p.phase;
+    for (const t of timers) arm(t);
+    p.anims.forEach((a) => a.play());
+    if (phase === "charge") {
+      api.drone.start(px);
+      api.drone.set(charge);
+    }
+  }
+
   function tap(kind) {
+    if (phase === "paused") {
+      if (!document.hidden) resume();
+      return false;
+    }
     if (phase !== "charge") return false;
     const nfc = kind === "nfc";
     if (!nfc) {
@@ -1306,9 +1351,7 @@ export async function createGimo(api) {
       return promise;
     },
     tap,
-    abort() {
-      if (phase === "ready" || phase === "charge") finish("aborted");
-    },
+    pause,
     get phase() {
       return phase;
     },
