@@ -2753,7 +2753,11 @@ svg[data-icon="beyond"] .i-b { stroke: #f6d8a8; }
 html.f-on .dock-btn:not([data-farm]),
 html.f-on .topbar-end,
 html.f-on .mascot-toggle { opacity: .22; filter: saturate(.5); pointer-events: none; transition: opacity .4s ease, filter .4s ease; }
-html.f-on .window { touch-action: manipulation; }
+html.f-on .window { touch-action: none; }
+html.f-layout main { padding-left: 20px; padding-right: 20px; }
+html.f-layout .plate, html.f-layout .pet-stats { display: none; }
+html.f-layout .window { max-height: none; min-height: 300px; margin: 4px 0; }
+
 .dock-btn.is-loading .dock-cap { animation: f-load .7s ease-in-out infinite alternate; }
 @keyframes f-load { to { transform: translateY(2px) scale(.94); } }
 
@@ -2795,6 +2799,20 @@ html.f-on .window { touch-action: manipulation; }
 .f-chips { position: absolute; left: 10px; top: 10px; display: flex; flex-wrap: wrap; gap: 5px; max-width: calc(100% - 20px); }
 .f-chip { display: flex; align-items: center; gap: 2px; padding: 3px 8px 3px 4px; font-size: 13px; font-weight: 900; background: rgba(255, 252, 244, .92); border: 2px solid #e6d4b3; border-radius: 999px; }
 .f-chip img { width: 22px; height: 22px; }
+
+.f-order { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; max-width: 90%; padding: 6px; border-radius: 14px; }
+.f-check { position: absolute; right: -14px; top: -20px; font-size: 42px; line-height: 1; color: #36802f; text-shadow: 2px 2px #fff; transform: rotate(-12deg); }
+.f-delivery { position: fixed; z-index: 150; font-size: 30px; pointer-events: none; }
+.f-guide { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 10px; text-align: center; color: #fff9e8; background: repeating-linear-gradient(0deg, #84502c 0 18px, #784523 19px 21px); border: 3px solid #58301a; border-radius: 10px; box-shadow: 0 4px 0 #462718, inset 0 1px #d4a270; }
+.f-guide b { font-size: 22px; line-height: 1.2; font-weight: 900; }
+.f-guide svg { flex: none; width: 42px; height: 24px; }
+.f-hand { position: absolute; width: 60px; height: 66px; filter: drop-shadow(2px 4px 3px #4a2c2066); }
+.f-hand svg { width: 100%; height: 100%; }
+.f-hand span { display: none; position: absolute; top: -24px; left: 30px; font-size: 36px; font-weight: 900; color: #fff; text-shadow: 2px 2px #4a2c20; }
+.f-hand.is-swipe { animation: f-swipe 2s ease-in-out infinite; }
+.f-hand.is-basket { animation: f-hand-tap 1s ease-in-out infinite; }
+@keyframes f-swipe { 0%, 15% { transform: translateX(-20px) rotate(-15deg); } 80%, 100% { transform: translateX(calc(var(--swipe) - 20px)) rotate(-15deg); } }
+@keyframes f-hand-tap { 50% { transform: translateY(8px) scale(.9); } }
 
 .f-card {
   position: absolute; left: 50%; top: 50%; width: 86%; max-height: calc(100% - 16px); overflow: auto; padding: 14px 12px 12px;
@@ -2870,6 +2888,8 @@ html.f-on .window { touch-action: manipulation; }
 
 @media (prefers-reduced-motion: reduce) {
   .f-cta.is-ripe, .f-prompt p, .f-seed.is-gold::after, .dock-btn.is-loading .dock-cap { animation: none; }
+  .f-hand { animation: none !important; }
+  .f-hand span { display: block; }
 }
 
 /* Talk: a small mic in the speech line, a slim bar over the dock */
