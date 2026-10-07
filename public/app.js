@@ -732,6 +732,12 @@ function tryVibrate(pattern) {
   }
 }
 
+// A buzz before the page's first touch is blocked, so a celebration's buzz waits for that touch while the celebration still shows.
+function celebrateBuzz(pattern, showing) {
+  if (navigator.userActivation?.hasBeenActive === false) firstTouch.push(() => showing() && tryVibrate(pattern));
+  else tryVibrate(pattern);
+}
+
 function enhanceRollingCounter({ duration = 400, goldPop = false } = {}) {
   const countEl = document.querySelector("[data-tap-count]");
   if (!countEl) return;
@@ -1001,7 +1007,7 @@ function reunionJump() {
   const pet = document.querySelector('[data-pet="alive"]');
   if (!pet || prefersReducedMotion()) return;
   pet.classList.add("is-reunion-jump");
-  tryVibrate([40, 60, 40]);
+  celebrateBuzz([40, 60, 40], () => pet.classList.contains("is-reunion-jump"));
   window.setTimeout(() => pet.classList.remove("is-reunion-jump"), 900);
 }
 
@@ -1034,7 +1040,7 @@ function runCelebrate() {
     }
     pulseFlash(FLASH_OPACITY, 150);
     shakeScreen(300);
-    tryVibrate([30, 40, 30, 40, 80]);
+    celebrateBuzz([30, 40, 30, 40, 80], () => document.querySelector("canvas.celebrate-layer"));
     burstConfetti({ mode: "claim" });
     enhanceRollingCounter({ duration: 400, goldPop: false });
     return;
@@ -2034,7 +2040,10 @@ const care = (function careLoop() {
     wantEl.setAttribute("aria-label", WANTS[id]);
     wantEl.innerHTML = `<i></i><i></i><span class="want-cloud">${wantArt(id)}</span>`;
     win.appendChild(wantEl);
-    sound("want");
+    // Before the page's first touch the sound is lost, so that touch plays it once if this bubble still shows.
+    const shown = wantEl;
+    if (navigator.userActivation?.hasBeenActive === false) firstTouch.push(() => wantEl === shown && sound("want"));
+    else sound("want");
   }
 
   // Loose skips a tap's after-glow (combo key, gift glow), which talk can share the screen with.
