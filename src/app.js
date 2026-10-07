@@ -269,6 +269,13 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     };
   }
 
+  // A reported game trains its stat once a Seoul day and spends that stat's snack boost.
+  function playStats(row, key, t) {
+    const trained = train(parseStats(row.stats), key, t);
+    const spent = useBoost(trained.stats, key);
+    return { stats: spent.stats, trained: { stat: key, gained: trained.gained }, boostUsed: spent.used };
+  }
+
   // Saves a farm action's field, XP and stats, then answers like /arcade with the field and the stat sheet.
   function farmReply(uid, row, act, farm, xpGain, stats, animal, t, extra) {
     const xp = row.xp ?? 0;
@@ -566,11 +573,13 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         const st = petState(row, t);
         const out = applyRace(st, raceState(row.race), rival, won, t);
         const xp = st.xp + out.xpGain;
-        db.prepare("UPDATE plushies SET arcade_day = ?, arcade_plays = ?, race = ?, xp = ? WHERE uid = ?")
-          .run(out.arcadeDay, out.arcadePlays, JSON.stringify(out.race), xp, uid);
+        const { stats, trained, boostUsed } = playStats(row, "agi", t);
+        db.prepare("UPDATE plushies SET arcade_day = ?, arcade_plays = ?, race = ?, xp = ?, stats = ? WHERE uid = ?")
+          .run(out.arcadeDay, out.arcadePlays, JSON.stringify(out.race), xp, JSON.stringify(stats), uid);
         const after = xpProgress(xp);
         return { ok: true, race: out.race, rivalLevel: out.rivalLevel, xpGain: out.xpGain, xpLeft: out.xpLeft,
-          level: after.level, leveledUp: after.level > levelForXp(st.xp), xpInto: after.into, xpSpan: after.span };
+          level: after.level, leveledUp: after.level > levelForXp(st.xp), xpInto: after.into, xpSpan: after.span,
+          trained, boostUsed, stats: sheetOf(uid, stats, animalOf(row, req)) };
       })();
       if (typeof reply === "number") return res.status(reply).json({ ok: false });
       return res.json(reply);
@@ -585,8 +594,9 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const st = petState(row, t);
       const out = applyPlay(st, height, t);
       const xpAfter = st.xp + out.xpGain;
-      db.prepare("UPDATE plushies SET arcade_day = ?, arcade_plays = ?, gi_best = ?, xp = ? WHERE uid = ?")
-        .run(out.arcadeDay, out.arcadePlays, out.best, xpAfter, uid);
+      const { stats, trained, boostUsed } = playStats(row, "str", t);
+      db.prepare("UPDATE plushies SET arcade_day = ?, arcade_plays = ?, gi_best = ?, xp = ?, stats = ? WHERE uid = ?")
+        .run(out.arcadeDay, out.arcadePlays, out.best, xpAfter, JSON.stringify(stats), uid);
       const after = xpProgress(xpAfter);
       return {
         ok: true,
@@ -598,6 +608,9 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         leveledUp: levelForXp(xpAfter) > levelForXp(st.xp),
         xpInto: after.into,
         xpSpan: after.span,
+        trained,
+        boostUsed,
+        stats: sheetOf(uid, stats, animalOf(row, req)),
       };
     })();
     if (typeof reply === "number") return res.status(reply).json({ ok: false });

@@ -1,6 +1,7 @@
 import { seoulDayKey } from "./pet.js";
 
-export const ARCADE = { xpPlays: 3, xpPerPlay: 5, maxHeight: 12500 };
+// 12500 m is a full charge; the top 힘 bonus adds 15%.
+export const ARCADE = { xpPlays: 3, xpPerPlay: 15, maxHeight: 14375 };
 
 export function arcadeToday(state, now) {
   return state.arcadeDay === seoulDayKey(now) ? state.arcadePlays : 0;
