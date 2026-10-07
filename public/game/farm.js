@@ -197,7 +197,7 @@ export async function createFarm(api) {
       }
     });
   }
-  // Pet faces exactly as the app shows them, so worlds and horse/sheep follow.
+  // Pet faces exactly as the app shows them, so worlds and every animal follow.
   function faceUrl(name) {
     const el = petEl.querySelector(`[data-frame="${name}"]`);
     const c = getComputedStyle(el).content;

@@ -1,4 +1,3 @@
-const PETS = { rat: "쥐", ox: "소", tiger: "호랑이", rabbit: "토끼", dragon: "용", snake: "뱀", horse: "말", sheep: "양", monkey: "원숭이", rooster: "닭", dog: "강아지", pig: "돼지" };
 const CUPS = { classic: ["노을빛 트랙", "GOLDEN HOUR CUP"], "8bit": ["픽셀 그랑프리", "PIXEL GRAND PRIX"], milk: ["딸기우유 산책길", "STRAWBERRY SPRINT"], najeon: ["달빛 비단길", "MOONLIGHT RACE"] };
 // Depth of each band: screen size scales with 1/(d - dolly), so near things grow fastest when the camera pushes in.
 const D = { fg: 0.62, near: 0.88, me: 1, split: 1.216, rival: 1.55, back: 1.85, gate: 1.89, props: 2.3, mid: 5, far: 15, clouds: 40 };
@@ -39,7 +38,8 @@ function cropOf(img) {
 export async function createRace(api) {
   // A retry's query reaches the parts too: a failed module import stays failed for its URL.
   const v = new URL(import.meta.url).search;
-  const [{ RACE, eta, newRace, raceTap, stepRace }, { WORLD_ART, canvas, sprites }] = await Promise.all([import(`./race-model.js${v}`), import(`./race-art.js${v}`)]);
+  const [{ RACE, eta, newRace, raceTap, stepRace }, { WORLD_ART, canvas, sprites }, { DEFAULT_KIND, KINDS, kindOf }] = await Promise.all([import(`./race-model.js${v}`), import(`./race-art.js${v}`), import(`../kinds.js${v}`)]);
+  const PETS = Object.fromEntries(KINDS.map((k) => [k.id, k.name]));
   const P = window.PIXI;
   const FX = P.filters;
   const world = document.documentElement.dataset.theme in CUPS ? document.documentElement.dataset.theme : "classic";
@@ -79,9 +79,10 @@ export async function createRace(api) {
   /* ---------- textures ---------- */
   let app;
   const faces = {};
-  try {
-    await Promise.all(["horse", "sheep"].map(async (kind) => {
-      const imgs = await Promise.all(["canon", "blink", "react"].map((f) => image(faceUrl(kind, f, px))));
+  const loading = {};
+  // Each kind's faces load once, the first time a race needs them.
+  const loadFaces = (kinds) => Promise.all(kinds.map((kind) => {
+    loading[kind] ||= Promise.all(["canon", "blink", "react"].map((f) => image(faceUrl(kind, f, px)))).then((imgs) => {
       const tex = imgs.map((i) => {
         const t = P.Texture.from(i);
         if (px) t.source.scaleMode = "nearest";
@@ -89,7 +90,16 @@ export async function createRace(api) {
         return t;
       });
       faces[kind] = { canon: tex[0], blink: tex[1], react: tex[2], crop: cropOf(imgs[0]), texels: imgs[0].naturalHeight, url: faceUrl(kind, "canon", px) };
-    }));
+    }, (error) => {
+      delete loading[kind];
+      throw error;
+    });
+    return loading[kind];
+  }));
+  const first = kindOf(document.documentElement.dataset.mascot).id;
+  try {
+    // 8-bit sizes every runner off the 말 sprite, so its texels land on the pixel grid.
+    await loadFaces([first, kindOf(first).rival, ...(px ? [DEFAULT_KIND] : [])]);
     app = new P.Application();
     await app.init({ width: 393, height: 700, resolution: px ? 0.5 : Math.min(2, devicePixelRatio || 1), autoDensity: true, antialias: !px, preference: "webgl", roundPixels: px, autoStart: false, background: 0x000000 });
   } catch (error) {
@@ -135,8 +145,8 @@ export async function createRace(api) {
     L.f = W / 11;
     L.hy = H * 0.33;
     L.ch = (H * 0.46) / L.f;
-    const crop = faces.horse.crop;
-    L.size = px ? (crop.v1 - crop.v0) * faces.horse.texels * 2 / L.f : Math.min(H * 0.16, W * 0.36) / L.f;
+    const ref = faces[DEFAULT_KIND];
+    L.size = px ? (ref.crop.v1 - ref.crop.v0) * ref.texels * 2 / L.f : Math.min(H * 0.16, W * 0.36) / L.f;
     L.over = Math.ceil(W * 0.08);
   }
 
@@ -336,7 +346,7 @@ export async function createRace(api) {
 
   /* ---------- runners ---------- */
   function makeRunner(id) {
-    return { id, kind: "horse", d: id ? D.rival : D.me, phase: 0.3, contact: false, tipX: 0, theta: 0, thetaTo: 0, thetaV: 0, lastTheta: 0, sq: 0, sqv: 0, lean: 0, leanV: 0, bend: 0, bendV: 0, hipH: 0, airH: 0, glide: 0, face: "canon", blinkAt: rnd(1, 3), react: 0, flip: 0, mood: "idle", trail: [], x: 0, pose: 0, catchup: 0 };
+    return { id, kind: first, d: id ? D.rival : D.me, phase: 0.3, contact: false, tipX: 0, theta: 0, thetaTo: 0, thetaV: 0, lastTheta: 0, sq: 0, sqv: 0, lean: 0, leanV: 0, bend: 0, bendV: 0, hipH: 0, airH: 0, glide: 0, face: "canon", blinkAt: rnd(1, 3), react: 0, flip: 0, mood: "idle", trail: [], x: 0, pose: 0, catchup: 0 };
   }
   const runners = [makeRunner(0), makeRunner(1)];
 
@@ -611,8 +621,8 @@ export async function createRace(api) {
   let mode = "screen";
   let still = false;
   let state = {};
-  let own = "horse";
-  let rival = "sheep";
+  let own = first;
+  let rival = kindOf(first).rival;
   let level = 1;
   // The pet's 민첩 bonus in percent, read as the picker opens.
   let agi = 0;
@@ -712,7 +722,7 @@ export async function createRace(api) {
     const best = state[rival]?.best || 0;
     agi = Math.max(0, Number(api.bonus?.("agi")) || 0);
     $(".r-pick").innerHTML = `<p class="r-eyebrow">${venue}</p><h2>달리기 시합</h2>
-      <ul class="r-roster">${Object.keys(PETS).filter((p) => p !== own).map((p) => `<li class="${p === rival ? "is-open" : "is-locked"}"><img src="/game/art/race/${p}.webp" alt=""><b>${PETS[p]}</b><small>${p === rival ? `Lv.${level}` : "곧 만나요"}</small></li>`).join("")}</ul>
+      <ul class="r-roster">${Object.keys(PETS).filter((p) => p !== own).map((p) => `<li class="${p === rival ? "is-open" : "is-locked"}"><img src="/game/art/race/${p}${p === rival ? "" : "-locked"}.webp" alt=""><b>${PETS[p]}</b><small>${p === rival ? `Lv.${level}` : "곧 만나요"}</small></li>`).join("")}</ul>
       <p class="r-versus"><b>${PETS[rival]} 친구</b><span>Lv.${level}</span><small>${best ? `최고 기록 Lv.${best} 승리` : "첫 승리를 기다려요"}</small></p>
       ${agi > 0 ? `<p class="r-bonus">민첩 +${agi >= 1 ? Math.round(agi) : agi}%</p>` : ""}
       <button type="button" class="r-go">시작</button>`;
@@ -1579,10 +1589,13 @@ export async function createRace(api) {
     tap,
     abort,
     play(input, race, kind) {
+      const next = kindOf(kind).id;
+      // An animal picked since the race was made loads its faces first.
+      if (!faces[next] || !faces[kindOf(next).rival]) return loadFaces([next, kindOf(next).rival]).then(() => this.play(input, race, kind));
       generation++;
       state = race || {};
-      own = kind === "sheep" ? "sheep" : "horse";
-      rival = own === "horse" ? "sheep" : "horse";
+      own = next;
+      rival = kindOf(own).rival;
       mode = input;
       still = Boolean(api.still());
       shell.classList.toggle("r-still", still);
@@ -1590,6 +1603,7 @@ export async function createRace(api) {
       shell.getAnimations().forEach((a) => a.cancel());
       measure();
       app.renderer.resize(W, H);
+      kinds();
       build();
       pick();
       enter();

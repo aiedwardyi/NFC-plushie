@@ -1,7 +1,8 @@
-/* Dad demo: horse↔sheep corner toggle. Persist localStorage+cookie. binding.js untouched. */
+/* Dad demo: the 말/양 corner toggle and the admin panel's 12 animals. Persist localStorage+cookie. binding.js untouched. */
 (function mascotDemoToggle() {
   const KEY = "pokkey-mascot";
   const MAX_AGE = String(400 * 24 * 60 * 60);
+  const KINDS = (document.querySelector("script[data-mascots]")?.dataset.mascots || "").split(" ");
 
   function readKind() {
     const saved = document.querySelector('meta[name="pet-kind"]');
@@ -9,25 +10,27 @@
     try {
       const params = new URLSearchParams(window.location.search);
       const q = params.get("mascot");
-      if (q === "sheep" || q === "horse") return q;
+      if (KINDS.includes(q)) return q;
     } catch (_) { /* ignore */ }
     try {
       const ls = localStorage.getItem(KEY);
-      if (ls === "sheep" || ls === "horse") return ls;
+      if (KINDS.includes(ls)) return ls;
     } catch (_) { /* ignore */ }
     try {
-      const m = document.cookie.match(/(?:^|; )mascot=(sheep|horse)(?:;|$)/);
-      if (m) return m[1];
+      const m = document.cookie.match(/(?:^|; )mascot=([a-z]+)(?:;|$)/);
+      if (m && KINDS.includes(m[1])) return m[1];
     } catch (_) { /* ignore */ }
-    const htmlKind = document.documentElement.getAttribute("data-mascot");
-    return htmlKind === "sheep" ? "sheep" : "horse";
+    return document.documentElement.getAttribute("data-mascot");
   }
 
   function persist(kind) {
-    try { localStorage.setItem(KEY, kind); } catch (_) { /* ignore */ }
-    try {
-      document.cookie = "mascot=" + kind + ";path=/;max-age=" + MAX_AGE + ";samesite=lax";
-    } catch (_) { /* ignore */ }
+    // A kind off the switch lives on the pet only, so this phone keeps its own 말 or 양.
+    if (KINDS.includes(kind)) {
+      try { localStorage.setItem(KEY, kind); } catch (_) { /* ignore */ }
+      try {
+        document.cookie = "mascot=" + kind + ";path=/;max-age=" + MAX_AGE + ";samesite=lax";
+      } catch (_) { /* ignore */ }
+    }
     // Drop sticky ?mascot= so it can't fight the toggle on the next read/navigation.
     try {
       const url = new URL(window.location.href);
@@ -40,7 +43,7 @@
   }
 
   function frameSrc(img, kind) {
-    return (img.getAttribute("src") || "").replace(/mascot-(?:horse|sheep)-/, `mascot-${kind}-`);
+    return (img.getAttribute("src") || "").replace(/mascot-[a-z]+-/, `mascot-${kind}-`);
   }
 
   function applyArt(kind) {
@@ -86,9 +89,35 @@
         if (!reply?.ok) return;
         paintStats(reply.stats);
         const animal = document.querySelector("[data-stat-animal]");
-        if (animal) animal.textContent = reply.kind === "sheep" ? "양" : "말";
+        if (animal) animal.textContent = reply.name;
       })
       .catch(() => {});
+  }
+
+  // The admin panel saves any of the 12 on the pet, named or not; a refusal puts the old animal back.
+  function saveDemoKind(next, was) {
+    const back = () => {
+      if (kind !== next) return;
+      kind = was;
+      applyArt(was);
+    };
+    fetch("/demo/kind", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: document.querySelector("[data-demo-panel] input[name=uid]")?.value, kind: next }),
+      credentials: "same-origin",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((reply) => {
+        if (!reply?.ok) return back();
+        persist(next);
+        paintStats(reply.stats);
+        const animal = document.querySelector("[data-stat-animal]");
+        if (animal) animal.textContent = reply.name;
+        const replay = document.querySelector("[data-reveal-replay]");
+        if (replay) replay.hidden = !revealKind();
+      })
+      .catch(back);
   }
 
   let kind = readKind();
@@ -97,24 +126,28 @@
 
   let skipClick = false;
 
-  function swapTo(next) {
-    if (next !== "horse" && next !== "sheep") return;
+  function swapTo(btn) {
+    const next = btn.getAttribute("data-mascot");
+    const picker = Boolean(btn.closest("[data-demo-switch]"));
+    if (!picker && !KINDS.includes(next)) return;
     if (next === kind) {
       bouncePet();
       return;
     }
+    const was = kind;
     kind = next;
-    persist(kind);
+    if (!picker) persist(kind);
     applyArt(kind); // swap FIRST so the squash is of the new pet
     bouncePet(); // same tick — one continuous motion
-    saveKind(kind);
+    if (picker) saveDemoKind(kind, was);
+    else saveKind(kind);
   }
 
   function onPointerDown(event) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     skipClick = true;
     try { event.currentTarget.setPointerCapture(event.pointerId); } catch (_) { /* ignore */ }
-    swapTo(event.currentTarget.getAttribute("data-mascot"));
+    swapTo(event.currentTarget);
   }
 
   function onClick(event) {
@@ -123,7 +156,7 @@
       event.preventDefault();
       return;
     }
-    swapTo(event.currentTarget.getAttribute("data-mascot"));
+    swapTo(event.currentTarget);
   }
 
   document.querySelectorAll(".mascot-tog").forEach((btn) => {
@@ -805,7 +838,7 @@ function currentPetSrc(pet) {
   const shown = pet?.querySelector(".pet-frame.is-show");
   // A theme can swap the art with content:url, so read what is on screen.
   const art = shown ? /^url\("?(.+?)"?\)$/.exec(getComputedStyle(shown).content) : null;
-  return art?.[1] || shown?.getAttribute("src") || "/mascot-horse-512-v3.png";
+  return art?.[1] || shown?.getAttribute("src") || `/mascot-${document.documentElement.dataset.mascot}-512-v3.png`;
 }
 
 function runEvolutionGlow({ onComplete } = {}) {
@@ -1574,7 +1607,7 @@ if (themeSheet) {
   }
 
   function prepare(id) {
-    const kind = root.dataset.mascot === "sheep" ? "sheep" : "horse";
+    const kind = root.dataset.mascot;
     const key = `${id}:${kind}`;
     if (!ready.has(key)) {
       const css = id === "classic" ? Promise.resolve(true) : sheetLink(`/themes/${id}.css`);
@@ -3949,7 +3982,7 @@ const racing = (function raceRoom() {
     root.classList.add("g-on", "r-on");
     combo.sink(() => g.tap("nfc"));
     let out = "quit";
-    try { out = await g.play(mode, state, root.dataset.mascot === "sheep" ? "sheep" : "horse"); }
+    try { out = await g.play(mode, state, root.dataset.mascot); }
     finally {
       combo.sink(null);
       combo.end();
@@ -5413,14 +5446,18 @@ function revealDate(day) {
   return day.replaceAll("-", ". ");
 }
 
+// The kinds with their own opening video, as the server listed them; the rest name their pet without one.
+const REVEALS = (document.querySelector("script[data-reveals]")?.dataset.reveals || "").split(" ");
+
 function revealKind() {
-  return document.documentElement.dataset.mascot === "sheep" ? "sheep" : "horse";
+  const kind = document.documentElement.dataset.mascot;
+  return REVEALS.includes(kind) ? kind : "";
 }
 
 const nameForm = document.querySelector(".name-form");
 
 function armReveal() {
-  if (nameForm && !prefersReducedMotion()) reveal.prepare(revealKind());
+  if (nameForm && revealKind() && !prefersReducedMotion()) reveal.prepare(revealKind());
 }
 
 // The key card pushes the form below the fold; bring it up under the code unless the user already scrolled.
@@ -5437,7 +5474,7 @@ function frameNameForm() {
 nameForm?.addEventListener("submit", (event) => {
   const name = nameForm.elements.name.value.trim();
   const size = Array.from(name).length;
-  if (!size || size > 24 || prefersReducedMotion()) return;
+  if (!size || size > 24 || prefersReducedMotion() || !revealKind()) return;
   event.preventDefault();
   const uid = nameForm.elements.uid.value;
   const saved = fetch("/name", {
@@ -5481,7 +5518,7 @@ if (demoSheet && demoHold) {
   function openDemo() {
     tryVibrate(15);
     loadSfx(cryName());
-    if (replayReveal) reveal.prepare(revealKind());
+    if (replayReveal && revealKind()) reveal.prepare(revealKind());
     pinDemo();
     demoSheet.hidden = false;
     void demoSheet.offsetWidth;
@@ -5502,6 +5539,8 @@ if (demoSheet && demoHold) {
   demoHold.addEventListener("pointerdown", (event) => {
     // The panel's replays would land on top of a game.
     if (document.documentElement.classList.contains("g-on") || document.documentElement.classList.contains("f-on")) return;
+    // The picker's art loads while the finger holds.
+    demoSheet.querySelectorAll('img[loading="lazy"]').forEach((img) => { img.loading = "eager"; });
     holdAt = [event.clientX, event.clientY];
     window.clearTimeout(holdTimer);
     holdTimer = window.setTimeout(() => {
@@ -5543,6 +5582,28 @@ if (demoSheet && demoHold) {
       onEnd: () => reveal.close(),
     });
   });
+  // The edition row saves on the pet and repaints the stat card in place.
+  const editions = demoSheet.querySelectorAll("[data-edition]");
+  editions.forEach((btn) => btn.addEventListener("click", () => {
+    fetch("/demo/edition", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: demoSheet.querySelector("input[name=uid]")?.value, edition: btn.dataset.edition }),
+      credentials: "same-origin",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((reply) => {
+        if (!reply?.ok) return;
+        editions.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+        paintStats(reply.stats);
+        const tag = document.querySelector(".st-edition");
+        if (tag) {
+          tag.className = `st-edition is-${reply.edition}`;
+          tag.textContent = reply.name;
+        }
+      })
+      .catch(() => {});
+  }));
   demoSheet.querySelector("[data-demo-fresh]")?.addEventListener("submit", () => {
     try {
       sessionStorage.removeItem(claimSeenKey(pageUid()));

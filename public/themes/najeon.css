@@ -247,6 +247,9 @@ html[data-theme="najeon"] .demo-card {
 }
 html[data-theme="najeon"] .demo-card::before { background: var(--pearl-dim); }
 html[data-theme="najeon"] .demo-close { color: #cfccd8; }
+html[data-theme="najeon"] .demo-tier { background: #050507; box-shadow: inset 0 0 0 1px rgba(233, 231, 239, 0.25); }
+html[data-theme="najeon"] .demo-card .demo-tier button { color: #cfccd8; }
+html[data-theme="najeon"] .demo-card .demo-tier button[aria-pressed="true"] { background: #1c1b22; color: var(--pearl); box-shadow: inset 0 0 0 1.5px var(--pearl); }
 
 /* Care: the pearl moon sits on the scene's own */
 html[data-theme="najeon"] .zzz { color: #eef3ff; font-family: "Gowun Batang", serif; text-shadow: 0 0 10px rgba(180, 220, 255, .7); }

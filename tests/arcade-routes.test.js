@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import Database from "better-sqlite3";
+import { KIND_IDS } from "../public/kinds.js";
 import { createApp } from "../src/app.js";
 import { openDatabase } from "../src/db.js";
 import { fakeUids } from "../src/pages.js";
@@ -79,6 +80,7 @@ async function play(ctx, jar, body) {
 }
 
 const visit = (ctx, jar) => ctx.request(`/t?uid=${A}`, { jar: { ...jar, pet_skip: A } });
+const fresh = Object.fromEntries(KIND_IDS.map((k) => [k, { level: 1, best: 0 }]));
 const count = (html, re) => (html.match(re) || []).length;
 
 test("race rejects locked, own and malformed rivals without writing", async (t) => {
@@ -119,11 +121,14 @@ test("race persists wins, preserves losses and caps each rival independently", a
   assert.match((await visit(ctx, jar)).html, /data-race="[^\"]*sheep[^\"]*level[^\"]*2/);
   for (let i = 0; i < 22; i++) await play(ctx, jar, body);
   const saved = JSON.parse(ctx.row().race);
-  assert.deepEqual(saved, { horse: { level: 1, best: 0 }, sheep: { level: 20, best: 20 } });
-  const swapped = await play(ctx, { ...jar, mascot: "sheep" }, { ...body, rival: "horse" });
+  assert.deepEqual(saved, { ...fresh, sheep: { level: 20, best: 20 } });
+  // The saved animal picks the side, not this browser's toggle.
+  assert.equal((await play(ctx, { ...jar, mascot: "sheep" }, { ...body, rival: "horse" })).status, 400);
+  assert.equal((await ctx.request("/kind", { jar, body: { uid: A, kind: "sheep" } })).status, 200);
+  const swapped = await play(ctx, jar, { ...body, rival: "horse" });
   assert.equal(swapped.status, 200);
   assert.deepEqual(swapped.body.race.horse, { level: 2, best: 1 });
-  assert.equal((await play(ctx, { ...jar, mascot: "sheep" }, body)).status, 400);
+  assert.equal((await play(ctx, jar, body)).status, 400);
 });
 
 test("the race card shows the pet, its line and the saved rival levels", async (t) => {
@@ -134,7 +139,7 @@ test("the race card shows the pet, its line and the saved rival levels", async (
   const card = sheet.match(/<li class="g-card is-ready"><span class="g-thumb r-thumb">.*<\/li>/)[0];
   assert.match(card, /<img class="g-thumb-pet" src="\/mascot-horse-512-v3\.png" alt="">.*<b>달리기 시합<\/b><small>화면을 톡톡! 결승선까지 달려요<\/small>.*<button type="button" class="g-start" data-game="race" data-race="[^"]+">시작<\/button>/);
   const saved = JSON.parse(card.match(/data-race="([^"]+)"/)[1].replaceAll("&quot;", '"'));
-  assert.deepEqual(saved, { horse: { level: 1, best: 0 }, sheep: { level: 2, best: 1 } });
+  assert.deepEqual(saved, { ...fresh, sheep: { level: 2, best: 1 } });
 });
 
 test("race and gi share three XP plays and reset at Seoul midnight", async (t) => {

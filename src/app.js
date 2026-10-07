@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import express from "express";
 import cookieParser from "cookie-parser";
+import { DEFAULT_KIND, KINDS, KIND_IDS, kindOf } from "../public/kinds.js";
 import * as binding from "./binding.js";
 import { hash, ownerToken, recoveryCode } from "./secrets.js";
 import { EMPTY_FOUND, EMPTY_SEEN } from "./db.js";
@@ -10,9 +11,9 @@ import { applyCare, careWant, mealsNow, playsNow } from "./care.js";
 import { comboNext, comboTap } from "./combo.js";
 import { ARCADE, applyPlay, applyRace, raceState, xpPlaysLeft } from "./arcade.js";
 import { FARM, addGiftSeeds, buySeed, farmDot, farmView, feedCrop, giftSeeds, harvestFarm, nextRipeAt, openFarm, parseFarm, pickPlot, ripenFarm, sendCrops } from "./farm.js";
-import { awayLine, devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
+import { KIND_CSS, awayLine, devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
 import { mountTalk, purgeTalk, takeQuestion } from "./chat.js";
-import { STAT_KEYS, editionOf, parseStats, setBoost, statSheet, train, useBoost } from "./stats.js";
+import { EDITIONS, STAT_KEYS, editionOf, parseStats, setBoost, statSheet, train, useBoost } from "./stats.js";
 
 const cookieAge = 400 * 24 * 60 * 60 * 1000;
 const cooldown = 15 * 60 * 1000;
@@ -25,7 +26,7 @@ const PANTRY_ACTS = ["feed", "send", "buy"];
 const validPlot = (p) => Number.isInteger(p) && p >= 0 && p < FARM.plots;
 const validCrop = (id) => typeof id === "string" && Object.hasOwn(FARM.crops, id);
 const validCrops = (a) => Array.isArray(a) && a.length >= 1 && a.length <= FARM.pantryMax && a.every(validCrop);
-const KINDS = ["horse", "sheep"];
+const TOGGLE_KINDS = KINDS.filter((k) => k.toggle).map((k) => k.id);
 const parseDemoUids = (raw) => String(raw || "").split(",").map((s) => s.trim().toUpperCase()).filter(validUid);
 const daysApart = (from, to) => (Date.parse(to) - Date.parse(from)) / (24 * 60 * 60 * 1000);
 
@@ -130,29 +131,30 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     },
   }));
 
-  // Dad demo: ?mascot=sheep|horse (cookie). Default horse. Does not touch binding.js.
+  // Dad demo: ?mascot= picks a switch kind (cookie), else the default kind. Does not touch binding.js.
   const resolveDemoMascot = (req, res) => {
     const q = typeof req.query?.mascot === "string" ? req.query.mascot : "";
-    if (q === "sheep" || q === "horse") {
+    if (TOGGLE_KINDS.includes(q)) {
       res.cookie("mascot", q, { httpOnly: false, sameSite: "lax", secure: production, maxAge: cookieAge, path: "/" });
       return q;
     }
-    return req.cookies?.mascot === "sheep" ? "sheep" : "horse";
+    return TOGGLE_KINDS.includes(req.cookies?.mascot) ? req.cookies.mascot : DEFAULT_KIND;
   };
   app.use((req, res, next) => {
     const mascot = resolveDemoMascot(req, res);
     req.demoMascot = mascot;
-    if (mascot !== "sheep") return next();
+    if (mascot === DEFAULT_KIND) return next();
     const send = res.send.bind(res);
+    const from = `mascot-${DEFAULT_KIND}`;
     res.send = (body) => {
-      if (typeof body === "string" && body.includes("mascot-horse") && !body.includes('name="pet-kind"')) {
-        // Keep toggle icons as horse|sheep; only rewrite pet frames outside the toggle.
+      if (typeof body === "string" && body.includes(from) && !body.includes('name="pet-kind"')) {
+        // Keep toggle and picker icons as they are; only rewrite pet frames outside them.
         const parts = body.split(/(<aside class="mascot-toggle"[\s\S]*?<\/aside>)/);
         body = parts
           .map((part) =>
             part.startsWith('<aside class="mascot-toggle"')
               ? part
-              : part.split("mascot-horse").join("mascot-sheep"),
+              : part.split(from).join(`mascot-${mascot}`),
           )
           .join("");
       }
@@ -163,12 +165,12 @@ export function createApp({ db, decisions = binding, production = process.env.NO
 
   const getRow = (uid) => db.prepare("SELECT * FROM plushies WHERE uid = ?").get(uid) || null;
   const editions = { rare: rareUids, legendary: legendaryUids };
-  const sheetOf = (uid, stats, kind) => statSheet(stats, kind, editionOf(uid, editions));
+  const sheetOf = (row, stats, kind) => statSheet(stats, kind, editionOf(row.uid, editions, row.edition));
   // The saved animal wins over this browser's toggle.
-  const animalOf = (row, req) => row.kind || req.demoMascot || "horse";
+  const animalOf = (row, req) => row.kind || req.demoMascot || DEFAULT_KIND;
   const cardOf = (row, req) => {
     const kind = animalOf(row, req);
-    return { kind, edition: editionOf(row.uid, editions), sheet: sheetOf(row.uid, parseStats(row.stats), kind) };
+    return { kind, edition: editionOf(row.uid, editions, row.edition), sheet: sheetOf(row, parseStats(row.stats), kind) };
   };
 
   // One care beat's write, for 밥 놀이 잠 and for a hungry pet's farm snack.
@@ -300,7 +302,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       xpSpan: after.span,
       hearts: heartHalves(currentMood(petState(getRow(uid), t), t)),
       farm: farmView(farm, after.level, t),
-      stats: sheetOf(uid, stats, animal),
+      stats: sheetOf(row, stats, animal),
     };
   }
 
@@ -310,7 +312,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     if (!farm && act !== "open") return null;
     const xp = row.xp ?? 0;
     let stats = parseStats(row.stats);
-    const sheet = sheetOf(uid, stats, animal);
+    const sheet = sheetOf(row, stats, animal);
     const bonus = { intBonus: sheet.int.bonus, chaBonus: sheet.cha.bonus };
     const out = act === "open" ? openFarm(farm, xp, t, bonus) : act === "pick" ? pickPlot(farm, xp, t, plot, bonus) : harvestFarm(farm, xp, t, bonus);
     let gained = 0;
@@ -360,7 +362,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       });
     }
     if (act === "send") {
-      const out = sendCrops(farm, crops, sheetOf(uid, stats, animal).cha.bonus, t);
+      const out = sendCrops(farm, crops, sheetOf(row, stats, animal).cha.bonus, t);
       if (!out) return null;
       return farmReply(uid, row, act, out.farm, out.xpGain, useBoost(stats, "cha").stats, animal, t, { crops, coinsGain: out.coinsGain });
     }
@@ -370,6 +372,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   }
 
   app.get("/health", (req, res) => res.type("text").send("ok"));
+  app.get("/kinds.css", (req, res) => res.type("css").send(KIND_CSS));
   app.get("/t", (req, res) => {
     // The open farm page sets farm_at; any tap spends it.
     const farmAt = req.cookies.farm_at;
@@ -397,7 +400,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           mood_value, mood_updated_at, xp, reward_day_count, gift_seen, gift_found, days_together, last_active_day, last_counter)
           VALUES (?, ?, ?, 1, ?, ?, 100, ?, 0, 0, ?, ?, 1, ?, ?)`)
           .run(serial, hash(token), guest ? null : hash(code), stamp, stamp, t, EMPTY_SEEN, EMPTY_FOUND, today, counter);
-        return { html: petPage(getRow(serial), code, { celebrate: "claim", demo, theme, guest }), token: guest ? null : token };
+        const fresh = getRow(serial);
+        return { html: petPage(fresh, code, { celebrate: "claim", demo, theme, guest, card: cardOf(fresh, req) }), token: guest ? null : token };
       }
       if (state === "OWNER") {
         // The skip cookie marks the redirect after /name or /claim, not a tap; view=1 is a phone page's own reload.
@@ -405,7 +409,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         const view = !skip && req.query.view === "1";
         if (!skip && !view) db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ? WHERE uid = ?").run(stamp, serial);
         const afterTap = getRow(serial);
-        if (afterTap.pet_name && !afterTap.kind) db.prepare("UPDATE plushies SET kind = ? WHERE uid = ?").run(req.demoMascot || "horse", serial);
+        if (afterTap.pet_name && !afterTap.kind) db.prepare("UPDATE plushies SET kind = ? WHERE uid = ?").run(req.demoMascot || DEFAULT_KIND, serial);
         const raiseMirror = () => {
           if (counter !== null && (afterTap.last_counter === null || counter > afterTap.last_counter)) {
             db.prepare("UPDATE plushies SET last_counter = ? WHERE uid = ?").run(counter, serial);
@@ -425,7 +429,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         }
         if (!afterTap.pet_name) {
           raiseMirror();
-          return { html: petPage(getRow(serial), null, { celebrate: flash, demo, theme }) };
+          const fresh = getRow(serial);
+          return { html: petPage(fresh, null, { celebrate: flash, demo, theme, card: cardOf(fresh, req) }) };
         }
         const st = petState(afterTap, t);
         const out = applyTap(st, t, {
@@ -515,7 +520,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         meals: mealsNow(after, t),
         plays: playsNow(after, t),
         trained: { stat: "cha", gained },
-        stats: sheetOf(uid, stats, animalOf(row, req)),
+        stats: sheetOf(row, stats, animalOf(row, req)),
       };
     })();
     if (!reply) return res.status(403).json({ ok: false });
@@ -585,11 +590,12 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   app.post("/arcade", (req, res) => {
     if (req.body?.game === "race") {
       const { uid, rival, won } = req.body;
-      const own = req.demoMascot || "horse";
-      if (!validUid(uid) || !["horse", "sheep"].includes(rival) || rival === own || typeof won !== "boolean") return res.status(400).json({ ok: false });
+      if (!validUid(uid) || !KIND_IDS.includes(rival) || typeof won !== "boolean") return res.status(400).json({ ok: false });
       const reply = db.transaction(() => {
         const row = getRow(uid);
         if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row?.pet_name) return 403;
+        // Each pet races its own zodiac neighbour.
+        if (rival !== kindOf(animalOf(row, req)).rival) return 400;
         if (row.slept_at !== null) return 409;
         const t = now();
         const st = petState(row, t);
@@ -601,7 +607,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         const after = xpProgress(xp);
         return { ok: true, race: out.race, rivalLevel: out.rivalLevel, xpGain: out.xpGain, xpLeft: out.xpLeft,
           level: after.level, leveledUp: after.level > levelForXp(st.xp), xpInto: after.into, xpSpan: after.span,
-          trained, boostUsed, stats: sheetOf(uid, stats, animalOf(row, req)) };
+          trained, boostUsed, stats: sheetOf(row, stats, animalOf(row, req)) };
       })();
       if (typeof reply === "number") return res.status(reply).json({ ok: false });
       return res.json(reply);
@@ -632,7 +638,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         xpSpan: after.span,
         trained,
         boostUsed,
-        stats: sheetOf(uid, stats, animalOf(row, req)),
+        stats: sheetOf(row, stats, animalOf(row, req)),
       };
     })();
     if (typeof reply === "number") return res.status(reply).json({ ok: false });
@@ -657,12 +663,12 @@ export function createApp({ db, decisions = binding, production = process.env.NO
 
   app.post("/kind", (req, res) => {
     const { uid, kind } = req.body || {};
-    if (!validUid(uid) || !KINDS.includes(kind)) return res.status(400).json({ ok: false });
+    if (!validUid(uid) || !TOGGLE_KINDS.includes(kind)) return res.status(400).json({ ok: false });
     const reply = db.transaction(() => {
       const row = getRow(uid);
       if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row.pet_name) return null;
       db.prepare("UPDATE plushies SET kind = ? WHERE uid = ?").run(kind, uid);
-      return { ok: true, kind, stats: sheetOf(uid, parseStats(row.stats), kind) };
+      return { ok: true, kind, name: kindOf(kind).name, stats: sheetOf(row, parseStats(row.stats), kind) };
     })();
     if (!reply) return res.status(403).json({ ok: false });
     res.json(reply);
@@ -718,6 +724,22 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       setSkip(res, uid);
       res.redirect(303, `/t?uid=${uid}`);
     });
+    // The admin panel's animal and edition, saved on the pet like /kind, named or not; the demo chip's owner only.
+    const demoSave = (column, valid, said) => (req, res) => {
+      const { uid } = req.body || {};
+      const value = req.body?.[column];
+      if (!validUid(uid) || !valid(value)) return res.status(400).json({ ok: false });
+      const reply = db.transaction(() => {
+        if (!demoUids.includes(uid) || !decisions.canRename(getRow(uid), req.cookies.owner_token || null, hash)) return null;
+        db.prepare(`UPDATE plushies SET ${column} = ? WHERE uid = ?`).run(value, uid);
+        const row = getRow(uid);
+        return { ok: true, [column]: value, name: said(value), stats: sheetOf(row, parseStats(row.stats), animalOf(row, req)) };
+      })();
+      if (!reply) return res.status(403).json({ ok: false });
+      res.json(reply);
+    };
+    app.post("/demo/kind", demoSave("kind", (kind) => KIND_IDS.includes(kind), (kind) => kindOf(kind).name));
+    app.post("/demo/edition", demoSave("edition", (edition) => typeof edition === "string" && Object.hasOwn(EDITIONS, edition), (edition) => EDITIONS[edition].name));
   }
 
   if (!production) {
@@ -731,7 +753,9 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       if (!ok) {
         return res.status(404).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>", { theme: req.theme }));
       }
-      res.send(previewPetPage({ kind, count, tier, reason, mascot: req.demoMascot || "horse", theme: req.theme }));
+      // A preview shows any kind; only the switch kinds stick to this phone.
+      const mascot = KIND_IDS.includes(req.query.mascot) ? req.query.mascot : req.demoMascot || DEFAULT_KIND;
+      res.send(previewPetPage({ kind, count, tier, reason, mascot, theme: req.theme }));
     });
     app.post("/dev/prime", (req, res) => {
       const { uid, preset, tier } = req.body || {};

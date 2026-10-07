@@ -2,13 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { applyRace, raceState } from "../src/arcade.js";
 import { newRace, raceTap, stepRace } from "../public/game/race-model.js";
+import { KIND_IDS } from "../public/kinds.js";
 
 const T0 = Date.parse("2026-05-01T10:00:00+09:00");
 const state = { arcadeDay: null, arcadePlays: 0, giBest: 5000 };
 
 test("race state survives missing and malformed old rows", () => {
-  for (const text of [null, "", "bad", "null", "[]", "{}"] ) assert.deepEqual(raceState(text), { horse: { level: 1, best: 0 }, sheep: { level: 1, best: 0 } });
-  assert.deepEqual(raceState('{"horse":{"best":50},"sheep":{"best":-2}}'), { horse: { level: 20, best: 20 }, sheep: { level: 1, best: 0 } });
+  const fresh = Object.fromEntries(KIND_IDS.map((k) => [k, { level: 1, best: 0 }]));
+  for (const text of [null, "", "bad", "null", "[]", "{}"] ) assert.deepEqual(raceState(text), fresh);
+  assert.deepEqual(raceState('{"horse":{"best":50},"sheep":{"best":-2},"tiger":{"best":3},"unicorn":{"best":4}}'), { ...fresh, horse: { level: 20, best: 20 }, tiger: { level: 4, best: 3 } });
 });
 
 test("wins advance only that rival, losses keep the record, level 20 caps", () => {

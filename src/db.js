@@ -34,6 +34,7 @@ const petColumns = [
   "farm TEXT",
   "kind TEXT",
   "stats TEXT",
+  "edition TEXT",
 ];
 
 export function migratePetColumns(db, migrationMs = Date.now()) {

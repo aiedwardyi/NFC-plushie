@@ -39,6 +39,18 @@ test("editions add to every stat; 레전더리 wins over 레어", () => {
   assert.deepEqual(totals(statSheet(parseStats(""), "horse", "rare")), [60, 50, 80, 70]);
 });
 
+test("the edition saved on the pet wins over the lists, the lists over 클래식", () => {
+  const lists = { rare: ["04AAAAAAAAAAA1"], legendary: ["04BBBBBBBBBBB2"] };
+  assert.equal(editionOf("04BBBBBBBBBBB2", lists, "rare"), "rare");
+  assert.equal(editionOf("04AAAAAAAAAAA1", lists, "classic"), "classic");
+  assert.equal(editionOf("04DDDDDDDDDDD4", lists, "legendary"), "legendary");
+  for (const saved of [null, undefined, "", "gold", "__proto__"]) {
+    assert.equal(editionOf("04BBBBBBBBBBB2", lists, saved), "legendary", String(saved));
+    assert.equal(editionOf("04AAAAAAAAAAA1", lists, saved), "rare", String(saved));
+    assert.equal(editionOf("04DDDDDDDDDDD4", lists, saved), "classic", String(saved));
+  }
+});
+
 test("a legendary 말's 민첩 is 90 with a bonus of 8.3", () => {
   assert.deepEqual(statSheet(parseStats(""), "horse", "legendary").agi, { base: 70, plus: 20, trained: 0, boost: 0, total: 90, bonus: 8.3 });
 });

@@ -282,6 +282,9 @@ html[data-theme="milk"] .demo-card {
 }
 html[data-theme="milk"] .demo-card::before { background: var(--straw); }
 html[data-theme="milk"] .demo-close { color: var(--berry-soft); }
+html[data-theme="milk"] .demo-tier { background: #fff; box-shadow: inset 0 0 0 2px #ffd0dc; }
+html[data-theme="milk"] .demo-card .demo-tier button { color: var(--berry-soft); }
+html[data-theme="milk"] .demo-card .demo-tier button[aria-pressed="true"] { background: #ffe3ea; color: var(--berry); box-shadow: inset 0 0 0 2px var(--straw); }
 html[data-theme="milk"] .still-wash { background: radial-gradient(ellipse at center, rgba(255, 143, 171, 0.3), rgba(255, 143, 171, 0.06) 55%, transparent 78%); }
 
 /* Care */

@@ -351,13 +351,10 @@ html[data-theme="8bit"] .mascot-toggle,
 html[data-theme="8bit"] .mascot-tog,
 html[data-theme="8bit"] .mascot-tog.is-active { border-radius: 0; }
 
-/* Pixel pet art follows the horse/sheep toggle */
-html[data-theme="8bit"][data-mascot="horse"] .pet-frame { content: url("/themes/px/horse-px.png"); }
-html[data-theme="8bit"][data-mascot="sheep"] .pet-frame { content: url("/themes/px/sheep-px.png"); }
-html[data-theme="8bit"][data-mascot="horse"] .pet-away .pet-frame { content: url("/themes/px/horse-away-px.png"); }
-html[data-theme="8bit"][data-mascot="sheep"] .pet-away .pet-frame { content: url("/themes/px/sheep-away-px.png"); }
-html[data-theme="8bit"] .mascot-tog[data-mascot="horse"] img { content: url("/themes/px/horse-px.png"); }
-html[data-theme="8bit"] .mascot-tog[data-mascot="sheep"] img { content: url("/themes/px/sheep-px.png"); }
+/* Pixel pet art follows the pet's kind; each kind's sprites come from /kinds.css */
+html[data-theme="8bit"] .pet-frame { content: var(--px); }
+html[data-theme="8bit"] .pet-away .pet-frame { content: var(--px-away); }
+html[data-theme="8bit"] .mascot-tog img { content: var(--px); }
 
 /* 꾸미기 */
 html[data-theme="8bit"] .topbar .theme-btn,
@@ -462,19 +459,16 @@ html[data-theme="8bit"] .demo-card::before {
   background: var(--cream);
 }
 html[data-theme="8bit"] .demo-close { color: var(--cream); font-weight: 700; }
+html[data-theme="8bit"] .demo-tier,
+html[data-theme="8bit"] .demo-card .demo-tier button { border-radius: 0; }
 html[data-theme="8bit"] .notice { font-weight: 700; }
 
 /* Care: pixel faces, crisp props, the blinking arrow */
-html[data-theme="8bit"][data-mascot="horse"] .pet-frame[data-frame="blink"] { content: url("/themes/px/horse-closed-px.png"); }
-html[data-theme="8bit"][data-mascot="horse"] .pet-frame[data-frame="react"] { content: url("/themes/px/horse-happy-px.png"); }
-html[data-theme="8bit"][data-mascot="horse"] .pet-frame[data-frame="munch"] { content: url("/themes/px/horse-munch-px.png"); }
-html[data-theme="8bit"][data-mascot="horse"] .pet-frame[data-frame="yawn"] { content: url("/themes/px/horse-yawn-px.png"); }
-html[data-theme="8bit"][data-mascot="horse"] .pet-frame[data-frame="away"] { content: url("/themes/px/horse-away-px.png"); }
-html[data-theme="8bit"][data-mascot="sheep"] .pet-frame[data-frame="blink"] { content: url("/themes/px/sheep-closed-px.png"); }
-html[data-theme="8bit"][data-mascot="sheep"] .pet-frame[data-frame="react"] { content: url("/themes/px/sheep-happy-px.png"); }
-html[data-theme="8bit"][data-mascot="sheep"] .pet-frame[data-frame="munch"] { content: url("/themes/px/sheep-munch-px.png"); }
-html[data-theme="8bit"][data-mascot="sheep"] .pet-frame[data-frame="yawn"] { content: url("/themes/px/sheep-yawn-px.png"); }
-html[data-theme="8bit"][data-mascot="sheep"] .pet-frame[data-frame="away"] { content: url("/themes/px/sheep-away-px.png"); }
+html[data-theme="8bit"] .pet-frame[data-frame="blink"] { content: var(--px-closed); }
+html[data-theme="8bit"] .pet-frame[data-frame="react"] { content: var(--px-happy); }
+html[data-theme="8bit"] .pet-frame[data-frame="munch"] { content: var(--px-munch); }
+html[data-theme="8bit"] .pet-frame[data-frame="yawn"] { content: var(--px-yawn); }
+html[data-theme="8bit"] .pet-frame[data-frame="away"] { content: var(--px-away); }
 html[data-theme="8bit"] .window .pet[data-pet="alive"].is-care .pet-motion { animation: none; }
 html[data-theme="8bit"] .prop svg,
 html[data-theme="8bit"] .moon svg,
@@ -596,8 +590,7 @@ html[data-theme="8bit"] .g-start { font-family: "Galmuri11", monospace; backgrou
 html[data-theme="8bit"] .g-gifts { border-radius: 0; background: none; color: var(--muted); box-shadow: none; }
 html[data-theme="8bit"] .g-gifts.has-new .g-gift-ic::after { border-radius: 0; }
 html[data-theme="8bit"] .g-thumb-pet { image-rendering: pixelated; }
-html[data-theme="8bit"][data-mascot="horse"] .g-thumb-pet { content: url("/themes/px/horse-px.png"); }
-html[data-theme="8bit"][data-mascot="sheep"] .g-thumb-pet { content: url("/themes/px/sheep-px.png"); }
+html[data-theme="8bit"] .g-thumb-pet { content: var(--px); }
 html[data-theme="8bit"] .g-label, html[data-theme="8bit"] .g-pause { border-radius: 0; font-family: "Galmuri11", monospace; box-shadow: 3px 3px 0 rgba(0, 0, 0, .35); }
 html[data-theme="8bit"] .g-tier svg { image-rendering: pixelated; }
 html[data-theme="8bit"] .g-big { font-family: "Galmuri11", monospace; -webkit-text-stroke: 0; text-shadow: 5px 5px 0 #1d2b53, -2px -2px 0 #1d2b53, 2px -2px 0 #1d2b53, -2px 2px 0 #1d2b53; }

@@ -1,10 +1,10 @@
+import { DEFAULT_KIND } from "../public/kinds.js";
 import { seoulDayKey } from "./pet.js";
 
 export const STAT_KEYS = ["str", "int", "agi", "cha"];
 export const STAT_NAMES = { str: "힘", int: "지능", agi: "민첩", cha: "매력" };
 // s per animal [str, int, agi, cha]; shown base = 20 + s * 10
 export const ANIMALS = { rabbit: [2, 3, 5, 4], ox: [5, 3, 2, 4], tiger: [5, 2, 4, 3], dragon: [4, 5, 2, 3], snake: [2, 5, 3, 4], horse: [3, 2, 5, 4], sheep: [3, 4, 2, 5], monkey: [2, 5, 4, 3], rooster: [3, 3, 4, 4], dog: [4, 3, 3, 4], pig: [4, 4, 2, 4], rat: [1, 5, 4, 4] };
-export const ANIMAL_NAMES = { rabbit: "토끼", ox: "소", tiger: "호랑이", dragon: "용", snake: "뱀", horse: "말", sheep: "양", monkey: "원숭이", rooster: "닭", dog: "개", pig: "돼지", rat: "쥐" };
 export const EDITIONS = { classic: { name: "포근 클래식", plus: 0 }, rare: { name: "금실 레어", plus: 10 }, legendary: { name: "별밤 레전더리", plus: 20 } };
 export const STAT_RULES = { trainCap: 30, bonusCap: 15 };
 
@@ -12,7 +12,9 @@ const BOOSTS = [10, 20];
 const perStat = (fn) => Object.fromEntries(STAT_KEYS.map((k, i) => [k, fn(k, i)]));
 const copy = (s) => ({ v: 1, trained: { ...s.trained }, trainedDay: { ...s.trainedDay }, boost: { ...s.boost } });
 
-export function editionOf(uid, { rare = [], legendary = [] } = {}) {
+// The edition an admin saved on the pet wins over the env lists.
+export function editionOf(uid, { rare = [], legendary = [] } = {}, saved = null) {
+  if (Object.hasOwn(EDITIONS, saved)) return saved;
   if (legendary.includes(uid)) return "legendary";
   return rare.includes(uid) ? "rare" : "classic";
 }
@@ -41,7 +43,7 @@ export function statBonus(total) {
 }
 
 export function statSheet(stats, kind, edition) {
-  const s = ANIMALS[Object.hasOwn(ANIMALS, kind) ? kind : "horse"];
+  const s = ANIMALS[Object.hasOwn(ANIMALS, kind) ? kind : DEFAULT_KIND];
   const plus = EDITIONS[Object.hasOwn(EDITIONS, edition) ? edition : "classic"].plus;
   return perStat((k, i) => {
     const base = 20 + s[i] * 10;

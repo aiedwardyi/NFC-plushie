@@ -113,11 +113,11 @@ test("/kind is the owner's alone and answers with the new sheet", async (t) => {
   assert.deepEqual(ctx.row(), before);
   const out = await kind(ctx, jar, { kind: "sheep" });
   assert.equal(out.status, 200);
-  assert.deepEqual([out.body.ok, out.body.kind, totals(out.body.stats)], [true, "sheep", [50, 60, 40, 70]]);
+  assert.deepEqual([out.body.ok, out.body.kind, out.body.name, totals(out.body.stats)], [true, "sheep", "양", [50, 60, 40, 70]]);
   assert.deepEqual(out.body.stats.cha, { base: 70, plus: 0, trained: 0, boost: 0, total: 70, bonus: 5 });
   assert.equal(ctx.row().kind, "sheep");
   const back = await kind(ctx, jar, { kind: "horse" });
-  assert.deepEqual(totals(back.body.stats), [50, 40, 70, 60]);
+  assert.deepEqual([back.body.name, totals(back.body.stats)], ["말", [50, 40, 70, 60]]);
   assert.equal(ctx.row().kind, "horse");
 });
 
