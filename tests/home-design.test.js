@@ -155,6 +155,13 @@ test("first meet has the live nameplate and key card hooks but no dock", async (
   assert.doesNotMatch(first.html, /data-care|class="dock"|data-sheet=|data-tile=/);
 });
 
+test("the owner home carries an empty 씨앗 가게 sheet for the farm to fill", async (t) => {
+  const { request, jar } = await named(t);
+  const home = await request(`/t?uid=${A}`, { jar });
+  assert.match(home.html, /<div class="sheet" data-sheet="shop" role="dialog" aria-modal="true" aria-labelledby="sheet-shop-title" hidden>[\s\S]*?<h2 id="sheet-shop-title">씨앗 가게<\/h2>[\s\S]*?<ul class="shop-list" data-shop-list><\/ul>/);
+  assert.doesNotMatch((await request(`/t?uid=${A}`)).html, /data-sheet="shop"/);
+});
+
 test("stranger page has no dock, owner sheets or collection, only the stat card", async (t) => {
   const { request } = await named(t);
   const stranger = await request(`/t?uid=${A}`);

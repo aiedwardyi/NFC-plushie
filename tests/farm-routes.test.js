@@ -622,10 +622,11 @@ test("feeding a hungry pet also counts as its 밥", async (t) => {
   ctx.set("mood_value = 50, mood_updated_at = ?", T0);
   const out = await farm(ctx, jar, "feed", { crop: "potato" });
   assert.deepEqual([out.body.meal, out.body.hearts], [true, 7]);
+  assert.deepEqual([out.body.want, out.body.meals, out.body.plays, out.body.lonely], ["play", 1, 0, false]);
   assert.deepEqual([ctx.row().fed_at, ctx.row().meals, ctx.row().mood_value], [T0, 1, 70]);
   ctx.advance(MIN);
   const full = await farm(ctx, jar, "feed", { crop: "potato" });
-  assert.equal(full.body.meal, false);
+  assert.deepEqual([full.body.meal, full.body.want, full.body.meals], [false, "play", 1]);
   assert.deepEqual([ctx.row().fed_at, ctx.row().meals, ctx.row().mood_value], [T0, 1, 70]);
 });
 

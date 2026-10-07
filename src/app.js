@@ -349,11 +349,15 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         stats = boosted.stats;
         set ||= boosted.set;
       }
-      // A hungry pet takes the crop as its 밥 too.
+      // A hungry pet takes the crop as its 밥 too, so the reply carries the dock's care state like /care.
       const st = petState(row, t);
       const meal = careWant(st, t) === "feed";
       if (meal) saveCare(uid, applyCare(st, "feed", t), t);
-      return farmReply(uid, row, act, out.farm, out.xpGain, stats, animal, t, { crop, boost: { stat, amount, set }, meal });
+      const care = petState(getRow(uid), t);
+      return farmReply(uid, row, act, out.farm, out.xpGain, stats, animal, t, {
+        crop, boost: { stat, amount, set }, meal,
+        lonely: currentMood(care, t) <= PET.moodLonelyAt, want: careWant(care, t), meals: mealsNow(care, t), plays: playsNow(care, t),
+      });
     }
     if (act === "send") {
       const out = sendCrops(farm, crops, sheetOf(uid, stats, animal).cha.bonus, t);

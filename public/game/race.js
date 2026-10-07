@@ -614,6 +614,8 @@ export async function createRace(api) {
   let own = "horse";
   let rival = "sheep";
   let level = 1;
+  // The pet's 민첩 bonus in percent, read as the picker opens.
+  let agi = 0;
   let model = null;
   let resolve = null;
   let raf = 0;
@@ -708,9 +710,11 @@ export async function createRace(api) {
     $(".r-hint").hidden = true;
     big.textContent = "";
     const best = state[rival]?.best || 0;
+    agi = Math.max(0, Number(api.bonus?.("agi")) || 0);
     $(".r-pick").innerHTML = `<p class="r-eyebrow">${venue}</p><h2>달리기 시합</h2>
       <ul class="r-roster">${Object.keys(PETS).filter((p) => p !== own).map((p) => `<li class="${p === rival ? "is-open" : "is-locked"}"><img src="/game/art/race/${p}.webp" alt=""><b>${PETS[p]}</b><small>${p === rival ? `Lv.${level}` : "곧 만나요"}</small></li>`).join("")}</ul>
       <p class="r-versus"><b>${PETS[rival]} 친구</b><span>Lv.${level}</span><small>${best ? `최고 기록 Lv.${best} 승리` : "첫 승리를 기다려요"}</small></p>
+      ${agi > 0 ? `<p class="r-bonus">민첩 +${agi >= 1 ? Math.round(agi) : agi}%</p>` : ""}
       <button type="button" class="r-go">시작</button>`;
     $(".r-pick").getAnimations().forEach((a) => a.cancel());
     $(".r-pick").style.pointerEvents = "";
@@ -732,7 +736,7 @@ export async function createRace(api) {
     party = null;
     flexAt = 0;
     if (S?.flag) S.flag.texture = T.flag[0];
-    model = newRace(level);
+    model = newRace(level, agi);
     leader = null;
     leadAt = -9;
     spurt = false;

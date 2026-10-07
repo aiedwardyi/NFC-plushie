@@ -34,8 +34,8 @@ test("a zero step mid-race leaves the race running", () => {
   assert.ok(race.finish.every(Number.isFinite));
 });
 
-function simulate(rate, level, dashes = []) {
-  const race = newRace(level);
+function simulate(rate, level, dashes = [], agi = 0) {
+  const race = newRace(level, agi);
   let tap = 0;
   let dash = 0;
   while (race.time < 40 && race.finish.some((t) => t === null)) {
@@ -82,6 +82,30 @@ test("the first crossing decides both times and later taps change nothing", () =
 test("slowed-down taps pay the same per second of race", () => {
   const run = (scale) => {
     const r = newRace(1);
+    let next = 0;
+    for (let real = 0; r.time < 3; real += 1 / 240) {
+      if (real >= next) { raceTap(r, "screen", scale); next += 1 / 6; }
+      stepRace(r, scale / 240);
+    }
+    return r.distance[0];
+  };
+  assert.ok(Math.abs(run(1) - run(0.2)) < 0.5);
+});
+
+test("민첩 lifts only the pet's top speed, and slow motion still pays the same", () => {
+  const plain = simulate(6, 5);
+  const quick = simulate(6, 5, [], 8.3);
+  assert.ok(quick.finish[0] < plain.finish[0]);
+  assert.deepEqual([quick.goal, quick.rival], [plain.goal, plain.rival]);
+  const [a, b] = [newRace(1), newRace(1, 15)];
+  for (const r of [a, b]) {
+    raceTap(r, "screen");
+    stepRace(r, 0.5);
+  }
+  assert.ok(Math.abs(b.speed[0] / a.speed[0] - 1.15) < 1e-9);
+  assert.equal(newRace(1).agi, 0);
+  const run = (scale) => {
+    const r = newRace(1, 10);
     let next = 0;
     for (let real = 0; r.time < 3; real += 1 / 240) {
       if (real >= next) { raceTap(r, "screen", scale); next += 1 / 6; }

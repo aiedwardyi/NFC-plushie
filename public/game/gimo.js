@@ -741,6 +741,9 @@ export async function createGimo(api) {
   let hudEl = null;
   let shownHeight = 0;
   let heightTween = 0;
+  // The pet's 힘 bonus in percent, read as each play starts. Floored, so a full charge stays under the server's cap.
+  let str = 0;
+  const reach = (c) => Math.floor((meters(c) * (1 + str / 100)) / 10) * 10;
   function setHeight(n, instant) {
     cancelAnimationFrame(heightTween);
     const el = hudEl?.querySelector(".g-height b");
@@ -898,7 +901,8 @@ export async function createGimo(api) {
       await hold(loadFaces());
     }
     resetStage();
-    hudEl = domAdd("g-hud", `<div class="g-timer"><i></i></div><p class="g-height"><small>예상 높이</small><b>0</b><span>m</span></p>
+    hudEl = domAdd("g-hud", `<div class="g-timer"><i></i></div><p class="g-height"><small>예상 높이</small><b>0</b><span>m</span></p>${str > 0 ? `
+      <p class="g-bonus">힘 +${str >= 1 ? Math.round(str) : str}%</p>` : ""}
       <div class="g-meter"><div class="g-fill"></div>${TIERS.map((t) => `<span class="g-tier" data-tier="${t.id}">${iconSvg(t.id, px)}</span>`).join("")}</div>`);
     hudEl.setAttribute("aria-hidden", "true");
     hudEl.classList.toggle("is-still", calm);
@@ -1040,7 +1044,7 @@ export async function createGimo(api) {
       later(() => { wd.remove(); doms.delete(wd); }, 950);
     }
     hudEl.querySelector(".g-fill").style.height = `${Math.min(100, (charge / MAX) * 100)}%`;
-    setHeight(meters(charge));
+    setHeight(reach(charge));
     note(taps - 1, nfc);
     buzz(nfc ? 16 : 8);
     while (reached < TIERS.length && charge >= TIERS[reached].at) {
@@ -1067,7 +1071,7 @@ export async function createGimo(api) {
     api.drone.stop();
     const target = Math.min(charge, MAX);
     const tier = tierOf(target);
-    const height = meters(target);
+    const height = reach(target);
     // The save runs through the flight; the result card gives a slow one a moment more.
     reply = Promise.resolve().then(() => api.onLaunch(height)).catch(() => null);
     say(pick(LINES.launch));
@@ -1138,7 +1142,7 @@ export async function createGimo(api) {
       const prev = alt;
       alt = D * k;
       speed = (alt - prev) * 60;
-      heightEl.textContent = fmt(Math.round((meters(target) * k) / 10) * 10);
+      heightEl.textContent = fmt(Math.round((reach(target) * k) / 10) * 10);
       while (passed < passY.length && alt >= passY[passed] - 2) {
         game("ding", { rate: DING_RATE[passed] });
         buzz(10);
@@ -1147,7 +1151,7 @@ export async function createGimo(api) {
     }, E.fly));
     speed = 0;
     tickers.delete(trail);
-    heightEl.textContent = fmt(meters(target));
+    heightEl.textContent = fmt(reach(target));
     await apex(tier);
     await descend(D);
   }
@@ -1295,7 +1299,7 @@ export async function createGimo(api) {
 
   async function result(tier) {
     phase = "result";
-    const h = meters(Math.min(charge, MAX));
+    const h = reach(Math.min(charge, MAX));
     const r = await hold(Promise.race([reply, wait(1500)]));
     const isBest = Boolean(r?.isBest);
     say(pick(LINES.home));
@@ -1338,6 +1342,7 @@ export async function createGimo(api) {
       phase = "ready";
       mode = how === "nfc" ? "nfc" : "screen";
       best = Number(record) || 0;
+      str = Math.max(0, Number(api.bonus?.("str")) || 0);
       calm = Boolean(api.still());
       taps = 0;
       nfcTaps = 0;

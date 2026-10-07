@@ -459,12 +459,17 @@ function talkBar(name) {
   </form>`;
 }
 
+// The farm fills the list from its own view whenever it opens the shop.
+const SHOP = sheetHtml("shop", "씨앗 가게", `<p class="shop-purse"><span class="shop-coins" data-shop-coins></span><span class="shop-bag" data-shop-bag></span></p>
+      <ul class="shop-list" data-shop-list></ul>`);
+
 function homeExtras(row, pet, found, mascot, talk) {
   return {
     dock: dockHtml({ gift: Boolean(pet?.gift), want: pet?.want, meals: pet?.meals, plays: pet?.plays, uid: row.uid, combo: pet?.combo, later: pet?.comboLaterLine, arcadeLeft: pet?.arcadeLeft, giBest: pet?.giBest, farmDot: Boolean(pet?.farm?.dot) }),
     sheets: arcadeSheet(pet, found, mascot)
       + sheetHtml("gifts", "선물함", giftCollection(found, pet?.gift || null))
       + sheetHtml("record", "우리 기록", recordSheet(row, pet))
+      + SHOP
       + (talk ? talkBar(row.pet_name) : ""),
   };
 }
