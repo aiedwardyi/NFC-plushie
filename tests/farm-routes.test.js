@@ -89,6 +89,8 @@ test("the first open plants the starter packet, and only once", async (t) => {
   const first = await farm(ctx, jar, "open");
   assert.equal(first.status, 200);
   const plot = (i, crop, name, quick, ripeAt, eta, left, clock = "timed") => ({ plot: i, crop, name, quick, at: T0, ripeAt, ripe: false, clock, eta, left });
+  const shop = [["lettuce", "상추", 5, 3], ["potato", "감자", 5, 3], ["carrot", "당근", 10, 3], ["tomato", "토마토", 10, 3], ["sweet", "고구마", 30, 4], ["melon", "수박", 30, 5], ["gold", "황금 감자", 200, 6]]
+    .map(([crop, name, price, lv]) => ({ crop, name, price, locked: true, reason: `Lv ${lv}부터` }));
   assert.deepEqual(first.body, {
     ok: true,
     act: "open",
@@ -123,6 +125,10 @@ test("the first open plants the starter packet, and only once", async (t) => {
       bag: ["potato"],
       harvested: 0,
       golden: 0,
+      pantry: [],
+      coins: 0,
+      shopOpen: false,
+      shop,
     },
   });
   assert.deepEqual(stateOf(ctx), createFarm(T0));
@@ -304,6 +310,24 @@ test("corrupt farm JSON never breaks a visit or the farm", async (t) => {
   }
   const open = await farm(ctx, jar, "open");
   assert.deepEqual([open.status, open.body.created], [200, true]);
+});
+
+test("an old v1 farm row keeps its field and bag and plays on as v2", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  const v1 = { ...createFarm(T0), v: 1, bag: ["carrot"], harvested: 4 };
+  delete v1.pantry;
+  delete v1.coins;
+  delete v1.day;
+  ctx.set("farm = ?", JSON.stringify(v1));
+  ctx.advance(MIN);
+  const out = await farm(ctx, jar, "harvest");
+  assert.equal(out.status, 200);
+  assert.deepEqual(out.body.picked.map((p) => p.crop), ["sprout"]);
+  assert.deepEqual([out.body.farm.pantry, out.body.farm.coins, out.body.farm.harvested], [["sprout"], 0, 5]);
+  const saved = stateOf(ctx);
+  assert.deepEqual(saved.plots.slice(1), v1.plots.slice(1));
+  assert.deepEqual([JSON.parse(ctx.row().farm).v, crops(saved)[0], saved.bag], [2, "carrot", []]);
 });
 
 test("a pre-farm database gains the farm column as no farm", async (t) => {
