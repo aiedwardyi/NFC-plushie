@@ -1076,8 +1076,9 @@ function wakeAudio() {
   }
 }
 
+// A hidden page stays silent: a game the hiding ended still types its goodbye line.
 function blip() {
-  if (!audio || audio.state !== "running") return;
+  if (!audio || audio.state !== "running" || document.hidden) return;
   const t = audio.currentTime;
   const osc = audio.createOscillator();
   const gain = audio.createGain();
@@ -1093,7 +1094,7 @@ function blip() {
 }
 
 function boop() {
-  if (!audio || audio.state !== "running") return;
+  if (!audio || audio.state !== "running" || document.hidden) return;
   const t = audio.currentTime;
   const osc = audio.createOscillator();
   const gain = audio.createGain();
@@ -1109,7 +1110,7 @@ function boop() {
 }
 
 function tick() {
-  if (!audio || audio.state !== "running") return;
+  if (!audio || audio.state !== "running" || document.hidden) return;
   const t = audio.currentTime;
   const osc = audio.createOscillator();
   const gain = audio.createGain();
@@ -1174,7 +1175,7 @@ function playSfx(name, { rate = 1, gain = 1 } = {}) {
   const asked = performance.now();
   ensureAudio(() => {
     sfxBuffer(name).then((buffer) => {
-      if (performance.now() - asked > SFX_LATE_MS || audio.state !== "running") return;
+      if (performance.now() - asked > SFX_LATE_MS || audio.state !== "running" || document.hidden) return;
       const source = audio.createBufferSource();
       source.buffer = buffer;
       source.playbackRate.value = rate;
@@ -3437,6 +3438,9 @@ function petBusy() {
     || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump"));
 }
 
+// 시작 gives the NFC reader this long, then plays on screen taps: an unanswered permission prompt must not hold the game.
+const NFC_WAIT_MS = 600;
+
 /* 오락실: 기 모으기 on a WebGL stage, loaded when the room first opens; the first 3 plays a day give XP. */
 const arcade = (function arcadeRoom() {
   const dock = document.querySelector(".dock[data-care-uid]");
@@ -3454,7 +3458,6 @@ const arcade = (function arcadeRoom() {
   const kit = () => (world() === "8bit" ? "chip" : "soft");
   const BLURB = blurb.textContent;
   const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
-  const NFC_WAIT_MS = 15000;
   const SOUNDS = ["count", "go", "note-c5", "note-c6", "note-c7", "tier", "rocket", "ding", "chime", "chime-low", "fall", "result", "best", "wind-2", "wind-3", "wind-4"];
   let retry = 0;
   let posted = 0;
@@ -3636,7 +3639,7 @@ const arcade = (function arcadeRoom() {
     if (out === "quit") care.fx.say("재밌었어요! 또 놀아요!");
   }
 
-  // A tap is held until the engine and the NFC reader are up; closing the sheet first drops it.
+  // A tap is held until the engine is up and the NFC reader has had its moment; closing the sheet first drops it.
   function begin() {
     if (playing || held || careHold.asleep || petBusy()) return;
     const tap = {};
@@ -3774,7 +3777,7 @@ const racing = (function raceRoom() {
     playSfx(`care-${root.dataset.theme === "8bit" ? "chip" : "soft"}-press`);
     tryVibrate(12);
     const listening = "NDEFReader" in window ? combo.listen() : null;
-    const reader = listening && Promise.race([listening, new Promise((done) => setTimeout(() => done(null), 15000))]);
+    const reader = listening && Promise.race([listening, new Promise((done) => setTimeout(() => done(null), NFC_WAIT_MS))]);
     Promise.all([prepare(), reader]).then(([g, nfc]) => {
       if (held !== tap) return;
       held = null;
