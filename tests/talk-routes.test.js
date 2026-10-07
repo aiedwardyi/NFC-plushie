@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { createApp } from "../src/app.js";
-import { applyChanges, TALK_LINES } from "../src/chat.js";
+import { applyChanges, linksOf, TALK_LINES } from "../src/chat.js";
 import { openDatabase } from "../src/db.js";
 import { fakeUids } from "../src/pages.js";
 import { talkFromEnv } from "../src/talk.js";
@@ -190,6 +190,45 @@ test("a [춤] reply dances: the tag leaves the line, the turn keeps it", async (
   assert.deepEqual((await say(ctx, jar, "또 춰 줘")).body, { ok: true, text: "신나게 춤출게요!", sources: [], action: "dance" });
   ctx.provider.replyWith = async () => ({ ok: true, stop: "end_turn", text: "춤은 내일 춰요.", sources: [], usage: { input: 900, output: 5, searches: 0 }, ms: 5 });
   assert.deepEqual((await say(ctx, jar, "춤 좋아해?")).body, { ok: true, text: "춤은 내일 춰요.", sources: [] });
+});
+
+test("a [지도] reply carries a Naver Map link: the tag leaves the line, the turn keeps it", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  ctx.provider.replyWith = async () => ({ ok: true, stop: "end_turn", text: "을지면옥 여기 있어요! [지도:을지면옥 을지로]", sources: [], usage: { input: 900, output: 30, searches: 0 }, ms: 5 });
+  assert.deepEqual(await say(ctx, jar, "그 식당 링크 줘"), {
+    status: 200,
+    body: {
+      ok: true,
+      text: "을지면옥 여기 있어요!",
+      sources: [],
+      links: [{ kind: "map", title: "을지면옥 을지로", url: "https://map.naver.com/p/search/%EC%9D%84%EC%A7%80%EB%A9%B4%EC%98%A5%20%EC%9D%84%EC%A7%80%EB%A1%9C" }],
+    },
+  });
+  await ctx.app.locals.talkIdle();
+  assert.equal(ctx.db.prepare("SELECT reply FROM talk_turns WHERE uid = ?").get(A).reply, "을지면옥 여기 있어요! [지도:을지면옥 을지로]");
+  assert.equal(ctx.provider.notebooks[0].prompt.includes("[지도"), false);
+});
+
+test("link tags: Naver map or search, two at most, the line keeps only words", () => {
+  const cases = [
+    ["레시피는 여기요. [링크:김치볶음밥 레시피]", "레시피는 여기요.", [{ kind: "search", title: "김치볶음밥 레시피", url: "https://search.naver.com/search.naver?query=%EA%B9%80%EC%B9%98%EB%B3%B6%EC%9D%8C%EB%B0%A5%20%EB%A0%88%EC%8B%9C%ED%94%BC" }]],
+    ["찾아봐요 [링크:A&B/C?]", "찾아봐요", [{ kind: "search", title: "A&B/C?", url: "https://search.naver.com/search.naver?query=A%26B%2FC%3F" }]],
+    ["둘 다 좋아요! [지도:가] [지도:가] [지도:나] [링크:다]", "둘 다 좋아요!", [
+      { kind: "map", title: "가", url: "https://map.naver.com/p/search/%EA%B0%80" },
+      { kind: "map", title: "나", url: "https://map.naver.com/p/search/%EB%82%98" },
+    ]],
+    ["[지도 ： 광장시장] 맛있어요!", "맛있어요!", [{ kind: "map", title: "광장시장", url: "https://map.naver.com/p/search/%EA%B4%91%EC%9E%A5%EC%8B%9C%EC%9E%A5" }]],
+    ["빈 표시는 [지도:] 그냥 [링크] 사라져요.", "빈 표시는 그냥 사라져요.", []],
+    [`[링크:${"a".repeat(120)}]`, "여기 있어요!", [{ kind: "search", title: "a".repeat(100), url: `https://search.naver.com/search.naver?query=${"a".repeat(100)}` }]],
+    ["두 곳이에요! [지도:National Museum of Modern and Contemporary Art Seoul] [지도:National Museum of Modern and Contemporary Art Cheongju]", "두 곳이에요!", [
+      { kind: "map", title: "National Museum of Modern and Contemporary Art Seoul", url: "https://map.naver.com/p/search/National%20Museum%20of%20Modern%20and%20Contemporary%20Art%20Seoul" },
+      { kind: "map", title: "National Museum of Modern and Contemporary Art Cheongju", url: "https://map.naver.com/p/search/National%20Museum%20of%20Modern%20and%20Contemporary%20Art%20Cheongju" },
+    ]],
+    ["[지도자]라는 단어는 leader예요. [링크드인]도 있어요.", "[지도자]라는 단어는 leader예요. [링크드인]도 있어요.", []],
+    ["링크 없이 대답해요.", "링크 없이 대답해요.", []],
+  ];
+  for (const [reply, text, links] of cases) assert.deepEqual(linksOf(reply), { text, links }, reply);
 });
 
 test("failures and refusals answer with the pet's own lines and keep no turn", async (t) => {
