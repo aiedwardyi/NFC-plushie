@@ -1106,6 +1106,8 @@ const PAUSE_MS = { "!": 260, ".": 260, "?": 260, ",": 140 };
 let audio = null;
 let introLine = null;
 let waking = false;
+// Runs at the page's first touch: before it a phone plays no sound and blocks a buzz.
+const firstTouch = [];
 
 function wakeAudio() {
   try {
@@ -1415,7 +1417,7 @@ function settleLine(index) {
   if (!last) lineTimer = window.setTimeout(() => sayLine(index + 1), AUTO_MS);
 }
 
-function sayLine(index, onTyped) {
+function sayLine(index, onTyped, delay = index === 0 ? 520 : 160) {
   const token = ++sayToken;
   const el = dialogLines[index];
   window.clearTimeout(lineTimer);
@@ -1424,10 +1426,10 @@ function sayLine(index, onTyped) {
   const text = lineText(el);
   showLine(index);
   if (el.classList.contains("gift")) glowGift();
-  typeLine(lineTarget(el), text, () => {
+  return typeLine(lineTarget(el), text, () => {
     if (token === sayToken) settleLine(index);
     onTyped?.();
-  }, index === 0 ? 520 : 160);
+  }, delay);
 }
 
 function startDialog(onTyped) {
@@ -1436,7 +1438,38 @@ function startDialog(onTyped) {
     return;
   }
   dialogBox.classList.add("is-seq");
-  sayLine(0, onTyped);
+  if (navigator.userActivation?.hasBeenActive) {
+    sayLine(0, onTyped);
+    return;
+  }
+  // A plushie tap opens the page untouched, and an untouched phone stays silent, so the first line waits behind a typing bubble.
+  const target = lineTarget(dialogLines[0]);
+  const text = lineText(dialogLines[0]);
+  const dots = document.createElement("span");
+  const spoken = document.createElement("span");
+  dots.className = "dialog-dots";
+  dots.setAttribute("aria-hidden", "true");
+  dots.innerHTML = "<i></i><i></i><i></i>";
+  spoken.className = "visually-hidden";
+  spoken.textContent = text;
+  target.replaceChildren(dots, spoken);
+  showLine(0);
+  const token = sayToken;
+  firstTouch.push((event) => {
+    const control = event.target.closest?.("a, button, input, select, textarea, label");
+    // On the next task, so the touch that starts the line can't also finish it.
+    window.setTimeout(() => {
+      if (token !== sayToken) {
+        if (dots.isConnected) target.textContent = text;
+        onTyped?.();
+      } else if (control || prefersReducedMotion() || document.querySelector(".sheet.is-open, .demo-sheet.is-open, .has-reveal, .g-on, .f-on")) {
+        // The touch started something that talks for itself, so the line shows at once, unspoken.
+        sayLine(0, onTyped)();
+      } else {
+        sayLine(0, onTyped, 60);
+      }
+    }, 0);
+  });
 }
 
 dialogBox?.addEventListener("pointerdown", () => {
@@ -4807,6 +4840,7 @@ function rewake(event) {
   if (navigator.userActivation?.hasBeenActive === false) return;
   if (!audio) wakeAudio();
   else if (audio.state !== "running") audio.resume?.().catch(() => {});
+  for (const fn of firstTouch.splice(0)) fn(event);
 }
 for (const type of ["pointerdown", "pointerup", "keydown"]) document.addEventListener(type, rewake, true);
 document.addEventListener("visibilitychange", () => {

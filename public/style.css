@@ -803,6 +803,30 @@ html[data-time="night"] .stars { opacity: 1; }
   from { transform: translateY(0); }
   to { transform: translateY(4px); }
 }
+/* The first line's typing bubble, held until the page's first touch */
+.dialog-dots {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(74, 44, 32, 0.08);
+  vertical-align: -2px;
+}
+.dialog-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cocoa);
+  opacity: .3;
+  animation: dialog-dots 1.2s ease-in-out infinite;
+}
+.dialog-dots i:nth-child(2) { animation-delay: .18s; }
+.dialog-dots i:nth-child(3) { animation-delay: .36s; }
+@keyframes dialog-dots {
+  0%, 60%, 100% { opacity: .3; transform: translateY(0); }
+  30% { opacity: .85; transform: translateY(-2px); }
+}
 
 /* Dock: gift box and records at the edges, the three care verbs between */
 .dock {
@@ -1951,6 +1975,7 @@ body.is-still-celebrate main {
 @media (prefers-reduced-motion: reduce) {
   .dialog-cursor,
   .dialog-cursor.is-done { animation: none; }
+  .dialog-dots i { animation: none; opacity: .6; }
   .demo-sheet,
   .demo-card,
   .sheet,
