@@ -35,7 +35,7 @@ function deferred() {
 // A provider the test drives: each call waits on its own hook.
 function fakeProvider() {
   const p = {
-    model: "claude-haiku-4-5",
+    model: "claude-haiku-5-5",
     replies: [],
     notebooks: [],
     replyWith: async ({ messages }) => ({ ok: true, stop: "end_turn", text: `대답: ${messages.at(-1).content}`, sources: [], usage: { input: 1000, output: 40, searches: 0 }, ms: 5 }),
@@ -172,10 +172,10 @@ test("a reply comes back as text with sources, logged with its cost", async (t) 
   assert.deepEqual(res, { status: 200, body: { ok: true, text: "맑아요!", sources: [{ title: "날씨", url: "https://w.example.kr/" }] } });
   await ctx.app.locals.talkIdle();
   const log = ctx.db.prepare("SELECT * FROM talk_log ORDER BY id").all();
-  assert.deepEqual(log.map((r) => [r.kind, r.uid, r.model, r.status, r.day]), [["reply", A, "claude-haiku-4-5", "ok", "2026-05-01"], ["notebook", A, "claude-haiku-4-5", "ok", "2026-05-01"]]);
+  assert.deepEqual(log.map((r) => [r.kind, r.uid, r.model, r.status, r.day]), [["reply", A, "claude-haiku-5-5", "ok", "2026-05-01"], ["notebook", A, "claude-haiku-5-5", "ok", "2026-05-01"]]);
   assert.deepEqual([log[0].ms, log[0].tokens_in, log[0].tokens_out, log[0].searches, log[0].said, log[0].reply], [812, 3000, 50, 1, "오늘 날씨 어때?", "맑아요!"]);
-  assert.ok(Math.abs(log[0].cost - (3000 * 1 + 50 * 5) / 1e6 - 0.01) < 1e-12);
-  assert.ok(Math.abs(log[1].cost - (600 * 1 + 20 * 5) / 1e6) < 1e-12);
+  assert.ok(Math.abs(log[0].cost - (3000 * 0.1 + 50 * 0.5) / 1e6 - 0.01) < 1e-12);
+  assert.ok(Math.abs(log[1].cost - (600 * 0.1 + 20 * 0.5) / 1e6) < 1e-12);
 });
 
 test("a [춤] reply dances: the tag leaves the line, the turn keeps it", async (t) => {

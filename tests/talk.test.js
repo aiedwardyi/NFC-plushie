@@ -44,9 +44,14 @@ function scripted(responses) {
 
 const ASK = { system: "persona", messages: [{ role: "user", content: "안녕?" }] };
 
-for (const model of ["claude-haiku-4-5", "claude-sonnet-5-5"]) {
-  const sonnet = model === "claude-sonnet-5-5";
-  const lead = sonnet ? [thinking] : [];
+const PARAMS = {
+  "claude-haiku-5-5": { thinking: { type: "adaptive" }, output_config: { effort: "low" } },
+  "claude-haiku-4-5": { thinking: undefined, output_config: undefined },
+  "claude-sonnet-5-5": { thinking: { type: "between_tools" }, output_config: { effort: "low" } },
+};
+
+for (const model of Object.keys(PARAMS)) {
+  const lead = model === "claude-haiku-4-5" ? [] : [thinking];
 
   test(`${model}: request shape`, async () => {
     const s = scripted([msg([...lead, text("안녕하세요!")])]);
@@ -57,17 +62,12 @@ for (const model of ["claude-haiku-4-5", "claude-sonnet-5-5"]) {
     const { body, opts } = s.calls[0];
     assert.equal(opts.signal, signal);
     assert.equal(body.model, model);
-    assert.equal(body.max_tokens, 600);
+    assert.equal(body.max_tokens, 1000);
     assert.deepEqual(body.tools, [{ type: "web_search_20250305", name: "web_search", max_uses: 2, user_location: { type: "approximate", city: "Seoul", region: "Seoul", country: "KR", timezone: "Asia/Seoul" } }]);
     assert.equal(body.tool_choice, undefined);
     assert.equal(body.temperature, undefined);
-    if (sonnet) {
-      assert.deepEqual(body.thinking, { type: "between_tools" });
-      assert.deepEqual(body.output_config, { effort: "low" });
-    } else {
-      assert.equal(body.thinking, undefined);
-      assert.equal(body.output_config, undefined);
-    }
+    assert.deepEqual(body.thinking, PARAMS[model].thinking);
+    assert.deepEqual(body.output_config, PARAMS[model].output_config);
   });
 
   test(`${model}: plain reply`, async () => {
@@ -247,15 +247,16 @@ test("lastSentence", () => {
 });
 
 test("notebook call: Haiku, no tools, JSON schema, 1024 tokens", async () => {
-  for (const model of ["claude-haiku-4-5", "claude-sonnet-5-5"]) {
-    const s = scripted([msg([text('{"add":["딸기를 좋아함"],"drop":[],"plans":[]}')], "end_turn", usage(700, 20))]);
+  for (const model of Object.keys(PARAMS)) {
+    const s = scripted([msg([thinking, text('{"add":["딸기를 좋아함"],"drop":[],"plans":[]}')], "end_turn", usage(700, 20))]);
     const out = await anthropicTalk({ apiKey: "k", model, Client: s.Client }).notebook({ system: "sys", prompt: "p" });
     assert.deepEqual(out.changes, { add: ["딸기를 좋아함"], drop: [], plans: [] });
     const { body } = s.calls[0];
-    assert.equal(body.model, "claude-haiku-4-5");
+    assert.equal(body.model, "claude-haiku-5-5");
     assert.equal(body.max_tokens, 1024);
     assert.equal(body.tools, undefined);
-    assert.equal(body.thinking, undefined);
+    assert.deepEqual(body.thinking, { type: "adaptive" });
+    assert.equal(body.output_config.effort, "low");
     assert.equal(body.output_config.format.type, "json_schema");
     assert.equal(JSON.stringify(body.output_config.format.schema).includes("maxLength"), false);
   }
@@ -270,6 +271,7 @@ test("notebook call: refusal, max_tokens and bad JSON change nothing", async () 
 });
 
 test("cost at list price plus searches", () => {
+  assert.equal(costOf("claude-haiku-5-5", { input: 1e6, output: 1e6, searches: 1 }), 0.61);
   assert.equal(costOf("claude-haiku-4-5", { input: 1e6, output: 1e6, searches: 0 }), 6);
   assert.equal(costOf("claude-sonnet-5-5", { input: 1e6, output: 1e6, searches: 2 }), 12.02);
 });
@@ -286,7 +288,7 @@ test("gate: talk is off unless configured", () => {
   assert.equal(s.built(), 0);
   const on = talkFromEnv({ ANTHROPIC_API_KEY: "k", TALK_UIDS: `${uids}, 04bbbbbbbbbbb2` }, true, opts);
   assert.deepEqual(on.uids, [uids, "04BBBBBBBBBBB2"]);
-  assert.equal(on.provider.model, "claude-haiku-4-5");
+  assert.equal(on.provider.model, "claude-haiku-5-5");
   assert.equal(s.built(), 1);
 });
 
@@ -296,7 +298,7 @@ test("gate: TALK_FAKE is ignored in production and never builds the SDK client",
   const env = { TALK_FAKE: "1", TALK_UIDS: "04AAAAAAAAAAA1" };
   assert.equal(talkFromEnv(env, true, opts), null);
   const real = talkFromEnv({ ...env, ANTHROPIC_API_KEY: "k" }, true, opts);
-  assert.equal(real.provider.model, "claude-haiku-4-5");
+  assert.equal(real.provider.model, "claude-haiku-5-5");
   assert.equal(s.built(), 1);
   const fake = talkFromEnv({ ...env, ANTHROPIC_API_KEY: "k", TALK_MODEL: "claude-sonnet-5-5" }, false, opts);
   assert.equal(fake.provider.model, "fake");
