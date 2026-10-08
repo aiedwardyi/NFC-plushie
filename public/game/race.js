@@ -40,7 +40,7 @@ function cropOf(img) {
 export async function createRace(api) {
   // A retry's query reaches the parts too: a failed module import stays failed for its URL.
   const v = new URL(import.meta.url).search;
-  const [{ RACE, eta, newRace, raceTap, stepRace }, { WORLD_ART, canvas, sprites }, { DEFAULT_KIND, KINDS, kindOf }] = await Promise.all([import(`./race-model.js${v}`), import(`./race-art.js${v}`), import(`../kinds.js${v}`)]);
+  const [{ RACE, eta, newRace, picker, raceTap, stepRace }, { WORLD_ART, canvas, sprites }, { DEFAULT_KIND, KINDS, kindOf }] = await Promise.all([import(`./race-model.js${v}`), import(`./race-art.js${v}`), import(`../kinds.js${v}`)]);
   const PETS = Object.fromEntries(KINDS.map((k) => [k.id, k.name]));
   const P = window.PIXI;
   const FX = P.filters;
@@ -624,7 +624,7 @@ export async function createRace(api) {
   let still = false;
   let state = {};
   let own = first;
-  let rival = kindOf(first).rival;
+  let match = picker(kindOf(first).rival, (kind) => loadFaces([kind]));
   let level = 1;
   // The pet's 민첩 bonus in percent, read as the picker opens.
   let agi = 0;
@@ -676,7 +676,7 @@ export async function createRace(api) {
 
   function kinds() {
     for (const r of runners) {
-      const k = r.id ? rival : own;
+      const k = r.id ? match.shown : own;
       if (r.kind !== k) {
         r.kind = k;
         if (S) { r.shadow.destroy(); r.body.mesh.destroy(); r.ghosts.forEach((q) => q.mesh.destroy()); attach(r); }
@@ -713,7 +713,6 @@ export async function createRace(api) {
     model = null;
     result = null;
     photo = null;
-    level = state[rival]?.level || 1;
     kinds();
     placeAtStart();
     $(".r-hud").hidden = true;
@@ -721,13 +720,13 @@ export async function createRace(api) {
     $(".r-photo").hidden = true;
     $(".r-hint").hidden = true;
     big.textContent = "";
-    const best = state[rival]?.best || 0;
     agi = Math.max(0, Number(api.bonus?.("agi")) || 0);
     $(".r-pick").innerHTML = `<p class="r-eyebrow">${venue}</p><h2>달리기 시합</h2>
-      <ul class="r-roster">${Object.keys(PETS).filter((p) => p !== own).map((p) => `<li class="${p === rival ? "is-open" : "is-locked"}"><img src="/game/art/race/${p}${p === rival ? "" : "-locked"}.webp?v=${ART_V}" alt=""><b>${PETS[p]}</b><small>${p === rival ? `Lv.${level}` : "곧 만나요"}</small></li>`).join("")}</ul>
-      <p class="r-versus"><b>${PETS[rival]} 친구</b><span>Lv.${level}</span><small>${best ? `최고 기록 Lv.${best} 승리` : "첫 승리를 기다려요"}</small></p>
+      <ul class="r-roster">${Object.keys(PETS).filter((p) => p !== own).map((p) => `<li><button type="button" data-rival="${p}"><img src="/game/art/race/${p}.webp?v=${ART_V}" alt=""><b>${PETS[p]}</b><small>Lv.${state[p]?.level || 1}</small></button></li>`).join("")}</ul>
+      <p class="r-versus"></p>
       ${agi > 0 ? `<p class="r-bonus">민첩 +${agi >= 1 ? Math.round(agi) : agi}%</p>` : ""}
       <button type="button" class="r-go">시작</button>`;
+    ready();
     $(".r-pick").getAnimations().forEach((a) => a.cancel());
     $(".r-pick").style.pointerEvents = "";
     $(".r-pick").hidden = false;
@@ -735,13 +734,34 @@ export async function createRace(api) {
     if (!again) motion($(".r-pick"), [{ transform: "translateY(115%)" }, { transform: "none" }], 520, 140);
     $(".r-edge").hidden = true;
     $(".r-tag.is-me").textContent = "나";
-    $(".r-tag.is-rival").textContent = `${PETS[rival]} Lv.${level}`;
     $(".r-tag.is-rival").classList.remove("is-flex");
     $(".r-pick .r-go").focus({ preventScroll: true });
   }
 
+  // The sheet shows a pick at once; the lane, its tag and 시작 wait for that rival's art.
+  function ready() {
+    level = state[match.rival]?.level || 1;
+    const best = state[match.rival]?.best || 0;
+    for (const b of shell.querySelectorAll(".r-roster button")) b.setAttribute("aria-pressed", String(b.dataset.rival === match.rival));
+    $(".r-versus").innerHTML = `<b>${PETS[match.rival]} 친구</b><span>Lv.${level}</span><small>${best ? `최고 기록 Lv.${best} 승리` : "첫 승리를 기다려요"}</small>`;
+    if (runners[1].kind !== match.shown) {
+      kinds();
+      warm();
+    }
+    $(".r-tag.is-rival").textContent = `${PETS[match.shown]} Lv.${state[match.shown]?.level || 1}`;
+    const go = $(".r-pick .r-go");
+    go.disabled = match.shown !== match.rival;
+    go.textContent = go.disabled ? "준비 중…" : "시작";
+  }
+
+  function choose(kind) {
+    if (phase !== "pick" || kind === match.rival) return;
+    match.choose(kind).then(() => { if (phase === "pick") ready(); });
+    ready();
+  }
+
   function start() {
-    if (phase !== "pick") return;
+    if (phase !== "pick" || match.shown !== match.rival) return;
     setPhase("count");
     beat = 0;
     tape = null;
@@ -766,9 +786,9 @@ export async function createRace(api) {
     $(".r-hud").hidden = false;
     motion($(".r-hud"), [{ transform: "translateY(-46px)", opacity: 0 }, { transform: "none", opacity: 1 }], 520, 120);
     stripW = $(".r-strip").clientWidth;
-    $(".r-lv").textContent = `${PETS[rival]} Lv.${level}`;
+    $(".r-lv").textContent = `${PETS[match.rival]} Lv.${level}`;
     $(".r-head.is-me").src = faces[own].url;
-    $(".r-head.is-rival").src = faces[rival].url;
+    $(".r-head.is-rival").src = faces[match.rival].url;
     if (!hintSeen) {
       const fine = matchMedia("(pointer: fine)").matches;
       $(".r-hint").innerHTML = mode === "nfc" ? `${HINT_ART}화면을 톡톡! 인형을 톡 하면 부스터!` : `화면을 톡톡 눌러서 달려요!${fine ? " 스페이스바도 돼요" : ""}`;
@@ -940,7 +960,7 @@ export async function createRace(api) {
     $(".r-hint").hidden = true;
     const token = generation;
     saved = null;
-    Promise.resolve(api.finish(rival, won)).then((reply) => {
+    Promise.resolve(api.finish(match.rival, won)).then((reply) => {
       if (token !== generation) return;
       saved = reply || false;
       if (reply?.race) state = reply.race;
@@ -1062,8 +1082,8 @@ export async function createRace(api) {
 
   // The server's reply fills in the level-up line, XP and the buttons that need a saved record.
   function fillCard() {
-    const next = state[rival]?.level || level;
-    $(".r-flex").textContent = !result.won ? "다음엔 꼭 이길 거예요!" : saved && level < RACE.cap ? `${PETS[rival]} 친구가 더 빨라졌어요! Lv.${level} → Lv.${next}` : level >= RACE.cap ? "최고 레벨에서 이겼어요!" : "";
+    const next = state[match.rival]?.level || level;
+    $(".r-flex").textContent = !result.won ? "다음엔 꼭 이길 거예요!" : saved && level < RACE.cap ? `${PETS[match.rival]} 친구가 더 빨라졌어요! Lv.${level} → Lv.${next}` : level >= RACE.cap ? "최고 레벨에서 이겼어요!" : "";
     $(".r-saved").innerHTML = saved === null ? '<p class="g-xp">기록을 남기는 중이에요…</p>'
       : !saved ? '<p class="g-xp">기록을 못 남겼어요</p>'
       : `${saved.xpGain > 0 ? `<p class="g-xp"><b>+${saved.xpGain} XP</b><span>오늘 ${3 - saved.xpLeft}/3</span></p>` : '<p class="g-xp">오늘 XP는 다 받았어요</p>'}${saved.leveledUp ? `<p class="g-level">쑥쑥 컸어요! 이제 Lv. ${saved.level}!</p>` : ""}`;
@@ -1460,7 +1480,7 @@ export async function createRace(api) {
     edge.hidden = !out;
     if (out) {
       const gap = Math.abs(model.distance[1] - model.distance[0]).toFixed(1);
-      const text = rx < 0 ? `◀ ${PETS[rival]} ${gap}m` : `${PETS[rival]} ${gap}m ▶`;
+      const text = rx < 0 ? `◀ ${PETS[match.rival]} ${gap}m` : `${PETS[match.rival]} ${gap}m ▶`;
       if (edge.textContent !== text) edge.textContent = text;
       edge.classList.toggle("is-right", rx > 0);
       edge.style.top = `${Math.round(Y(D.rival, L.size * 0.7))}px`;
@@ -1490,7 +1510,7 @@ export async function createRace(api) {
     if (phase !== "result" || !result) return;
     const tag = $(".r-tag.is-rival");
     if (flexAt && !tag.classList.contains("is-flex") && clock - flexAt > 0.5) {
-      tag.textContent = `Lv.${state[rival]?.level || level + 1}!`;
+      tag.textContent = `Lv.${state[match.rival]?.level || level + 1}!`;
       tag.classList.add("is-flex");
       const r = runners[1];
       r.react = 1.5;
@@ -1564,7 +1584,11 @@ export async function createRace(api) {
   document.addEventListener("keydown", key);
   // Not during the finish hold: the save is already in flight and the card is a second away.
   $(".r-close").addEventListener("click", () => { if (phase !== "finish") abort(true); });
-  $(".r-pick").addEventListener("click", (event) => { if (event.target.closest(".r-go")) start(); });
+  $(".r-pick").addEventListener("click", (event) => {
+    const tile = event.target.closest("[data-rival]");
+    if (tile) choose(tile.dataset.rival);
+    else if (event.target.closest(".r-go")) start();
+  });
   $(".r-card").addEventListener("click", (event) => {
     const choice = event.target.closest("[data-choice]")?.dataset.choice;
     if (choice === "quit") abort(true);
@@ -1590,14 +1614,15 @@ export async function createRace(api) {
     get phase() { return phase; },
     tap,
     abort,
-    play(input, race, kind) {
+    play(input, race, kind, raced) {
       const next = kindOf(kind).id;
-      // An animal picked since the race was made loads its faces first.
-      if (!faces[next] || !faces[kindOf(next).rival]) return loadFaces([next, kindOf(next).rival]).then(() => this.play(input, race, kind));
+      const rival = raced && raced !== next ? raced : kindOf(next).rival;
+      // An animal picked since the race was made, or the rival raced last, loads its faces first.
+      if (!faces[next] || !faces[rival]) return loadFaces([next, rival]).then(() => this.play(input, race, kind, raced));
       generation++;
       state = race || {};
       own = next;
-      rival = kindOf(own).rival;
+      match = picker(rival, (k) => loadFaces([k]));
       mode = input;
       still = Boolean(api.still());
       shell.classList.toggle("r-still", still);

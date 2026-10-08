@@ -595,8 +595,6 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const reply = db.transaction(() => {
         const row = getRow(uid);
         if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row?.pet_name) return 403;
-        // Each pet races its own zodiac neighbour.
-        if (rival !== kindOf(animalOf(row, req)).rival) return 400;
         if (row.slept_at !== null) return 409;
         const t = now();
         const st = petState(row, t);

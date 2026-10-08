@@ -98,3 +98,20 @@ export function stepRace(race, dt) {
   if (race.distance[1] >= RACE.meters) race.finish[1] = race.goal;
   return true;
 }
+
+// The rival picker: a tap picks at once, but the lane only takes the newest pick, once its art is in.
+export function picker(rival, load) {
+  const match = {
+    rival,
+    shown: rival,
+    choose(kind) {
+      match.rival = kind;
+      return load(kind).then(() => {
+        if (match.rival === kind) match.shown = kind;
+      }, () => {
+        if (match.rival === kind) match.rival = match.shown;
+      });
+    },
+  };
+  return match;
+}

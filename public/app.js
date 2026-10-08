@@ -3989,6 +3989,8 @@ const racing = (function raceRoom() {
   const label = blurb.textContent;
   const button = dock.querySelector('[data-open="arcade"]');
   let state = JSON.parse(start.dataset.race || "{}");
+  // The rival raced last stays picked for the rest of this visit, across themes too.
+  let raced = null;
   let game = null;
   let ready = null;
   let held = null;
@@ -4002,6 +4004,7 @@ const racing = (function raceRoom() {
     buzz: (pattern) => tryVibrate(pattern),
     bonus: statBonus,
     async finish(rival, won) {
+      raced = rival;
       const run = ++posted;
       try {
         const res = await fetch("/arcade", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
@@ -4044,7 +4047,7 @@ const racing = (function raceRoom() {
     root.classList.add("g-on", "r-on");
     combo.sink(() => g.tap("nfc"));
     let out = "quit";
-    try { out = await g.play(mode, state, root.dataset.mascot); }
+    try { out = await g.play(mode, state, root.dataset.mascot, raced); }
     finally {
       combo.sink(null);
       combo.end();
