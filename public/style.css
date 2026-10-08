@@ -277,7 +277,7 @@ html:not(.has-app) .theme-btn { display: none; }
   flex: none;
   height: clamp(230px, 40dvh, 360px);
   margin: 12px 0 8px;
-  border-radius: 32px;
+  border-radius: var(--win-r, 32px);
   container-type: size;
   box-shadow:
     0 0 0 3px var(--gold-light),
@@ -1611,8 +1611,7 @@ html[data-edition="legendary"] .st-fill::after {
 @keyframes st-specks { from { opacity: 0; } to { opacity: .55; } }
 @keyframes st-twinkle { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 
-/* The edition's finish beyond the card: the window frame, the nameplate and the tap sparkles. 포근 클래식 keeps the gold-light ring. */
-/* The finish sits under the sky, which covers its middle, so only its band shows around the glass and its pseudos may reach past it. */
+/* The edition's finish sits under the sky, which covers its middle: only its band shows around the glass, and its pseudos may reach past it. */
 .finish { display: none; }
 html[data-look] .finish {
   position: absolute;
@@ -1656,7 +1655,6 @@ html[data-look="rare"] .finish {
     linear-gradient(90deg, transparent, #fff8e6 40% 60%, transparent) 50% 50% / 20px 1.2px no-repeat,
     linear-gradient(180deg, transparent, #fff8e6 40% 60%, transparent) 50% 50% / 1.2px 20px no-repeat;
 }
-/* The diagonal repeat reads as rope at phone size. */
 html[data-look="rare"] .finish,
 .look-card[data-look="rare"] .look-frame {
   background:
@@ -1672,49 +1670,47 @@ html[data-look="legendary"] .finish {
   --d: 17.6px;
   --halo: 0 0 48px -8px rgba(120, 110, 220, .55);
   --spark-tl:
-    radial-gradient(circle, var(--star) 0 1.6px, rgba(255, 248, 230, .5) 2.6px, transparent 3.6px) var(--d) var(--d) / 16px 16px no-repeat,
-    linear-gradient(90deg, transparent, var(--star) 40% 60%, transparent) var(--d) calc(var(--d) + 7.4px) / 16px 1.2px no-repeat,
-    linear-gradient(180deg, transparent, var(--star) 40% 60%, transparent) calc(var(--d) + 7.4px) var(--d) / 1.2px 16px no-repeat;
+    radial-gradient(circle, var(--tier-star) 0 1.6px, rgba(255, 248, 230, .5) 2.6px, transparent 3.6px) var(--d) var(--d) / 16px 16px no-repeat,
+    linear-gradient(90deg, transparent, var(--tier-star) 40% 60%, transparent) var(--d) calc(var(--d) + 7.4px) / 16px 1.2px no-repeat,
+    linear-gradient(180deg, transparent, var(--tier-star) 40% 60%, transparent) calc(var(--d) + 7.4px) var(--d) / 1.2px 16px no-repeat;
   --spark-tr:
-    radial-gradient(circle, var(--star) 0 1.6px, rgba(255, 248, 230, .5) 2.6px, transparent 3.6px) calc(100% - var(--d)) var(--d) / 16px 16px no-repeat,
-    linear-gradient(90deg, transparent, var(--star) 40% 60%, transparent) calc(100% - var(--d)) calc(var(--d) + 7.4px) / 16px 1.2px no-repeat,
-    linear-gradient(180deg, transparent, var(--star) 40% 60%, transparent) calc(100% - var(--d) - 7.4px) var(--d) / 1.2px 16px no-repeat;
+    radial-gradient(circle, var(--tier-star) 0 1.6px, rgba(255, 248, 230, .5) 2.6px, transparent 3.6px) calc(100% - var(--d)) var(--d) / 16px 16px no-repeat,
+    linear-gradient(90deg, transparent, var(--tier-star) 40% 60%, transparent) calc(100% - var(--d)) calc(var(--d) + 7.4px) / 16px 1.2px no-repeat,
+    linear-gradient(180deg, transparent, var(--tier-star) 40% 60%, transparent) calc(100% - var(--d) - 7.4px) var(--d) / 1.2px 16px no-repeat;
   --spark-bl:
-    radial-gradient(circle, var(--star) 0 1.6px, rgba(255, 248, 230, .5) 2.6px, transparent 3.6px) var(--d) calc(100% - var(--d)) / 16px 16px no-repeat,
-    linear-gradient(90deg, transparent, var(--star) 40% 60%, transparent) var(--d) calc(100% - var(--d) - 7.4px) / 16px 1.2px no-repeat,
-    linear-gradient(180deg, transparent, var(--star) 40% 60%, transparent) calc(var(--d) + 7.4px) calc(100% - var(--d)) / 1.2px 16px no-repeat;
+    radial-gradient(circle, var(--tier-star) 0 1.6px, rgba(255, 248, 230, .5) 2.6px, transparent 3.6px) var(--d) calc(100% - var(--d)) / 16px 16px no-repeat,
+    linear-gradient(90deg, transparent, var(--tier-star) 40% 60%, transparent) var(--d) calc(100% - var(--d) - 7.4px) / 16px 1.2px no-repeat,
+    linear-gradient(180deg, transparent, var(--tier-star) 40% 60%, transparent) calc(var(--d) + 7.4px) calc(100% - var(--d)) / 1.2px 16px no-repeat;
   --spark-br:
-    radial-gradient(circle, var(--star) 0 1.6px, rgba(255, 248, 230, .5) 2.6px, transparent 3.6px) calc(100% - var(--d)) calc(100% - var(--d)) / 16px 16px no-repeat,
-    linear-gradient(90deg, transparent, var(--star) 40% 60%, transparent) calc(100% - var(--d)) calc(100% - var(--d) - 7.4px) / 16px 1.2px no-repeat,
-    linear-gradient(180deg, transparent, var(--star) 40% 60%, transparent) calc(100% - var(--d) - 7.4px) calc(100% - var(--d)) / 1.2px 16px no-repeat;
+    radial-gradient(circle, var(--tier-star) 0 1.6px, rgba(255, 248, 230, .5) 2.6px, transparent 3.6px) calc(100% - var(--d)) calc(100% - var(--d)) / 16px 16px no-repeat,
+    linear-gradient(90deg, transparent, var(--tier-star) 40% 60%, transparent) calc(100% - var(--d)) calc(100% - var(--d) - 7.4px) / 16px 1.2px no-repeat,
+    linear-gradient(180deg, transparent, var(--tier-star) 40% 60%, transparent) calc(100% - var(--d) - 7.4px) calc(100% - var(--d)) / 1.2px 16px no-repeat;
   --deco: var(--spark-tl), var(--spark-tr), var(--spark-bl), var(--spark-br);
 }
-/* Fourteen stars on the band's center line; --band is half the band. */
+/* --band is half the band. */
 html[data-look="legendary"] .finish,
 .look-card[data-look="legendary"] .look-frame {
-  --star: #fff8e6;
   background:
-    radial-gradient(circle at 14% var(--band), var(--star) 0 1.4px, rgba(255, 248, 230, .45) 2.4px, transparent 3.6px),
-    radial-gradient(circle at 31% var(--band), var(--star) 0 1px, transparent 2.2px),
+    radial-gradient(circle at 14% var(--band), var(--tier-star) 0 1.4px, rgba(255, 248, 230, .45) 2.4px, transparent 3.6px),
+    radial-gradient(circle at 31% var(--band), var(--tier-star) 0 1px, transparent 2.2px),
     radial-gradient(circle at 52% var(--band), #f6d98a 0 1.4px, rgba(246, 217, 138, .4) 2.4px, transparent 3.6px),
-    radial-gradient(circle at 70% var(--band), var(--star) 0 1px, transparent 2.2px),
-    radial-gradient(circle at 88% var(--band), var(--star) 0 1.4px, rgba(255, 248, 230, .45) 2.4px, transparent 3.6px),
-    radial-gradient(circle at 10% calc(100% - var(--band)), var(--star) 0 1px, transparent 2.2px),
-    radial-gradient(circle at 27% calc(100% - var(--band)), var(--star) 0 1.4px, rgba(255, 248, 230, .45) 2.4px, transparent 3.6px),
+    radial-gradient(circle at 70% var(--band), var(--tier-star) 0 1px, transparent 2.2px),
+    radial-gradient(circle at 88% var(--band), var(--tier-star) 0 1.4px, rgba(255, 248, 230, .45) 2.4px, transparent 3.6px),
+    radial-gradient(circle at 10% calc(100% - var(--band)), var(--tier-star) 0 1px, transparent 2.2px),
+    radial-gradient(circle at 27% calc(100% - var(--band)), var(--tier-star) 0 1.4px, rgba(255, 248, 230, .45) 2.4px, transparent 3.6px),
     radial-gradient(circle at 46% calc(100% - var(--band)), #f6d98a 0 1px, transparent 2.2px),
-    radial-gradient(circle at 64% calc(100% - var(--band)), var(--star) 0 1.4px, rgba(255, 248, 230, .45) 2.4px, transparent 3.6px),
-    radial-gradient(circle at 83% calc(100% - var(--band)), var(--star) 0 1px, transparent 2.2px),
-    radial-gradient(circle at var(--band) 40%, var(--star) 0 1.2px, transparent 2.6px),
-    radial-gradient(circle at var(--band) 72%, var(--star) 0 1px, transparent 2.2px),
-    radial-gradient(circle at calc(100% - var(--band)) 28%, var(--star) 0 1.2px, transparent 2.6px),
-    radial-gradient(circle at calc(100% - var(--band)) 60%, var(--star) 0 1px, transparent 2.2px),
+    radial-gradient(circle at 64% calc(100% - var(--band)), var(--tier-star) 0 1.4px, rgba(255, 248, 230, .45) 2.4px, transparent 3.6px),
+    radial-gradient(circle at 83% calc(100% - var(--band)), var(--tier-star) 0 1px, transparent 2.2px),
+    radial-gradient(circle at var(--band) 40%, var(--tier-star) 0 1.2px, transparent 2.6px),
+    radial-gradient(circle at var(--band) 72%, var(--tier-star) 0 1px, transparent 2.2px),
+    radial-gradient(circle at calc(100% - var(--band)) 28%, var(--tier-star) 0 1.2px, transparent 2.6px),
+    radial-gradient(circle at calc(100% - var(--band)) 60%, var(--tier-star) 0 1px, transparent 2.2px),
     linear-gradient(180deg, #4a3cb0 0%, #2d2a7e 45%, #1f1d62 100%);
 }
 /* The page glows in the frame's light, after the time of day's. */
 html[data-look="rare"] { --glow: rgba(226, 178, 82, .26); }
 html[data-look="legendary"] { --glow: rgba(120, 110, 220, .30); }
-/* The name, in the same material as the frame. A text shadow would sit on the clipped gold, so it becomes a drop shadow; the sheen layer rests near the name's start. */
-/* Its box hugs the letters, so the gradient's ends, the dots and the sheen land on the name. */
+/* The name in the frame's material: a text shadow would sit on the clipped gold, so it is a drop shadow, and the box hugs the letters so the gradient lands on them. */
 html[data-look] .nameplate,
 .look-card:not([data-look="classic"]) .look-name {
   width: fit-content;
@@ -1735,7 +1731,7 @@ html[data-look="legendary"] .nameplate,
     radial-gradient(circle at 22% 30%, #fff 0 1px, transparent 2px),
     radial-gradient(circle at 61% 64%, #fff 0 .8px, transparent 1.8px),
     radial-gradient(circle at 84% 26%, #fff 0 1px, transparent 2px),
-    linear-gradient(180deg, #fff8e6 0%, #f6d98a 50%, #c9b8ff 100%);
+    linear-gradient(180deg, var(--tier-star) 0%, var(--tier-gold-2) 50%, #c9b8ff 100%);
   background-size: 300% 100%, auto, auto, auto, auto;
 }
 /* The one loop a frame adds to the home: the 금실 stud's glint, the sheen across the 별밤 name. */
@@ -1957,8 +1953,7 @@ html[data-look="legendary"] .sparkle { background: var(--tier-star); filter: dro
   border-width: 0 3px 3px 0;
   transform: rotate(45deg);
 }
-/* 창틀과 이름: each tile is the home's frame and name in miniature, in the current world, from the same rules. */
-/* Set tight enough that a 포근 클래식 owner's two locked notes still end above the fold at 655px. */
+/* 창틀과 이름: the home's frame and name in miniature from the same rules, tight enough that two locked notes end above the fold at 655px. */
 .theme-sub {
   margin: 10px 0 2px;
   font-size: .8125rem;
@@ -2009,7 +2004,7 @@ html[data-look="legendary"] .sparkle { background: var(--tier-star); filter: dro
 .look-card[data-look="legendary"] .look-frame::after { inset: 6px; border-radius: 6px; box-shadow: 0 0 0 1px var(--edge); }
 .look-title { font-size: 12px; font-weight: 800; color: var(--cream); }
 .look-note { font-size: 11px; line-height: 1.3; color: var(--muted); }
-/* Locked tiles keep their full preview. The lock is the window's own keyhole: the plushie is the key. */
+/* Locked tiles keep their full preview. */
 .look-card.is-locked::before {
   content: "";
   position: absolute;

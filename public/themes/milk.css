@@ -65,7 +65,6 @@ html[data-theme="milk"] .level-pin svg { fill: #fff; filter: drop-shadow(0 1px 0
 
 /* Window: plush frame with stitching, pink sky, gingham floor */
 html[data-theme="milk"] .window {
-  border-radius: 34px;
   outline: 2.5px dashed rgba(255, 255, 255, 0.95);
   outline-offset: 5px;
   box-shadow:
@@ -394,8 +393,7 @@ html[data-theme="milk"] .stat-pop { color: #fff; background: linear-gradient(180
 html.f-layout[data-theme="milk"] .f-basket { background: linear-gradient(180deg, #fff, #ffeef3); box-shadow: inset 0 0 0 2px var(--straw), 0 6px 14px rgba(122, 46, 69, 0.18); }
 html[data-theme="milk"] .f-basket .fb-act.is-all { box-shadow: 0 3px 0 #b9821c, 0 0 0 7px #fff5f8, -16px 0 10px -2px #fff5f8; }
 
-/* The edition's finish in milk: the plush grows thicker and the trim sits on its inside edge, a gold braid for 금실, a twilight ribbon with gold stars for 별밤. */
-/* The ornaments sit on the pink: --d is measured from the plush's outer corner, which the ::before box follows. */
+/* The edition's finish in milk: the plush grows thicker with the trim on its inside edge, and --d is measured from the plush's outer corner, which ::before follows. */
 html[data-theme="milk"] { --win-r: 34px; }
 html[data-theme="milk"][data-look] .window::after { box-shadow: inset 0 8px 18px rgba(242, 87, 127, .18), 0 0 0 var(--edge-w) var(--edge); }
 /* The page glows in the frame's light; classic milk has no glow of its own. */
@@ -430,7 +428,6 @@ html[data-theme="milk"][data-look="rare"] .finish {
   box-shadow: none;
 }
 html[data-theme="milk"][data-look="rare"] .finish::before { inset: -11px; }
-/* The glint sits on the top-right button, out on the plush. */
 html[data-theme="milk"][data-look="rare"] .finish::after { top: calc(var(--d) - 21px); right: calc(var(--d) - 21px); }
 html[data-theme="milk"][data-look="rare"] .finish,
 html[data-theme="milk"] .look-card[data-look="rare"] .look-frame {
@@ -466,19 +463,19 @@ html[data-theme="milk"][data-look="legendary"] .finish {
 html[data-theme="milk"][data-look="legendary"] .finish::before { inset: -11.5px; }
 html[data-theme="milk"][data-look="legendary"] .finish,
 html[data-theme="milk"] .look-card[data-look="legendary"] .look-frame {
-  --star: #ffe08a;
+  --tier-star: #ffe08a;
   background:
-    radial-gradient(circle at 14% var(--band), var(--star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
-    radial-gradient(circle at 31% var(--band), var(--star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
-    radial-gradient(circle at 52% var(--band), var(--star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
-    radial-gradient(circle at 70% var(--band), var(--star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
-    radial-gradient(circle at 88% var(--band), var(--star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
-    radial-gradient(circle at 10% calc(100% - var(--band)), var(--star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
-    radial-gradient(circle at 27% calc(100% - var(--band)), var(--star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
-    radial-gradient(circle at 46% calc(100% - var(--band)), var(--star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
-    radial-gradient(circle at 64% calc(100% - var(--band)), var(--star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
-    radial-gradient(circle at 83% calc(100% - var(--band)), var(--star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
-    linear-gradient(180deg, #7d5fb8, #b39be0 60%, #d8c8f5);
+    radial-gradient(circle at 14% var(--band), var(--tier-star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
+    radial-gradient(circle at 31% var(--band), var(--tier-star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
+    radial-gradient(circle at 52% var(--band), var(--tier-star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
+    radial-gradient(circle at 70% var(--band), var(--tier-star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
+    radial-gradient(circle at 88% var(--band), var(--tier-star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
+    radial-gradient(circle at 10% calc(100% - var(--band)), var(--tier-star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
+    radial-gradient(circle at 27% calc(100% - var(--band)), var(--tier-star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
+    radial-gradient(circle at 46% calc(100% - var(--band)), var(--tier-star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
+    radial-gradient(circle at 64% calc(100% - var(--band)), var(--tier-star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
+    radial-gradient(circle at 83% calc(100% - var(--band)), var(--tier-star) 0 1.4px, rgba(255, 224, 138, .45) 2.4px, transparent 3.4px),
+    linear-gradient(180deg, var(--tier-night-1), var(--tier-night-2) 60%, #d8c8f5);
 }
 /* 금실 keeps the sticker type flat, in honey: a clipped gradient would lose the white stroke. */
 html[data-theme="milk"][data-look="rare"] .nameplate,
@@ -507,7 +504,6 @@ html[data-theme="milk"] .look-card[data-look="legendary"] .look-name {
   text-shadow: none;
   filter: drop-shadow(4px 0 0 #fff) drop-shadow(-4px 0 0 #fff) drop-shadow(0 4px 0 #fff) drop-shadow(0 -4px 0 #fff) drop-shadow(0 5px 0 rgba(155, 127, 208, 0.3));
 }
-/* In the minis the sticker edge is cut down to their size. */
 html[data-theme="milk"] .look-card[data-look="rare"] .look-name { -webkit-text-stroke: 3px #fff; }
 html[data-theme="milk"] .look-card[data-look="legendary"] .look-name { filter: drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff); }
 

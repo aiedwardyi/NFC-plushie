@@ -81,7 +81,6 @@ html[data-theme="8bit"] .level-pin svg {
 
 /* The window: a pixel frame, banded sky, grass */
 html[data-theme="8bit"] .window {
-  border-radius: 0;
   box-shadow:
     -4px 0 0 0 var(--cream), 4px 0 0 0 var(--cream), 0 -4px 0 0 var(--cream), 0 4px 0 0 var(--cream),
     -8px 0 0 0 var(--ink), 8px 0 0 0 var(--ink), 0 -8px 0 0 var(--ink), 0 8px 0 0 var(--ink),
@@ -744,12 +743,11 @@ html[data-theme="8bit"] .f-coin-ic,
 html[data-theme="8bit"] .f-coin { border-radius: 0; background: #ffec27; box-shadow: inset -3px -3px 0 #ffa300, inset 0 0 0 2px #ab5236; }
 html[data-theme="8bit"] .f-big.is-snack { font-family: "Galmuri11", monospace; }
 
-/* The edition's finish in pixels: a dithered gold band for 금실, a night band with pixel stars for 별밤. Hard edges, square corners, stepped motion. */
-/* Each tier writes its own inset and outline; the inner ring is the glass's, and the studs cover the corners the clip used to cut. */
+/* The edition's finish in pixels, hard edges and stepped motion: each tier writes its own inset and outline, and the inner ring is the glass's. */
 html[data-theme="8bit"] { --win-r: 0px; }
 html[data-theme="8bit"][data-look],
 html[data-theme="8bit"] .look-card:not([data-look="classic"]) { --edge: transparent; --edge-w: 0px; }
-html[data-theme="8bit"][data-look] .finish { border-radius: 0; clip-path: none; }
+html[data-theme="8bit"][data-look] .finish { border-radius: 0; }
 /* The window keeps its rings underneath; the finish carries the hard drop shadow, which the window's own would double. */
 html[data-theme="8bit"][data-look] .window {
   box-shadow:
@@ -771,7 +769,6 @@ html[data-theme="8bit"][data-look="rare"] .finish {
     linear-gradient(var(--ink), var(--ink)) 3px calc(100% - 3px) / 10px 10px no-repeat,
     linear-gradient(var(--ink), var(--ink)) calc(100% - 3px) calc(100% - 3px) / 10px 10px no-repeat;
 }
-/* The glint is one cream pixel on the top-right stud. */
 html[data-theme="8bit"][data-look="rare"] .finish::after { top: -2px; right: -2px; width: 4px; height: 4px; background: #fff1e8; }
 html[data-theme="8bit"][data-look="rare"] .finish,
 html[data-theme="8bit"] .look-card[data-look="rare"] .look-frame {

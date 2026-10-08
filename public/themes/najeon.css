@@ -54,7 +54,6 @@ html[data-theme="najeon"] .level-pin svg { fill: #c8323c; filter: drop-shadow(0 
 
 /* Window: inlay screen in a lacquer frame with a bead border */
 html[data-theme="najeon"] .window {
-  border-radius: 24px;
   outline: 2px dotted rgba(233, 231, 239, 0.75);
   outline-offset: 5px;
   box-shadow:
@@ -380,9 +379,8 @@ html[data-theme="najeon"] .look-card[data-look="rare"] { --edge: #060608; --edge
 html[data-theme="najeon"][data-look="rare"] { --glow: rgba(201, 162, 74, .12); }
 html[data-theme="najeon"][data-look="rare"] .window { box-shadow: 0 0 0 10px #060608, 0 0 0 11.5px #c9a24a, 0 24px 40px -10px rgba(0, 0, 0, .8); }
 /* The beads ride the 8-10px lacquer seam. The finish paints over the window's own outline, so they are the finish's: its edge is that ring. */
-html[data-theme="najeon"][data-look="rare"] .finish { outline: 2px dotted rgba(226, 194, 122, .85); }
-/* Four pearl five-dot flowers, and a pearl glint on the top-right one. */
 html[data-theme="najeon"][data-look="rare"] .finish {
+  outline: 2px dotted rgba(226, 194, 122, .85);
   --band-w: 7px;
   --d: 11.8px;
   --deco:
@@ -425,7 +423,6 @@ html[data-theme="najeon"][data-look="legendary"] .window {
   outline-offset: 11.5px;
   box-shadow: 0 0 0 15px #060608, 0 0 0 16.5px #e2c27a, 0 24px 40px -10px rgba(0, 0, 0, .8);
 }
-/* Four gold five-dot flowers. */
 html[data-theme="najeon"][data-look="legendary"] .finish {
   --band-w: 8.5px;
   --band: 4.25px;
@@ -452,7 +449,6 @@ html[data-theme="najeon"][data-look="legendary"] .finish {
     radial-gradient(circle at calc(100% - var(--d) - 12.2px) calc(100% - var(--d) - 8px), #e2c27a 0 1.6px, transparent 2.1px),
     radial-gradient(circle at calc(100% - var(--d) - 3.8px) calc(100% - var(--d) - 8px), #e2c27a 0 1.6px, transparent 2.1px);
 }
-/* Pearl flecks and three gold dots on the band's center line, over the pearl itself. */
 html[data-theme="najeon"][data-look="legendary"] .finish,
 html[data-theme="najeon"] .look-card[data-look="legendary"] .look-frame {
   background:
@@ -477,7 +473,6 @@ html[data-theme="najeon"] .look-card[data-look="legendary"] .look-frame {
 html[data-theme="najeon"][data-look] .nameplate { background-position: 62% 0; }
 html[data-theme="najeon"][data-look="rare"] .nameplate,
 html[data-theme="najeon"] .look-card[data-look="rare"] .look-name { background-image: var(--tier-thread), linear-gradient(100deg, #a8832f 0%, #e2c27a 30%, #f8ecc4 48%, #e2c27a 66%, #a8832f 100%); }
-/* Pearl and the sun's gold, moving. */
 html[data-theme="najeon"][data-look="legendary"] .nameplate,
 html[data-theme="najeon"] .look-card[data-look="legendary"] .look-name {
   background-image:

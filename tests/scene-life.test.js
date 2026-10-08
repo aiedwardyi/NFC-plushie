@@ -316,8 +316,8 @@ function source(text, pieces) {
   }).join("\n");
 }
 const roomOf = (name) => app.match(new RegExp(`\\nconst \\w+ = \\(function ${name}\\(\\) \\{[\\s\\S]*?\\n\\}\\)\\(\\);\\n`))?.[0] || "";
-// The start deadline and its wait, where app.js has them.
-const deadline = () => source(app, [{ re: /\nconst START_MS = \d+;\n/, optional: true }, { re: /\nfunction inTime\(promise, ms\) \{[\s\S]*?\n\}\n/, optional: true }]);
+// The start deadline, its retry line and its wait, where app.js has them.
+const deadline = () => source(app, [{ re: /\nconst START_MS = \d+;\n/, optional: true }, { re: /\nconst FAILED = "[^"]+";\n/, optional: true }, { re: /\nfunction inTime\(promise, ms\) \{[\s\S]*?\n\}\n/, optional: true }]);
 const never = () => new Promise(() => {});
 
 // A click on `el` whose target matches `selector`, the way a tap on that child of it lands.
@@ -348,6 +348,30 @@ test("the race leaves at once from its finish: × and Escape settle play() and h
     await env.clock.run(100, 50);
     assert.deepEqual(env.errors, [], how);
   }
+});
+
+test("a race opened again inside the last one's fade keeps its shell, and Escape still leaves it", async () => {
+  const env = installPage();
+  const { createRace } = await import("../public/game/race.js");
+  const race = await settle(env, createRace({ still: () => true, sfx() {}, buzz() {}, bonus: () => 0, finish: never }));
+  await settle(env, race.open({}, "horse", null));
+  race.play("screen");
+  await env.clock.run(1200, 50);
+  const shell = env.shell();
+  race.exit(true);
+  await env.clock.run(100, 10);
+  let out = null;
+  let opened = false;
+  race.open({}, "horse", null).then(() => { opened = true; });
+  for (let t = 0; t < 100 && !opened; t += 10) await env.clock.run(10, 10);
+  assert.ok(opened, "open again inside the fade");
+  race.play("screen").then((value) => { out = value; });
+  await env.clock.run(600, 50);
+  assert.equal(shell.hidden, false, "the last fade leaves the new race alone");
+  env.document.key("Escape");
+  await env.clock.run(400, 50);
+  assert.equal(out, "quit");
+  assert.deepEqual(env.errors, []);
 });
 
 test("기 모으기 ends on its own when a frame throws at its result: play() settles once and the pet is back", async () => {
@@ -404,7 +428,6 @@ function farmRoom(load, over = {}) {
     ...over,
   };
   runInNewContext(deadline() + source(roomOf("farmRoom"), [
-    /const FAILED = "[^"]+";/,
     "const ASLEEP = 'asleep';",
     "const COOKIE_MS = 60000;",
     "let isOpen = false; let opening = false; let visit = null; let first = null; let game = null; let ready = null;",

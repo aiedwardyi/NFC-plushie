@@ -17,7 +17,7 @@ const lerp = (a, b, k) => a + (b - a) * k;
 const smooth = (k) => (k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k));
 const rnd = (a, b) => a + Math.random() * (b - a);
 // A wait cut short: past `ms` it fails, while what it waits on goes on loading.
-const soon = (promise, ms) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`late past ${ms} ms`)), ms))]);
+const inTime = (promise, ms) => new Promise((resolve, reject) => { const timer = setTimeout(() => reject(new Error("timed out")), ms); promise.then(resolve, reject).finally(() => clearTimeout(timer)); });
 // The roster's art under /game/art/race/, which phones keep a day; bump ART_V when one changes.
 const ART_V = 2;
 const faceUrl = (kind, face, px) => px ? `/themes/px/${kind}${face === "canon" ? "" : face === "blink" ? "-closed" : "-happy"}-px.png` : `/mascot-${kind}-${face === "canon" ? "512-v3.png" : face === "blink" ? "closed-512.webp" : "happy-512.webp"}`;
@@ -78,11 +78,11 @@ export async function createRace(api) {
 
   /* ---------- textures ---------- */
   // Each kind's faces load once, the first time a race needs them; each stage makes its own textures of them.
-  const looks = {};
+  const pics = {};
   const loading = {};
   const loadFaces = (kinds) => Promise.all(kinds.map((kind) => {
     loading[kind] ||= Promise.all(["canon", "blink", "react"].map((f) => image(faceUrl(kind, f, px)))).then((imgs) => {
-      looks[kind] = { imgs, crop: cropOf(imgs[0]), texels: imgs[0].naturalHeight, url: faceUrl(kind, "canon", px) };
+      pics[kind] = { imgs, crop: cropOf(imgs[0]), texels: imgs[0].naturalHeight, url: faceUrl(kind, "canon", px) };
     }, (error) => {
       delete loading[kind];
       throw error;
@@ -116,7 +116,7 @@ export async function createRace(api) {
   // This stage's textures of a kind's faces, made the first time the stage draws that kind.
   function facesOf(kind) {
     if (!faces[kind]) {
-      const [canon, blink, react] = looks[kind].imgs.map((i) => {
+      const [canon, blink, react] = pics[kind].imgs.map((i) => {
         const t = P.Texture.from(i);
         if (px) t.source.scaleMode = "nearest";
         owned.push(t);
@@ -133,7 +133,7 @@ export async function createRace(api) {
   let root = null;
   let overlay = null;
   async function up() {
-    stage = await makeStage(P, { width: W, height: H, resolution: px ? 0.5 : Math.min(2, devicePixelRatio || 1), roundPixels: px, background: 0x000000, fault: broke });
+    stage = await makeStage(P, { width: W, height: H, resolution: px ? 0.5 : Math.min(2, devicePixelRatio || 1), roundPixels: px, background: 0x000000, fault: lost });
     app = stage.app;
     $(".r-stage").append(app.canvas);
     for (const [k, c] of Object.entries(sheets)) T[k] = Array.isArray(c) ? c.map((one) => tex(one)) : tex(c);
@@ -173,7 +173,7 @@ export async function createRace(api) {
     L.f = W / 11;
     L.hy = H * 0.33;
     L.ch = (H * 0.46) / L.f;
-    const ref = looks[DEFAULT_KIND];
+    const ref = pics[DEFAULT_KIND];
     L.size = px ? (ref.crop.v1 - ref.crop.v0) * ref.texels * 2 / L.f : Math.min(H * 0.16, W * 0.36) / L.f;
     L.over = Math.ceil(W * 0.08);
   }
@@ -336,7 +336,7 @@ export async function createRace(api) {
   // One throwaway frame with every filter on and every texture drawn, so nothing compiles or uploads mid-race.
   function warm() {
     const bin = new P.Container();
-    for (const t of [...Object.values(T).flat(), ...Object.keys(looks).map(facesOf).flatMap((f) => [f.canon, f.blink, f.react])]) {
+    for (const t of [...Object.values(T).flat(), ...Object.keys(pics).map(facesOf).flatMap((f) => [f.canon, f.blink, f.react])]) {
       const s = new P.Sprite(t);
       s.alpha = 0.01;
       s.position.set(-400, -400);
@@ -386,7 +386,7 @@ export async function createRace(api) {
       q.mesh.tint = look.ghost;
       return q;
     });
-    const c = looks[r.kind].crop;
+    const c = pics[r.kind].crop;
     for (const q of [r.body, ...r.ghosts]) {
       const uv = q.uv.data;
       for (let k = 0; k < ROWS; k++) {
@@ -494,7 +494,7 @@ export async function createRace(api) {
     const s = sOf(r.d);
     const Hm = L.size;
     const size = Hm * s;
-    const w = size * looks[r.kind].crop.aspect;
+    const w = size * pics[r.kind].crop.aspect;
     const hx = X(r.x - shift, r.d);
     const hy = Y(r.d, r.hipH);
     const sy = 1 - r.sq;
@@ -570,7 +570,7 @@ export async function createRace(api) {
       r.shadow.alpha = 0.55 * (1 - lift * 0.6);
       r.tip = [at[ROWS - 1][0], at[ROWS - 1][1]];
       r.head = [at[0][0], at[0][1]];
-      r.reach = hx - left;
+      r.behind = hx - left;
     }
   }
 
@@ -665,7 +665,7 @@ export async function createRace(api) {
   let photo = null;
   let result = null;
   let saved = null;
-  // Bumped by every play and every exit: async work started under an older one leaves the race alone.
+  // Bumped by every exit: async work started under an older one leaves the race alone.
   let gen = 0;
   let fadeTimer = 0;
   let lowFx = false;
@@ -683,9 +683,7 @@ export async function createRace(api) {
   let hintSeen = false;
   try { hintSeen = localStorage.getItem("pokkey-race-hint") === "1"; } catch {}
 
-  // Fades and drops that end in a state are held per element, so the timer that sets that state, and every way out,
-  // cancels them by hand: a finished animation that is only forgotten keeps its last frame once collected (Chromium 141
-  // and older), out of reach of getAnimations().
+  // Fades and drops that end in a state, held per element so every way out cancels them by hand: a finished one only forgotten stays drawn once collected (Chromium 141 and older).
   const fills = new Map();
   function fillTo(el, frames, o) {
     fills.get(el)?.cancel();
@@ -830,8 +828,8 @@ export async function createRace(api) {
     motion($(".r-hud"), [{ transform: "translateY(-46px)", opacity: 0 }, { transform: "none", opacity: 1 }], 520, 120);
     stripW = $(".r-strip").clientWidth;
     $(".r-lv").textContent = `${PETS[match.rival]} Lv.${level}`;
-    $(".r-head.is-me").src = looks[own].url;
-    $(".r-head.is-rival").src = looks[match.rival].url;
+    $(".r-head.is-me").src = pics[own].url;
+    $(".r-head.is-rival").src = pics[match.rival].url;
     if (!hintSeen) {
       const fine = matchMedia("(pointer: fine)").matches;
       $(".r-hint").innerHTML = mode === "nfc" ? `${HINT_ART}화면을 톡톡! 인형을 톡 하면 부스터!` : `화면을 톡톡 눌러서 달려요!${fine ? " 스페이스바도 돼요" : ""}`;
@@ -1150,10 +1148,12 @@ export async function createRace(api) {
     return L.ch - ((feet - L.hy) * (px ? 1 : 1.12)) / L.f;
   }
 
-  // How far the camera sinks under the result card, whatever its height, so the rival's level-up tag (60 px: the tag and a jog's hop) clears it.
+  // The room the rival's level-up tag keeps under the result card's edge: its height and a gap.
+  const TAG_ROOM = 30;
+  // How far the camera sinks under the result card, whatever its height, so the rival's tag clears it with as much again for a jog's hop.
   function sink() {
     const card = $(".r-card");
-    return cam.lift - (card.offsetTop + card.offsetHeight + 60 - Y(D.rival, L.size)) / (px ? L.f : sOf(D.rival));
+    return cam.lift - (card.offsetTop + card.offsetHeight + 2 * TAG_ROOM - Y(D.rival, L.size)) / (px ? L.f : sOf(D.rival));
   }
 
   function follow(dt) {
@@ -1175,7 +1175,7 @@ export async function createRace(api) {
     cam.vx += (k * (target - cam.x) + 2 * Math.sqrt(k) * (speed - cam.vx)) * dt;
     cam.x += cam.vx * dt;
     // The count's pan swings the pair left; however far its art reaches past the hip, the owner's runner stays on screen.
-    if (phase === "count") cam.x = Math.min(cam.x, runners[0].x + (W * cam.vp - 4 - (runners[0].reach || 0)) / sOf(D.me));
+    if (phase === "count") cam.x = Math.min(cam.x, runners[0].x + (W * cam.vp - 4 - (runners[0].behind || 0)) / sOf(D.me));
     let dzGoal = -0.12;
     if (phase === "count") dzGoal = lerp(-0.12, 0.06, smooth((clock - phaseAt) / 3));
     else if (phase === "run" && model) {
@@ -1485,7 +1485,7 @@ export async function createRace(api) {
   }
 
   // After a frame is drawn: the finish camera keeps the frame the leader crossed in.
-  function shot() {
+  function snap() {
     if (photo?.shot !== "now") return;
     photo.shot = true;
     grab();
@@ -1548,6 +1548,9 @@ export async function createRace(api) {
 
   function tags() {
     const flex = phase === "result" && flexAt && runners[1].head;
+    // Read before the writes below: a read after them lays the page out again every frame.
+    const card = flex ? $(".r-card") : null;
+    const under = card ? card.offsetTop + card.offsetHeight + TAG_ROOM : 0;
     for (const r of runners) {
       const el = $(r.id ? ".r-tag.is-rival" : ".r-tag.is-me");
       const on = (phase === "pick" || (flex && r.id)) && r.head;
@@ -1558,11 +1561,10 @@ export async function createRace(api) {
         const side = px && phase === "pick" && !r.id;
         const s = L.size * sOf(r.d);
         el.style.translate = side ? "-100% -50%" : "";
-        el.style.left = `${Math.round(r.head[0] + (side ? -s * (looks[r.kind].crop.aspect / 2 + 0.1) : phase === "pick" ? (r.id ? 16 : -18) : 0))}px`;
+        el.style.left = `${Math.round(r.head[0] + (side ? -s * (pics[r.kind].crop.aspect / 2 + 0.1) : phase === "pick" ? (r.id ? 16 : -18) : 0))}px`;
         // The runners jog on under the result card, and a hop can carry the rival's tag up under it: it stops at the card's edge.
-        const card = flex && r.id ? $(".r-card") : null;
         const top = r.head[1] + (side ? s * 0.3 : -10);
-        el.style.top = `${Math.round(card ? Math.max(top, card.offsetTop + card.offsetHeight + el.offsetHeight + 6) : top)}px`;
+        el.style.top = `${Math.round(card && r.id ? Math.max(top, under) : top)}px`;
       }
     }
   }
@@ -1620,7 +1622,7 @@ export async function createRace(api) {
   }
 
   // A frame that throws, a lost context or a stage that would not build ends the race like a fault anywhere.
-  function broke(error) {
+  function lost(error) {
     console.error(error);
     exit(false, "aborted");
   }
@@ -1632,10 +1634,10 @@ export async function createRace(api) {
     const next = kindOf(kind).id;
     const wanted = raced && raced !== next ? raced : kindOf(next).rival;
     // The pet's own faces are a must; a rival whose art is late races as an animal whose art is here, when there is one.
-    const spare = Object.keys(looks).some((k) => k !== next && k !== wanted);
-    const [mine, theirs] = await Promise.allSettled([loadFaces([next]), spare ? soon(loadFaces([wanted]), RIVAL_MS) : loadFaces([wanted])]);
+    const spare = Object.keys(pics).some((k) => k !== next && k !== wanted);
+    const [mine, theirs] = await Promise.allSettled([loadFaces([next]), spare ? inTime(loadFaces([wanted]), RIVAL_MS) : loadFaces([wanted])]);
     if (mine.status === "rejected") throw mine.reason;
-    const rival = theirs.status === "fulfilled" ? wanted : Object.keys(looks).find((k) => k !== next);
+    const rival = theirs.status === "fulfilled" ? wanted : Object.keys(pics).find((k) => k !== next);
     if (!rival) throw theirs.reason;
     if (g !== gen) throw STOP;
     state = race || {};
@@ -1650,6 +1652,7 @@ export async function createRace(api) {
     shell.hidden = false;
     measure();
     // A stage still fading out from the last race goes first: one context at a time.
+    clearTimeout(fadeTimer);
     down();
     await up();
     if (g !== gen) {
@@ -1721,7 +1724,7 @@ export async function createRace(api) {
       stage.resize(W, H);
       build();
     } catch (error) {
-      broke(error);
+      lost(error);
       return;
     }
     stripW = $(".r-strip").clientWidth || stripW;
@@ -1749,18 +1752,16 @@ export async function createRace(api) {
         if (!S) throw new Error("race played without its stage");
         pick();
         enter();
-        stage.run(tick, shot);
+        stage.run(tick, snap);
       } catch (error) {
-        broke(error);
+        lost(error);
       }
       return done;
     },
     dispose() {
       exit();
-      clearTimeout(fadeTimer);
       observer.disconnect();
       document.removeEventListener("keydown", key);
-      down();
       shell.remove();
     },
   };

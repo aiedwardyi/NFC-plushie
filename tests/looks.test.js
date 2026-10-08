@@ -59,8 +59,8 @@ async function setup(t) {
 
 const tagOf = (html) => html.match(/<html [^>]*>/)[0];
 const tag = (attrs = "") => `<html lang="ko" data-mascot="horse"${attrs}>`;
-const tiles = (html) => [...html.matchAll(/<button type="button" class="theme-card look-card( is-locked)?" data-look="(\w+)" aria-pressed="(true|false)"( aria-disabled="true")? aria-label="([^"]+)">([\s\S]*?)<\/button>/g)]
-  .map(([, locked, look, pressed, disabled, label, inner]) => ({ look, locked: Boolean(locked), pressed: pressed === "true", disabled: Boolean(disabled), label, inner }));
+const tiles = (html) => [...html.matchAll(/<button type="button" class="theme-card look-card( is-locked)?" data-look="(\w+)" aria-pressed="(true|false)"( aria-disabled="true")? aria-label="([^"]+)" data-label="([^"]+)" data-lock-label="([^"]+)">([\s\S]*?)<\/button>/g)]
+  .map(([, locked, look, pressed, disabled, label, open, shut, inner]) => ({ look, locked: Boolean(locked), pressed: pressed === "true", disabled: Boolean(disabled), label, open, shut, inner }));
 
 test("a worn look is capped at the plushie's edition: a lower look cookie is worn, a higher or unknown one is not", async (t) => {
   const ctx = await setup(t);
@@ -106,7 +106,8 @@ test("꾸미기 offers every frame up to the plushie's edition and shows the one
     jars[own] = jar;
     const home = await ctx.request(`/t?uid=${uid}&view=1`, { jar });
     assert.match(home, /<ul class="theme-grid">[\s\S]*?<\/ul>\n      <h3 class="theme-sub">창틀과 이름<\/h3>/, own);
-    assert.match(home, new RegExp(`<p class="theme-lede" data-look-lede>${LEDES[own].replace(/[.?]/g, "\\$&")}</p>\\n      <ul class="theme-grid look-grid" data-look-grid>`), own);
+    const esc = (text) => text.replace(/[.?]/g, "\\$&");
+    assert.match(home, new RegExp(`<p class="theme-lede" data-look-lede data-classic="${esc(LEDES.classic)}" data-rare="${esc(LEDES.rare)}" data-legendary="${esc(LEDES.legendary)}">${esc(LEDES[own])}</p>\\n      <ul class="theme-grid look-grid" data-look-grid>`), own);
     const row = tiles(home);
     assert.deepEqual(row.map((r) => r.look), ["classic", "rare", "legendary"], own);
     assert.deepEqual(row.filter((r) => !r.locked).map((r) => r.look), open, own);
@@ -116,13 +117,10 @@ test("꾸미기 offers every frame up to the plushie's edition and shows the one
       // Locked tiles keep their full preview; only the chip and the note mark them.
       assert.match(r.inner, /^<span class="look-mini" aria-hidden="true"><b class="look-name">보리&lt;&amp;&gt;<\/b><i class="look-frame"><\/i><\/span><span class="look-title">/, `${own} ${r.look}`);
       assert.equal(r.disabled, r.locked, `${own} ${r.look}`);
-      if (r.locked) {
-        assert.equal(r.label, `${title} 창틀, ${title} 인형이 열쇠예요`);
-        assert.match(r.inner, new RegExp(`<small class="look-note">${title} 인형이 열쇠예요</small>$`));
-      } else {
-        assert.equal(r.label, `${title} 창틀`);
-        assert.doesNotMatch(r.inner, /look-note/);
-      }
+      // The lock's note and label are always in the markup, so an edition changed under the page can show or hide them.
+      assert.deepEqual([r.open, r.shut], [`${title} 창틀`, `${title} 창틀, ${title} 인형이 열쇠예요`], `${own} ${r.look}`);
+      assert.equal(r.label, r.locked ? r.shut : r.open, `${own} ${r.look}`);
+      assert.match(r.inner, new RegExp(`<small class="look-note"${r.locked ? "" : " hidden"}>${title} 인형이 열쇠예요</small>$`), `${own} ${r.look}`);
     }
     assert.doesNotMatch(home, /구매|상점|가격|한정|https?:\/\/[^"]*shop/);
   }
@@ -179,9 +177,14 @@ function pickerPage({ edition = "", look = "", theme = "" } = {}) {
     const set = new Set();
     return { add: (n) => set.add(n), remove: (n) => set.delete(n), contains: (n) => set.has(n), toggle: (n, on) => (on ? set.add(n) : set.delete(n)), set };
   };
-  const card = (id) => ({ dataset: { look: id }, classList: classes(), attrs: {}, offsetWidth: 0, setAttribute(k, v) { this.attrs[k] = v; } });
+  const titles = { classic: "포근 클래식", rare: "금실 레어", legendary: "별밤 레전더리" };
+  const card = (id) => {
+    const note = { hidden: false };
+    const label = `${titles[id]} 창틀`;
+    return { dataset: { look: id, label, lockLabel: `${label}, ${titles[id]} 인형이 열쇠예요` }, classList: classes(), attrs: {}, note, offsetWidth: 0, setAttribute(k, v) { this.attrs[k] = v; }, querySelector: (sel) => (sel === ".look-note" ? note : null) };
+  };
   const looks = ["classic", "rare", "legendary"].map(card);
-  const lede = { textContent: "" };
+  const lede = { textContent: "", dataset: { ...LEDES } };
   const said = [];
   const sounds = [];
   const cookies = [];
@@ -215,7 +218,9 @@ function pickerPage({ edition = "", look = "", theme = "" } = {}) {
     disabled: looks.filter((c) => c.attrs["aria-disabled"] === "true").map((c) => c.dataset.look),
     lede: lede.textContent,
   });
-  return { root, looks, said, sounds, cookies, tap, state, sync: () => sandbox.syncNow() };
+  const notes = () => looks.filter((c) => !c.note.hidden).map((c) => c.dataset.look);
+  const labels = () => looks.map((c) => c.attrs["aria-label"]);
+  return { root, looks, said, sounds, cookies, tap, state, notes, labels, sync: () => sandbox.syncNow() };
 }
 
 test("picking a frame wears it, keeps the world and stores it like the world: own edition clears the cookie", () => {
@@ -250,9 +255,21 @@ test("the tiles follow the plushie's edition when the admin or the naming change
   const p = pickerPage();
   p.sync();
   assert.deepEqual(p.state(), { look: "classic", pressed: ["classic"], locked: ["rare", "legendary"], disabled: ["rare", "legendary"], lede: LEDES.classic });
+  assert.deepEqual(p.notes(), ["rare", "legendary"]);
+  assert.deepEqual(p.labels(), ["포근 클래식 창틀", "금실 레어 창틀, 금실 레어 인형이 열쇠예요", "별밤 레전더리 창틀, 별밤 레전더리 인형이 열쇠예요"]);
   p.root.dataset.edition = "rare";
   p.root.dataset.look = "rare";
   p.sync();
   assert.deepEqual(p.state(), { look: "rare", pressed: ["rare"], locked: ["legendary"], disabled: ["legendary"], lede: LEDES.rare });
   assert.deepEqual(p.looks.map((c) => c.attrs["aria-disabled"]), ["false", "false", "true"]);
+  assert.deepEqual(p.notes(), ["legendary"]);
+  p.root.dataset.edition = "legendary";
+  p.root.dataset.look = "legendary";
+  p.sync();
+  assert.deepEqual([p.state().locked, p.notes(), p.state().lede], [[], [], LEDES.legendary]);
+  assert.deepEqual(p.labels(), ["포근 클래식 창틀", "금실 레어 창틀", "별밤 레전더리 창틀"]);
+  delete p.root.dataset.edition;
+  delete p.root.dataset.look;
+  p.sync();
+  assert.deepEqual([p.state().locked, p.notes()], [["rare", "legendary"], ["rare", "legendary"]]);
 });

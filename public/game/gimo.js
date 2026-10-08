@@ -930,9 +930,7 @@ export async function createGimo(api) {
     facesFrom = "";
   }
 
-  // The stage for a game, made while the room still shows 준비 중…, or the one kept from the last round while the window
-  // is the same size (the browser's bars can change it): the app takes the screen only once this has settled.
-  // One open at a time; exit() lets a pending one go.
+  // The stage for a game, or the last round's while the window keeps its size; one open at a time, and exit() lets a pending one go.
   let opening = null;
   function open() {
     opening ||= (async () => {
@@ -952,7 +950,7 @@ export async function createGimo(api) {
 
   // Everything up to the first await shows at once: play() puts the game on screen in the same task the app takes it.
   async function begin() {
-    if (!built) throw new Error("기 모으기 played without its stage");
+    if (!built) throw new Error("gimo played without its stage");
     resetStage();
     hudEl = domAdd("g-hud", `<div class="g-timer"><i></i></div><p class="g-height"><small>예상 높이</small><b>0</b><span>m</span></p>${str > 0 ? `
       <p class="g-bonus">힘 +${str >= 1 ? Math.round(str) : str}%</p>` : ""}
@@ -1420,7 +1418,6 @@ export async function createGimo(api) {
     },
     dispose() {
       exit("aborted");
-      teardown();
     },
   };
 }

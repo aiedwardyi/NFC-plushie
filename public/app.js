@@ -1907,11 +1907,6 @@ if (themeSheet) {
     const RANK = { classic: 0, rare: 1, legendary: 2 };
     const LOOK_LINES = { classic: "포근하게 돌아왔어요!", rare: "금실이 반짝반짝해요!", legendary: "별밤처럼 빛나요!" };
     const LOCK_LINES = { rare: "금실 레어 인형이 열쇠예요!", legendary: "별밤 레전더리 인형이 열쇠예요!" };
-    const LEDES = {
-      classic: "포근 클래식 친구예요. 금실 레어와 별밤 레전더리 인형은 이렇게 빛나요.",
-      rare: "금실 레어 친구예요. 어떤 창틀로 보여줄까요?",
-      legendary: "별밤 레전더리 친구예요. 어떤 창틀로 보여줄까요?",
-    };
     const looks = Array.from(themeSheet.querySelectorAll("[data-look]"));
     const plush = () => root.dataset.edition || "classic";
     const worn = () => root.dataset.look || "classic";
@@ -1922,8 +1917,11 @@ if (themeSheet) {
         el.classList.toggle("is-locked", locked);
         el.setAttribute("aria-disabled", String(locked));
         el.setAttribute("aria-pressed", String(el.dataset.look === worn()));
+        el.setAttribute("aria-label", locked ? el.dataset.lockLabel : el.dataset.label);
+        el.querySelector(".look-note").hidden = !locked;
       }
-      themeSheet.querySelector("[data-look-lede]").textContent = LEDES[plush()];
+      const lede = themeSheet.querySelector("[data-look-lede]");
+      lede.textContent = lede.dataset[plush()];
     };
 
     function pickLook(card) {
@@ -4033,6 +4031,7 @@ function loadPixi() {
 
 // How long 시작 or 텃밭 waits for its scene to be ready to show; past that it comes back with a retry line.
 const START_MS = 10000;
+const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
 
 // A wait that gives up after `ms`: nothing a room waits on before its scene shows may hold the page.
 function inTime(promise, ms) {
@@ -4072,7 +4071,6 @@ const arcade = (function arcadeRoom() {
   const world = () => root.dataset.theme || "classic";
   const kit = () => (world() === "8bit" ? "chip" : "soft");
   const BLURB = blurb.textContent;
-  const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
   const SOUNDS = ["count", "go", "note-c5", "note-c6", "note-c7", "tier", "rocket", "ding", "chime", "chime-low", "fall", "result", "best", "wind-2", "wind-3", "wind-4"];
   let retry = 0;
   let posted = 0;
@@ -4253,7 +4251,8 @@ const arcade = (function arcadeRoom() {
         await inTime(g.open(), START_MS);
         out = await g.play(mode, Number(dock.dataset.giBest) || 0);
       }
-    } catch {
+    } catch (error) {
+      console.error(error);
       g.exit();
       out = "aborted";
     } finally {
@@ -4343,7 +4342,6 @@ const racing = (function raceRoom() {
   const thumb = start.closest(".g-card").querySelector(".g-thumb-pet");
   const label = blurb.textContent;
   const button = dock.querySelector('[data-open="arcade"]');
-  const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
   let state = JSON.parse(start.dataset.race || "{}");
   // The rival raced last stays picked for the rest of this visit, across themes too.
   let raced = null;
@@ -4442,7 +4440,7 @@ const racing = (function raceRoom() {
       if (held === tap) {
         held = null;
         paint();
-        blurb.textContent = "지금은 열 수 없어요. 다시 눌러 주세요";
+        blurb.textContent = FAILED;
       }
       if (!held && !playing) ready?.exit();
     });
@@ -4483,7 +4481,6 @@ const farm = (function farmRoom() {
   const cap = button.querySelector(".dock-cap");
   const FARM_ICON = cap.innerHTML;
   const HOME_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>';
-  const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
   const ASLEEP = `쿨쿨 자는 중이에요. ${TAP_SPOT === "desk" ? "새로고침해서" : "폰에 인형을 톡 해서"} 깨워 주세요`;
   const COOKIE_MS = 60 * 1000;
   const CALM_MS = 400;

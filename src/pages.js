@@ -276,11 +276,13 @@ function lookTiles({ own, shown, name }) {
     const title = EDITIONS[id].name;
     const locked = RANK[id] > RANK[own];
     const note = `${title} 인형이 열쇠예요`;
-    return `<li><button type="button" class="theme-card look-card${locked ? " is-locked" : ""}" data-look="${id}" aria-pressed="${id === shown}"${locked ? ' aria-disabled="true"' : ""} aria-label="${title} 창틀${locked ? `, ${note}` : ""}"><span class="look-mini" aria-hidden="true"><b class="look-name">${escapeHtml(name)}</b><i class="look-frame"></i></span><span class="look-title">${title}</span>${locked ? `<small class="look-note">${note}</small>` : ""}</button></li>`;
+    const label = `${title} 창틀`;
+    // The lock's note and label are always here: the admin can change the edition under an open page.
+    return `<li><button type="button" class="theme-card look-card${locked ? " is-locked" : ""}" data-look="${id}" aria-pressed="${id === shown}"${locked ? ' aria-disabled="true"' : ""} aria-label="${locked ? `${label}, ${note}` : label}" data-label="${label}" data-lock-label="${label}, ${note}"><span class="look-mini" aria-hidden="true"><b class="look-name">${escapeHtml(name)}</b><i class="look-frame"></i></span><span class="look-title">${title}</span><small class="look-note"${locked ? "" : " hidden"}>${note}</small></button></li>`;
   }).join("");
   return `
       <h3 class="theme-sub">창틀과 이름</h3>
-      <p class="theme-lede" data-look-lede>${LOOK_LEDES[own]}</p>
+      <p class="theme-lede" data-look-lede${Object.entries(LOOK_LEDES).map(([id, text]) => ` data-${id}="${text}"`).join("")}>${LOOK_LEDES[own]}</p>
       <ul class="theme-grid look-grid" data-look-grid>${tiles}</ul>`;
 }
 

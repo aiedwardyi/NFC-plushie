@@ -814,8 +814,7 @@ export async function createFarm(api) {
     return el;
   }
   const domAnim = (el, frames, o) => el.animate(frames, { fill: "forwards", ...o }).finished.catch(() => {});
-  // The home pet's own moves, one at a time and held here so every way out cancels them by hand: a finished animation
-  // that is only forgotten keeps its last frame on the pet once collected (Chromium 141 and older), out of getAnimations().
+  // Held so every exit cancels it.
   let petAnim = null;
   function petMove(frames, o) {
     petAnim?.cancel();
@@ -2118,8 +2117,7 @@ export async function createFarm(api) {
     }
     return undefined;
   }
-  // The home pet as the home shows it, at once: its own move cancelled by hand, no inline visibility, and any CSS
-  // animation on it dropped too (getAnimations() is only the fallback for those).
+  // The home pet as the home shows it, at once: its move cancelled by hand, no inline visibility, no CSS animation left.
   function restorePet() {
     petAnim?.cancel();
     petAnim = null;
@@ -2337,9 +2335,7 @@ export async function createFarm(api) {
       paintCta();
       schedule();
     },
-    // 집으로, or a farm the app gave up on: the pet is back at once. A farm on screen slides out over the home as
-    // decoration, and its stage goes once it is out, or after LEAVE_MS whatever the frames do; one never shown, or
-    // faulted, goes at once.
+    // 집으로, or a farm given up on: the pet is back at once, and a shown farm slides out as decoration, its stage gone once out or after LEAVE_MS.
     exit() {
       if (!built) {
         // Mid-build there is no stage to slide out; the bump keeps a pending open, play or refit shut.

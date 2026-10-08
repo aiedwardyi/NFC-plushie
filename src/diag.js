@@ -23,7 +23,7 @@ const line = (value, max) => (typeof value === "string"
   : "");
 
 // A beacon body as stored, or null when it is not one; unknown events are dropped and every text is capped.
-export function readBatch(body) {
+function readBatch(body) {
   if (!body || typeof body !== "object" || Array.isArray(body) || !Array.isArray(body.events) || typeof body.id !== "string" || !LOAD.test(body.id)) return null;
   const events = body.events.slice(0, DIAG.batch)
     .filter((e) => e && typeof e === "object" && DIAG.events.includes(e.name))
@@ -71,9 +71,7 @@ export function mountDiag(app, { db, key, now }) {
       let body = null;
       try {
         body = JSON.parse(Buffer.isBuffer(req.body) ? req.body.toString("utf8") : "");
-      } catch {
-        body = null;
-      }
+      } catch {}
       const batch = readBatch(body);
       const t = now();
       if (batch?.events.length && spend(ipOf(req), batch.events.length, t)) {
@@ -86,6 +84,7 @@ export function mountDiag(app, { db, key, now }) {
       }
     } catch {
       // A bad body or a full disk still gets its 204.
+      console.log("diag write failed");
     }
     res.status(204).end();
   }, (error, req, res, next) => res.status(204).end());

@@ -28,7 +28,7 @@ export function loadImage(url, ms = IMAGE_MS) {
 // Pixi reads the shader precision on a WebGL context of its own and keeps that context; read here first and dropped, it never sits beside a stage.
 let probed = false;
 
-export async function makeStage(P, { width, height, resolution = Math.min(2, window.devicePixelRatio || 1), antialias = false, roundPixels = false, background = null, fault }) {
+export async function makeStage(P, { width, height, resolution = Math.min(2, window.devicePixelRatio || 1), roundPixels = false, background = null, fault }) {
   if (!probed) {
     probed = true;
     P.getMaxFragmentPrecision();
@@ -36,7 +36,7 @@ export async function makeStage(P, { width, height, resolution = Math.min(2, win
   }
   const app = new P.Application();
   try {
-    await app.init({ width, height, resolution, autoDensity: true, antialias, roundPixels, autoStart: false, preference: "webgl", ...(background === null ? { backgroundAlpha: 0 } : { background }) });
+    await app.init({ width, height, resolution, autoDensity: true, antialias: false, roundPixels, autoStart: false, preference: "webgl", ...(background === null ? { backgroundAlpha: 0 } : { background }) });
   } catch (error) {
     try { app.destroy(true); } catch {}
     throw error;

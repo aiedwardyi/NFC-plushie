@@ -32,10 +32,9 @@ export function nextStep(guide, steps, { talk = true, night = false } = {}) {
   return steps.find((step) => !guide.done.includes(step) && (talk || step !== "talk") && (night || step !== "sleep")) || null;
 }
 
-// The goodbye skips sleep, so a later night never comes back to tuck the pet in.
 export function finishStep(guide, step) {
-  const add = (step === "bye" ? ["sleep", "bye"] : [step]).filter((s) => !guide.done.includes(s));
-  return add.length ? { ...guide, done: [...guide.done, ...add] } : guide;
+  if (guide.done.includes(step)) return guide;
+  return { ...guide, done: [...guide.done, step] };
 }
 
 export const skipGuide = (guide) => ({ ...guide, skipped: true });
