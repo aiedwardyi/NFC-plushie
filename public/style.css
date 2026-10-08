@@ -2984,6 +2984,18 @@ html.f-layout .plate, html.f-layout .pet-stats { display: none; }
 html.f-layout .window { max-height: none; min-height: 300px; margin: 4px 0; }
 /* The basket row takes the footer's room, so a 655 px phone still fits the whole farm. */
 html.f-layout main > footer { display: none; }
+/* A farm visit wears the farm from its first paint, a field over the home, until app.js has the farm in; one that celebrates shows that on the home first.
+   The layout must stay html.f-layout's (the empty room is the basket row's), or the page jumps and the stage is sized wrong. */
+.has-app body[data-farm-visit]:not([data-celebrate]) main { padding-left: 20px; padding-right: 20px; }
+.has-app body[data-farm-visit]:not([data-celebrate]) :is(.plate, .pet-stats, main > footer) { display: none; }
+.has-app body[data-farm-visit]:not([data-celebrate]) .window { max-height: none; min-height: 300px; margin: 4px 0; touch-action: none; }
+.has-app:not(.f-layout) body[data-farm-visit]:not([data-celebrate]) main::after { content: ""; order: -2; min-height: 52px; margin-top: -2px; }
+.has-app body[data-farm-visit]:not([data-celebrate]) :is(.dock-btn:not([data-farm]), .topbar-end, .mascot-toggle) { opacity: .22; filter: saturate(.5); pointer-events: none; }
+.has-app body[data-farm-visit]:not([data-celebrate]) .sky { animation: none; background: linear-gradient(180deg, #bfe1f4, #f7f3e8 35%, #f4e8cc 35% 41%, #d6eab0 41%, #bfdc93); }
+.has-app[data-time="evening"] body[data-farm-visit]:not([data-celebrate]) .sky { background: linear-gradient(180deg, #f6a77d, #ffcf9e 22%, #ffe2bd 35%, #f4e8cc 35% 41%, #d6eab0 41%, #bfdc93); box-shadow: inset 0 0 0 100vmax rgba(138, 58, 30, .12); }
+.has-app[data-time="night"] body[data-farm-visit]:not([data-celebrate]) .sky { background: linear-gradient(180deg, #16204a, #36457e 35%, #f4e8cc 35% 41%, #d6eab0 41%, #bfdc93); box-shadow: inset 0 0 0 100vmax rgba(30, 42, 94, .42); }
+.has-app body[data-farm-visit]:not([data-celebrate]) .sky::after { display: none; }
+.has-app body[data-farm-visit]:not([data-celebrate]) :is(.sky > *, .pet, .want) { visibility: hidden; }
 
 .dock-btn.is-loading .dock-cap { animation: f-load .7s ease-in-out infinite alternate; }
 @keyframes f-load { to { transform: translateY(2px) scale(.94); } }

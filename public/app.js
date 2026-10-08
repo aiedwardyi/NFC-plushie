@@ -3644,6 +3644,16 @@ const combo = (function tapCombo() {
     nfcButton.addEventListener("click", () => listen());
   }
 
+  // A desk's plushie is F5: while a game or the farm takes taps, the key is a read of this plushie, not a reload.
+  if (TAP_SPOT === "desk") {
+    window.addEventListener("keydown", (event) => {
+      if (event.key !== "F5" || event.ctrlKey || event.shiftKey || event.altKey || event.metaKey || !sinkFn) return;
+      event.preventDefault();
+      // A held key repeats; only its first press is a tap.
+      if (!event.repeat) heard({ serialNumber: uid });
+    }, true);
+  }
+
   // Called once the opening is over: the page's own stage, then listening when NFC is already allowed.
   function start() {
     ready = true;
@@ -4501,13 +4511,19 @@ const farm = (function farmRoom() {
     care.fx.say(FAILED);
   }
 
+  // The page wears the farm from its first paint (style.css, on data-farm-visit) until the farm is in or the visit gives up.
+  const uncover = () => delete body.dataset.farmVisit;
+
   function openVisit(r) {
     opening = true;
     preload();
     prepare().then((st) => {
       opening = false;
-      if (isOpen || careHold.asleep || st !== ready) return undefined;
-      return enter(st, r, "visit").then(() => {
+      if (isOpen || careHold.asleep || st !== ready) {
+        uncover();
+        return undefined;
+      }
+      return enter(st, r, "visit").finally(uncover).then(() => {
         if (!r.picked.length || !isOpen || st !== ready) return undefined;
         // A page opened by a plushie tap stays silent until it is touched, so the show waits for that touch.
         return st.promptTouch().then(() => {
@@ -4517,6 +4533,7 @@ const farm = (function farmRoom() {
         });
       }).catch((error) => broken(error, r));
     }, () => {
+      uncover();
       // The visit already harvested, so its XP and hearts show even without the farm.
       openFailed();
       flush(r);
@@ -4577,23 +4594,29 @@ const farm = (function farmRoom() {
     })();
   }
 
+  // Read before runCelebrate drops it: a celebrating visit has no cover, so it must not get one once the mark is gone.
+  const celebrating = body.hasAttribute("data-celebrate");
+
   function start() {
     if (body.dataset.farmNext) scheduleDot(Number(body.dataset.farmNext));
     const raw = body.dataset.farmVisit;
     if (!raw) return;
-    delete body.dataset.farmVisit;
+    if (celebrating) uncover();
     try {
       visit = JSON.parse(raw);
     } catch {
+      uncover();
       return;
     }
     prepare().catch(() => {});
-    whenCalm(() => {
+    const go = () => {
       if (!visit || isOpen || opening) return;
       const r = visit;
       visit = null;
       openVisit(r);
-    });
+    };
+    if (celebrating) whenCalm(go);
+    else go();
   }
 
   // A world picked while the farm is open rebuilds it once it closes.
