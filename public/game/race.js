@@ -13,6 +13,8 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, k) => a + (b - a) * k;
 const smooth = (k) => (k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k));
 const rnd = (a, b) => a + Math.random() * (b - a);
+// The roster's art under /game/art/race/, which phones keep a day; bump ART_V when one changes.
+const ART_V = 2;
 const faceUrl = (kind, face, px) => px ? `/themes/px/${kind}${face === "canon" ? "" : face === "blink" ? "-closed" : "-happy"}-px.png` : `/mascot-${kind}-${face === "canon" ? "512-v3.png" : face === "blink" ? "closed-512.webp" : "happy-512.webp"}`;
 
 async function image(url) {
@@ -722,7 +724,7 @@ export async function createRace(api) {
     const best = state[rival]?.best || 0;
     agi = Math.max(0, Number(api.bonus?.("agi")) || 0);
     $(".r-pick").innerHTML = `<p class="r-eyebrow">${venue}</p><h2>달리기 시합</h2>
-      <ul class="r-roster">${Object.keys(PETS).filter((p) => p !== own).map((p) => `<li class="${p === rival ? "is-open" : "is-locked"}"><img src="/game/art/race/${p}${p === rival ? "" : "-locked"}.webp" alt=""><b>${PETS[p]}</b><small>${p === rival ? `Lv.${level}` : "곧 만나요"}</small></li>`).join("")}</ul>
+      <ul class="r-roster">${Object.keys(PETS).filter((p) => p !== own).map((p) => `<li class="${p === rival ? "is-open" : "is-locked"}"><img src="/game/art/race/${p}${p === rival ? "" : "-locked"}.webp?v=${ART_V}" alt=""><b>${PETS[p]}</b><small>${p === rival ? `Lv.${level}` : "곧 만나요"}</small></li>`).join("")}</ul>
       <p class="r-versus"><b>${PETS[rival]} 친구</b><span>Lv.${level}</span><small>${best ? `최고 기록 Lv.${best} 승리` : "첫 승리를 기다려요"}</small></p>
       ${agi > 0 ? `<p class="r-bonus">민첩 +${agi >= 1 ? Math.round(agi) : agi}%</p>` : ""}
       <button type="button" class="r-go">시작</button>`;
