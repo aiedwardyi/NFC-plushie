@@ -4152,6 +4152,84 @@ html[data-theme="najeon"] .talk-bar {
   .r-game .r-card { top: calc(var(--r-top) + 52px); }
 }
 
+/* 우리 동네: the race picker's other pane, rival cards as the plushie showroom, 우리 동네 소식 and its row in 우리 기록 */
+.r-places { display: flex; gap: 4px; margin: -4px 0 10px; padding: 3px; border-radius: 999px; background: rgba(var(--g-aura), .2); }
+.r-places button { flex: 1; min-height: 32px; margin: 0; padding: 0; border: 0; border-radius: 999px; font-size: 14px !important; font-weight: 800; background: none; color: inherit; box-shadow: none; opacity: .7; }
+.r-places [aria-selected="true"] { background: var(--g-accent); color: var(--g-accent-ink); opacity: 1; box-shadow: 0 2px 0 rgba(0, 0, 0, .15); }
+.r-town { min-height: 132px; }
+.c-wait { margin: 50px 0 0; font-size: 13px; font-weight: 700; opacity: .6; }
+.c-head { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0; font-size: 13px; font-weight: 700; }
+.c-head b { font-size: 15px; font-weight: 900; }
+.c-head span { opacity: .7; }
+.c-pips { display: inline-flex; gap: 4px; }
+.c-pip { width: 11px; height: 11px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff6d6, var(--g-accent) 70%); box-shadow: 0 0 5px rgba(var(--g-aura), .7); }
+.c-pip.is-used { opacity: .28; box-shadow: none; filter: grayscale(1); }
+/* One row that scrolls sideways, so the sheet keeps its height however many pets the city has. */
+.c-row { display: flex; gap: 8px; margin: 0 -14px 6px; padding: 9px 14px 5px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; touch-action: pan-x; }
+.c-row::-webkit-scrollbar { display: none; }
+/* Each card is a corner of the owner's home: its navy, the frame and the name in the edition's material, so a tier reads as it does on this pet's own page. */
+.c-card {
+  --c-thumb: var(--thumb-classic);
+  position: relative; display: grid; justify-items: center; gap: 2px; flex: none; width: 94px; min-height: 0; margin: 0; padding: 7px 5px 6px;
+  border-radius: 16px; background: var(--navy2); color: var(--cream); box-shadow: inset 0 0 0 1.5px rgba(var(--g-aura), .55); text-align: center; scroll-snap-align: start;
+}
+.c-card:active { transform: none; box-shadow: inset 0 0 0 1.5px rgba(var(--g-aura), .55); }
+.c-card[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--g-accent), 0 6px 14px rgba(0, 0, 0, .25); }
+.c-card .look-frame { width: 80px; height: 58px; }
+/* The window shows the pet's portrait in this world, over the sky it would stand in. */
+.c-card.look-card .look-frame::after { background: var(--c-thumb) center 74% / 128% auto no-repeat, linear-gradient(180deg, var(--sky-top), var(--sky-bottom) 74%); }
+.c-card .look-name { max-width: 84px; margin-top: 4px; font-size: 13px; }
+.c-meta { font-size: 10.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.c-tag { position: absolute; top: -8px; right: -3px; z-index: 1; padding: 2px 7px; border-radius: 999px; font-size: 10.5px; font-style: normal; font-weight: 900; background: var(--g-accent); color: var(--g-accent-ink); box-shadow: 0 2px 6px rgba(0, 0, 0, .2); }
+html[data-theme="8bit"] .c-card { --c-thumb: var(--thumb-8bit); }
+html[data-theme="milk"] .c-card { --c-thumb: var(--thumb-milk); }
+html[data-theme="najeon"] .c-card { --c-thumb: var(--thumb-najeon); }
+html[data-theme="8bit"] .c-card .look-frame::after { image-rendering: pixelated; }
+.c-say { position: relative; margin: 12px 0 8px; padding: 12px 12px 9px; border-radius: 16px; font-size: 13px; font-weight: 700; line-height: 1.5; text-align: left; background: rgba(var(--g-aura), .16); box-shadow: inset 0 0 0 1.5px rgba(var(--g-aura), .4); }
+.c-say b { position: absolute; top: -10px; left: 10px; max-width: 70%; overflow: hidden; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 900; white-space: nowrap; text-overflow: ellipsis; background: var(--g-accent); color: var(--g-accent-ink); }
+.c-cities { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; margin: 0 0 8px; padding: 0; list-style: none; }
+.c-city { width: 100%; min-height: 30px; margin: 0; padding: 0; border-radius: 10px; font-size: 13px !important; font-weight: 800; background: rgba(var(--g-aura), .16); color: inherit; box-shadow: inset 0 0 0 1px rgba(var(--g-aura), .35); }
+.c-city:active { transform: none; box-shadow: inset 0 0 0 1px rgba(var(--g-aura), .35); }
+.c-city[aria-pressed="true"] { background: var(--g-accent); color: var(--g-accent-ink); box-shadow: none; }
+.c-fine { margin: 0 0 4px; font-size: 11px; font-weight: 600; line-height: 1.45; opacity: .66; }
+/* This week's top three on one line. */
+.c-best { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; }
+.c-week { flex: none; font-size: 10.5px; font-weight: 900; color: var(--g-xp); }
+.c-best ol { display: flex; flex: 1; gap: 5px; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.c-best li { display: flex; align-items: baseline; justify-content: center; gap: 3px; flex: 1; min-width: 0; padding: 4px 6px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; background: rgba(var(--g-aura), .16); }
+.c-best i { font-style: normal; font-weight: 900; color: var(--g-xp); }
+.c-best li b { min-width: 0; overflow: hidden; font-weight: 900; text-overflow: ellipsis; }
+.c-best span { flex: none; opacity: .7; }
+.c-best .is-me { box-shadow: inset 0 0 0 1.5px var(--g-accent); }
+.c-best .is-none { opacity: .7; }
+/* A city race's countdown holds up the rival's card like a challenge. */
+.r-foe { position: absolute; z-index: 3; right: 16px; bottom: max(76px, calc(env(safe-area-inset-bottom) + 64px)); display: grid; justify-items: center; gap: 4px; pointer-events: none; }
+.r-vs { margin: 0; padding: 3px 12px; border-radius: 999px; font-size: 14px; font-weight: 900; color: var(--g-accent-ink); background: var(--g-accent); box-shadow: 0 4px 12px rgba(0, 0, 0, .25); }
+.r-foe .c-card { box-shadow: 0 0 0 3px var(--g-accent), 0 14px 30px rgba(0, 0, 0, .35); transform: rotate(4deg); }
+.r-8bit .r-places, .r-8bit .r-places button, .r-8bit .r-vs { border-radius: 0; }
+.r-8bit .r-vs { box-shadow: 2px 2px 0 rgba(0, 0, 0, .45); }
+.r-8bit .r-foe .c-card { box-shadow: 0 0 0 4px #ffec27, 6px 6px 0 4px rgba(0, 0, 0, .45); transform: none; }
+.r-milk .r-places { background: #fff0f4; }
+.r-milk .r-vs { font-family: "Cafe24Ssurround", sans-serif; font-weight: 400; }
+.r-milk .r-foe .c-card { transform: rotate(-4deg); }
+.r-najeon .r-places { border-radius: 4px; }
+.r-najeon .r-places button { border-radius: 2px; }
+/* 우리 동네 소식 on the home's sheet: the cards take the sheet's gold, 복수전 its key. */
+.news { color: var(--cream); }
+.news .c-say { margin-top: 18px; font-size: .9375rem; }
+.news-row { margin: 4px -20px 6px; padding: 12px 20px 8px; justify-content: safe center; }
+.news-acts, .town-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.news-acts .copy, .town-acts .copy { flex: 1 1 0; min-width: max-content; justify-content: center; }
+.record-town { margin-top: 14px; }
+.record-town .record-list div { padding-bottom: 4px; }
+.record-town .town-acts { margin-top: 8px; }
+.town-pick .c-cities { margin: 10px 0 0; }
+.town-pick .c-city { min-height: 38px; color: var(--cream); }
+.town-pick .c-city[aria-pressed="true"] { color: var(--g-accent-ink); }
+.town-ask { margin-top: 10px; }
+.town-ask > p { margin: 0; font-size: .8125rem; font-weight: 700; line-height: 1.5; color: var(--cream); }
+.town-fail { margin: 8px 0 0; font-size: .8125rem; font-weight: 700; color: var(--coral); }
+
 /* Guide: the coach's soft scrim with one spotlight, a ring hugging the target and a finger pointing at it */
 :root {
   --coach-dim: rgba(8, 11, 19, 0.62);

@@ -174,7 +174,7 @@ html[data-theme="milk"] .dock-label { color: var(--berry); font-weight: 800; }
 html[data-theme="milk"] footer { color: var(--berry-soft); }
 
 /* Buttons and fields */
-html[data-theme="milk"] :where(main, .sheet, .demo-sheet) :where(button:not(.pet-hit, .dock-btn, .mascot-tog, .tile, .sheet-close, .st-share, .copy, .demo-close, .theme-btn, .theme-card), .button) {
+html[data-theme="milk"] :where(main, .sheet, .demo-sheet) :where(button:not(.pet-hit, .dock-btn, .mascot-tog, .tile, .sheet-close, .st-share, .copy, .demo-close, .theme-btn, .theme-card, .c-card, .c-city), .button) {
   background: linear-gradient(180deg, #ff9db6, var(--straw-deep));
   color: #fff;
   font-family: "Cafe24Ssurround", sans-serif;
@@ -190,6 +190,8 @@ html[data-theme="milk"] :where(main, .sheet, .demo-sheet) input::placeholder { c
 html[data-theme="milk"] .recovery { background: #fff; box-shadow: 0 10px 24px -10px rgba(242, 87, 127, 0.45); }
 html[data-theme="milk"] .recovery::before { border-color: var(--straw); }
 html[data-theme="milk"] .recovery h2 { color: var(--straw-deep); }
+/* 우리 동네's lines, in the race and on the home: the pet's name tag in the sticker type. */
+html[data-theme="milk"] .c-say b { font-family: "Cafe24Ssurround", sans-serif; font-weight: 400; }
 html[data-theme="milk"] .code { color: var(--berry); }
 
 /* Sheets */

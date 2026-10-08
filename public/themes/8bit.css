@@ -298,7 +298,7 @@ html[data-theme="8bit"] .dock-label { color: var(--cream); font-size: 11px; }
 html[data-theme="8bit"] footer { color: #83769c; font-size: 11px; }
 
 /* Buttons and fields */
-html[data-theme="8bit"] :where(main, .sheet, .demo-sheet) :where(button:not(.pet-hit, .dock-btn, .mascot-tog, .tile, .sheet-close, .st-share, .copy, .demo-close, .theme-btn, .theme-card), .button) {
+html[data-theme="8bit"] :where(main, .sheet, .demo-sheet) :where(button:not(.pet-hit, .dock-btn, .mascot-tog, .tile, .sheet-close, .st-share, .copy, .demo-close, .theme-btn, .theme-card, .c-card, .c-city), .button) {
   border-radius: 0;
   background: var(--gold-light);
   color: var(--ink);
@@ -312,6 +312,20 @@ html[data-theme="8bit"] :where(main, .sheet, .demo-sheet) input {
 }
 html[data-theme="8bit"] .recovery,
 html[data-theme="8bit"] .recovery::before { border-radius: 0; }
+/* 우리 동네's cards, chips and lines, in the race and on the home: square, with hard shadows. */
+html[data-theme="8bit"] .c-card,
+html[data-theme="8bit"] .c-say,
+html[data-theme="8bit"] .c-say b,
+html[data-theme="8bit"] .c-city,
+html[data-theme="8bit"] .c-best li,
+html[data-theme="8bit"] .c-tag,
+html[data-theme="8bit"] .c-pip { border-radius: 0; }
+html[data-theme="8bit"] .c-card[aria-pressed="true"] { box-shadow: 0 0 0 3px #ffec27, 4px 4px 0 3px rgba(0, 0, 0, .45); }
+html[data-theme="8bit"] .c-best .is-me { box-shadow: inset 0 0 0 2px #ffec27; }
+html[data-theme="8bit"] .c-say b,
+html[data-theme="8bit"] .c-tag { box-shadow: 2px 2px 0 rgba(0, 0, 0, .45); }
+html[data-theme="8bit"] .c-pip { background: #ffec27; box-shadow: inset -2px -2px 0 #ffa300; }
+html[data-theme="8bit"] .c-pip.is-used { background: #5f574f; box-shadow: none; filter: none; opacity: 1; }
 
 /* Sheets */
 html[data-theme="8bit"] .sheet-card {

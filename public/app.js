@@ -4331,6 +4331,13 @@ const arcade = (function arcadeRoom() {
   return { restyle };
 })();
 
+// 우리 기록's 우리 동네 row; a city picked in the race shows there too.
+let syncTown = () => {};
+// What the pet says with no ticket left: today's first plushie tap gives 3, and once they're spent, tomorrow's does.
+const ticketLine = (tapped) => (tapped
+  ? `오늘 도전 티켓을 다 썼어요! 내일 또 ${TAP_SPOT === "desk" ? "새로고침해서 인사해" : "톡 해"} 주세요`
+  : `${TAP_SPOT === "desk" ? "새로고침해서 인사해 주면" : "폰에 저를 톡 해 주면"} 오늘 도전 티켓 3장이 생겨요!`);
+
 /* 오락실: 달리기 시합 on its own full-screen stage made for each game, its code and art loaded when the room first opens; a finished race uses one of the day's 3 XP plays. */
 const racing = (function raceRoom() {
   const dock = document.querySelector(".dock[data-care-uid]");
@@ -4351,7 +4358,27 @@ const racing = (function raceRoom() {
   let playing = false;
   let retry = 0;
   let posted = 0;
+  // A 복수전 waits on its own button in 우리 동네 소식, not on 시작.
+  let from = { sheet, start };
   const sounds = ["count", "go", "ding", "tier", "race-hop", "race-dash", "race-crowd", "race-shutter", "race-win", "race-lose", "race-pop", "race-drum"];
+  // A saved race's reply: the day's plays, the level and the stats as a reload would draw them.
+  function settle(r) {
+    dock.dataset.arcadeLeft = String(r.xpLeft);
+    sheet.querySelectorAll(".g-pip").forEach((pip, i) => pip.classList.toggle("is-used", i < 3 - r.xpLeft));
+    sheet.querySelector("[data-arcade-today] b").textContent = r.xpLeft ? `${r.xpLeft}번 남았어요` : "다 했어요!";
+    button.classList.toggle("has-new", sheet.querySelector("[data-open-gifts]").classList.contains("has-new") || r.xpLeft > 0);
+    paintLevel(r);
+    paintStats(r.stats);
+    trainedPop(r.trained);
+  }
+  async function post(path, body) {
+    try {
+      const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
+        body: JSON.stringify({ uid: dock.dataset.careUid, ...body }) });
+      const r = res.ok ? await res.json() : null;
+      return r?.ok ? r : null;
+    } catch { return null; }
+  }
   const api = {
     still: () => prefersReducedMotion(),
     sfx: (name, options) => playSfx(name, options),
@@ -4360,24 +4387,31 @@ const racing = (function raceRoom() {
     async finish(rival, won) {
       raced = rival;
       const run = ++posted;
-      try {
-        const res = await fetch("/arcade", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
-          body: JSON.stringify({ uid: dock.dataset.careUid, game: "race", rival, won }) });
-        if (!res.ok) return null;
-        const r = await res.json();
-        if (!r.ok) return null;
-        // A slow reply from an earlier race must not roll back a newer one.
-        if (run !== posted) return r;
+      const r = await post("/arcade", { game: "race", rival, won });
+      // A slow reply from an earlier race must not roll back a newer one.
+      if (r && run === posted) {
         state = r.race;
-        dock.dataset.arcadeLeft = String(r.xpLeft);
-        sheet.querySelectorAll(".g-pip").forEach((pip, i) => pip.classList.toggle("is-used", i < 3 - r.xpLeft));
-        sheet.querySelector("[data-arcade-today] b").textContent = r.xpLeft ? `${r.xpLeft}번 남았어요` : "다 했어요!";
-        button.classList.toggle("has-new", sheet.querySelector("[data-open-gifts]").classList.contains("has-new") || r.xpLeft > 0);
-        paintLevel(r);
-        paintStats(r.stats);
-        trainedPop(r.trained);
+        settle(r);
+      }
+      return r;
+    },
+    // 우리 동네: the city's rivals race as bots; each result goes to the match the server issued for it.
+    city: {
+      name: document.querySelector("[data-nameplate]")?.textContent.trim() || "",
+      ask: (tapped) => ticketLine(tapped),
+      roster: () => post("/city/roster"),
+      board: () => post("/city/board"),
+      join: (city) => post("/city/join", { city }).then((r) => {
+        if (r) syncTown(r.city);
         return r;
-      } catch { return null; }
+      }),
+      start: (rival) => post("/city/race", { rival }),
+      async finish(id, won) {
+        const run = ++posted;
+        const r = await post("/city/result", { id, won });
+        if (r && run === posted) settle(r);
+        return r;
+      },
     },
   };
   function prepare() {
@@ -4390,8 +4424,12 @@ const racing = (function raceRoom() {
   }
   function paint() {
     start.disabled = careHold.asleep || Boolean(held);
-    start.textContent = held ? "준비 중…" : "시작";
+    start.textContent = held && from.start === start ? "준비 중…" : "시작";
     blurb.textContent = careHold.asleep ? "쿨쿨 자는 중이에요" : label;
+    if (from.start !== start) {
+      from.start.disabled = Boolean(held);
+      from.start.textContent = held ? "준비 중…" : from.label;
+    }
   }
   // The race is on screen in the same task the home is taken: its open() settled before this runs.
   async function run(g, mode) {
@@ -4415,23 +4453,25 @@ const racing = (function raceRoom() {
     else if (out === "aborted") care.fx.say(FAILED);
   }
   // As in 기 모으기: the home is taken only once the race can show, and a wait past START_MS gives 시작 back.
-  function begin() {
+  // A 복수전 begins the same way from its own sheet, on its rival's card.
+  function begin(rematch = null, origin = { sheet, start }) {
     if (held || playing || careHold.asleep || petBusy()) return;
     const tap = {};
     held = tap;
+    from = origin;
     paint();
     playSfx(`care-${root.dataset.theme === "8bit" ? "chip" : "soft"}-press`);
     tryVibrate(12);
     const listening = "NDEFReader" in window ? combo.listen() : null;
     const reader = listening && Promise.race([listening, new Promise((done) => setTimeout(() => done(null), NFC_WAIT_MS))]);
-    const opened = prepare().then((g) => (held === tap ? g.open(state, root.dataset.mascot, raced).then(() => g) : g));
+    const opened = prepare().then((g) => (held === tap ? g.open(state, root.dataset.mascot, raced, rematch).then(() => g) : g));
     Promise.all([inTime(opened, START_MS), reader]).then(([g, nfc]) => {
       const mine = held === tap;
       if (mine) {
         held = null;
         paint();
       }
-      if (!mine || sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) {
+      if (!mine || sheetOpen !== origin.sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) {
         if (!held && !playing) g.exit();
         return;
       }
@@ -4461,11 +4501,161 @@ const racing = (function raceRoom() {
     sounds.forEach((name) => loadSfx(`game-${kit}-${name}`));
     if (!careHold.asleep) prepare().catch(() => {});
   });
-  start.addEventListener("click", begin);
+  start.addEventListener("click", () => begin());
   // A hidden page pauses the race wherever it is: its clock runs on animation frames.
   document.addEventListener("visibilitychange", () => { if (document.hidden) { held = null; paint(); } });
   window.addEventListener("pagehide", restyle);
-  return { restyle };
+  return {
+    restyle,
+    // The 복수전 button waits like 시작 while the race gets ready, then the race opens on `card` in 우리 동네.
+    rematch(card, origin) {
+      if (!careHold.asleep) prepare().catch(() => {});
+      const kit = root.dataset.theme === "8bit" ? "chip" : "soft";
+      sounds.forEach((name) => loadSfx(`game-${kit}-${name}`));
+      begin(card, { ...origin, label: origin.start.textContent });
+    },
+  };
+})();
+
+/* 우리 기록's 우리 동네: the owner picks, changes or leaves the pet's city here; picking one is joining. */
+const townRow = document.querySelector("[data-town]");
+if (townRow && recoveryDock) {
+  const [name, idle, change, leave, picker, confirm, go, fail] = ["name", "idle", "change", "leave", "pick", "confirm", "go", "fail"]
+    .map((key) => townRow.querySelector(`[data-town-${key}]`));
+
+  function step(state) {
+    idle.hidden = state !== "idle";
+    picker.hidden = state !== "pick";
+    confirm.hidden = state !== "confirm";
+  }
+
+  syncTown = (city) => {
+    townRow.dataset.city = city || "";
+    const chip = picker.querySelector(`[data-city="${city}"]`);
+    name.textContent = chip?.textContent || "아직 없어요";
+    change.textContent = city ? "동네 바꾸기" : "동네 고르기";
+    leave.hidden = !city;
+    picker.querySelectorAll("[data-city]").forEach((b) => b.setAttribute("aria-pressed", String(b === chip)));
+  };
+
+  function send(path, body) {
+    if (townRow.getAttribute("aria-busy") === "true") return;
+    townRow.setAttribute("aria-busy", "true");
+    fail.hidden = true;
+    fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ uid: recoveryDock.dataset.careUid, ...body }) })
+      .then((res) => (res.ok ? res.json() : null))
+      .catch(() => null)
+      .then((reply) => {
+        townRow.removeAttribute("aria-busy");
+        if (reply?.ok) syncTown(reply.city);
+        else fail.hidden = false;
+        step("idle");
+        change.focus();
+      });
+  }
+
+  change.addEventListener("click", () => {
+    fail.hidden = true;
+    step("pick");
+  });
+  leave.addEventListener("click", () => {
+    fail.hidden = true;
+    step("confirm");
+    go.focus();
+  });
+  picker.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-city]");
+    if (!chip) return;
+    if (chip.dataset.city === townRow.dataset.city) step("idle");
+    else send("/city/join", { city: chip.dataset.city });
+  });
+  go.addEventListener("click", () => send("/city/leave", {}));
+  townRow.querySelectorAll("[data-town-cancel]").forEach((b) => b.addEventListener("click", () => {
+    step("idle");
+    change.focus();
+  }));
+  new MutationObserver(() => {
+    if (townRow.closest("[data-sheet]").hidden) step("idle");
+  }).observe(townRow.closest("[data-sheet]"), { attributes: true, attributeFilter: ["hidden"] });
+}
+
+/* 우리 동네 소식: the races run against the pet while its owner was away, told once on the next calm home, with the
+   challengers' cards and a 복수전 that spends one of the day's tickets. */
+const news = (function townNews() {
+  const dock = document.querySelector(".dock[data-care-uid]");
+  const sheet = document.querySelector('[data-sheet="news"]');
+  const box = sheet?.querySelector("[data-news]");
+  if (!dock || !box) return null;
+  const root = document.documentElement;
+  const name = document.querySelector("[data-nameplate]")?.textContent.trim() || "";
+  let asking = false;
+  let told = false;
+  // The server hands the news out once, so once asked for it waits here for a calm page.
+  let news = null;
+  let foe = null;
+
+  // A 복수전 is on offer against a challenger who won, while a ticket is left; all wins get one cheer, no tickets the pet's line.
+  function fill(reply, { cardHtml, sayHtml }) {
+    const lost = reply.news.filter((n) => !n.held);
+    const offer = lost.length > 0 && reply.tickets > 0;
+    foe = offer ? lost[0].card : null;
+    const cards = reply.news.map((n, i) => cardHtml(n.card, offer && !n.held ? { tag: "졌어요", attrs: ` data-news-card="${i}"`, pressed: n.card === foe } : { tag: n.held ? "이겼어요" : "졌어요", still: true }));
+    const acts = !lost.length ? '<button type="button" class="copy is-go" data-news-done>잘했어요!</button>'
+      : `${offer ? '<button type="button" class="copy is-go" data-news-go>복수전 · 티켓 1장</button>' : ""}<button type="button" class="copy" data-news-done>다음에 할래요</button>`;
+    box.innerHTML = `${sayHtml(name, reply.line)}
+      <div class="c-row news-row">${cards.join("")}</div>
+      ${lost.length && !offer ? sayHtml(name, ticketLine(reply.tapped)) : ""}
+      <div class="news-acts">${acts}</div>`;
+    box.addEventListener("click", (event) => {
+      const card = event.target.closest("[data-news-card]");
+      if (card) {
+        foe = reply.news[Number(card.dataset.newsCard)].card;
+        box.querySelectorAll("[data-news-card]").forEach((b) => b.setAttribute("aria-pressed", String(b === card)));
+      } else if (event.target.closest("[data-news-done]")) closeSheet();
+      else if (event.target.closest("[data-news-go]") && foe) racing?.rematch(foe, { sheet, start: event.target.closest("[data-news-go]") });
+    });
+  }
+
+  // The pet has said its piece and has the screen: no guide step, reveal, level-up, game, sheet, panel or talk bar on it.
+  function calm() {
+    return !(document.hidden || waking || careHold.asleep || careHold.busy || sheetOpen || (demoSheet && !demoSheet.hidden)
+      || ["has-coach", "has-reveal", "is-edition-lit", "g-on", "f-on"].some((c) => root.classList.contains(c)) || "editionReveal" in root.dataset
+      || dialogBox?.querySelector(".dialog-dots, .dialog-cursor:not(.is-done), .is-thinking") || (dialogBox?.classList.contains("is-seq") && !dialogBox.classList.contains("is-end"))
+      || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump, .talk-bar.is-open"));
+  }
+
+  // Tries again until a calm moment; a page that never has one keeps the news for the next visit.
+  function show() {
+    if (told || asking) return;
+    if (!calm()) {
+      window.setTimeout(show, 1500);
+      return;
+    }
+    if (news) {
+      told = true;
+      fill(...news);
+      openSheet("news");
+      return;
+    }
+    asking = true;
+    Promise.all([
+      fetch("/city/inbox", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ uid: dock.dataset.careUid }) })
+        .then((res) => (res.ok ? res.json() : null)),
+      import("/game/city.js"),
+    ]).then(([reply, parts]) => {
+      asking = false;
+      if (!reply?.ok || !reply.news.length) {
+        told = true;
+        return;
+      }
+      news = [reply, parts];
+      show();
+    }, () => {
+      asking = false;
+      window.setTimeout(show, 1500);
+    });
+  }
+  return { show };
 })();
 
 /* 텃밭: the pet's farm on a WebGL stage; one plushie tap harvests every ripe crop, a tap on a plot picks that one. */
@@ -6620,6 +6810,7 @@ if (document.body.hasAttribute("data-wake")) {
     armReveal();
     combo?.start();
     farm?.start();
+    news?.show();
   });
 } else if (care && document.body.hasAttribute("data-asleep")) {
   care.doze();
@@ -6628,6 +6819,7 @@ if (document.body.hasAttribute("data-wake")) {
 } else {
   runCelebrate();
   startDialog(() => care?.opened());
+  news?.show();
   combo?.start();
   farm?.start();
   armReveal();

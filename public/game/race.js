@@ -38,8 +38,9 @@ function cropOf(img) {
 export async function createRace(api) {
   // A retry's query reaches the parts too: a failed module import stays failed for its URL.
   const v = new URL(import.meta.url).search;
-  const [{ RACE, eta, newRace, picker, raceTap, stepRace }, { WORLD_ART, canvas, sprites }, { DEFAULT_KIND, KINDS, kindOf }, { makeStage, loadImage: image }] = await Promise.all([import(`./race-model.js${v}`), import(`./race-art.js${v}`), import(`../kinds.js${v}`), import(`./stage.js${v}`)]);
+  const [{ RACE, eta, newRace, picker, raceTap, stepRace }, { WORLD_ART, canvas, sprites }, { DEFAULT_KIND, KINDS, kindOf }, { makeStage, loadImage: image }, { boardHtml, cardHtml, cityPicker, esc, sayHtml, ticketPips }, { cityName }] = await Promise.all([import(`./race-model.js${v}`), import(`./race-art.js${v}`), import(`../kinds.js${v}`), import(`./stage.js${v}`), import(`./city.js${v}`), import(`../cities.js${v}`)]);
   const PETS = Object.fromEntries(KINDS.map((k) => [k.id, k.name]));
+  const rivalName = () => (bout ? bout.foe.name : PETS[match.rival]);
   const P = window.PIXI;
   const FX = P.filters;
   const world = document.documentElement.dataset.theme in CUPS ? document.documentElement.dataset.theme : "classic";
@@ -66,6 +67,7 @@ export async function createRace(api) {
     <div class="r-big" aria-live="assertive"></div>
     <p class="r-hint" hidden></p>
     <figure class="r-photo" hidden><div class="r-shot"></div><figcaption><span>사진 판독</span><b></b></figcaption></figure>
+    <div class="r-foe" aria-hidden="true" hidden></div>
     <div class="r-pick" hidden></div>
     <div class="g-result r-card" role="status" hidden></div>`;
   document.body.append(shell);
@@ -650,7 +652,19 @@ export async function createRace(api) {
   let state = {};
   let own = first;
   let match = picker(kindOf(first).rival, (kind) => loadFaces([kind]));
+  // The built-in rival picked last; a city rival only borrows the lane.
+  let kindPick = match.rival;
   let level = 1;
+  // 우리 동네, the picker's other pane: `town` is the last roster reply, `foe` the picked city rival, `bout` its issued match.
+  let pane = "kinds";
+  let town = null;
+  let ranks = null;
+  let foe = null;
+  let revenge = null;
+  let bout = null;
+  let chosen = "";
+  let asking = false;
+  let townAsk = 0;
   // The pet's 민첩 bonus in percent, read as the picker opens.
   let agi = 0;
   let model = null;
@@ -747,6 +761,8 @@ export async function createRace(api) {
   function pick(again = false) {
     setPhase("pick");
     quick = again;
+    // Picking a city is joining, so no chip waits picked.
+    if (!again) chosen = "";
     model = null;
     result = null;
     photo = null;
@@ -757,12 +773,20 @@ export async function createRace(api) {
     $(".r-photo").hidden = true;
     $(".r-hint").hidden = true;
     big.textContent = "";
+    bout = null;
+    $(".r-foe").hidden = true;
     agi = Math.max(0, Number(api.bonus?.("agi")) || 0);
     $(".r-pick").innerHTML = `<p class="r-eyebrow">${venue}</p><h2>달리기 시합</h2>
+      ${api.city ? `<div class="r-places" role="tablist" aria-label="상대"><button type="button" role="tab" data-pane="kinds">친구들</button><button type="button" role="tab" data-pane="city">우리 동네</button></div>` : ""}
       <ul class="r-roster">${Object.keys(PETS).filter((p) => p !== own).map((p) => `<li><button type="button" data-rival="${p}"><img src="${px ? faceUrl(p, "canon", true) : `/game/art/race/${p}.webp?v=${ART_V}`}" alt=""><b>${PETS[p]}</b><small>Lv.${state[p]?.level || 1}</small></button></li>`).join("")}</ul>
+      ${api.city ? '<div class="r-town"></div>' : ""}
       <p class="r-versus"></p>
       ${agi > 0 ? `<p class="r-bonus">민첩 +${agi >= 1 ? Math.round(agi) : agi}%</p>` : ""}
       <button type="button" class="r-go">시작</button>`;
+    if (pane === "city") {
+      if (again) paintTown();
+      else loadTown();
+    }
     ready();
     unfill($(".r-pick"));
     $(".r-pick").style.pointerEvents = "";
@@ -777,14 +801,21 @@ export async function createRace(api) {
 
   // The sheet shows a pick at once; the lane, its tag and 시작 wait for that rival's art.
   function ready() {
-    level = state[match.rival]?.level || 1;
-    const best = state[match.rival]?.best || 0;
-    for (const b of shell.querySelectorAll(".r-roster button")) b.setAttribute("aria-pressed", String(b.dataset.rival === match.rival));
-    $(".r-versus").innerHTML = `<b>${PETS[match.rival]} 친구</b><span>Lv.${level}</span><small>${best ? `최고 기록 Lv.${best} 승리` : "첫 승리를 기다려요"}</small>`;
     if (runners[1].kind !== match.shown) {
       kinds();
       warm();
     }
+    for (const tab of shell.querySelectorAll(".r-places [data-pane]")) tab.setAttribute("aria-selected", String(tab.dataset.pane === pane));
+    $(".r-roster").hidden = pane === "city";
+    if (api.city) $(".r-town").hidden = pane !== "city";
+    if (pane === "city") return readyTown();
+    $(".r-versus").hidden = false;
+    $(".r-pick .r-go").hidden = false;
+    if (shell.querySelector(".r-bonus")) $(".r-bonus").hidden = false;
+    level = state[match.rival]?.level || 1;
+    const best = state[match.rival]?.best || 0;
+    for (const b of shell.querySelectorAll(".r-roster button")) b.setAttribute("aria-pressed", String(b.dataset.rival === match.rival));
+    $(".r-versus").innerHTML = `<b>${PETS[match.rival]} 친구</b><span>Lv.${level}</span><small>${best ? `최고 기록 Lv.${best} 승리` : "첫 승리를 기다려요"}</small>`;
     $(".r-tag.is-rival").textContent = `${PETS[match.shown]} Lv.${state[match.shown]?.level || 1}`;
     const go = $(".r-pick .r-go");
     go.disabled = match.shown !== match.rival;
@@ -792,9 +823,156 @@ export async function createRace(api) {
   }
 
   function choose(kind) {
-    if (phase !== "pick" || kind === match.rival) return;
-    match.choose(kind).then(() => { if (phase === "pick") ready(); });
+    if (phase !== "pick") return;
+    kindPick = kind;
+    lane(kind);
+  }
+
+  // The rival lane takes `kind` once its art is in.
+  function lane(kind) {
+    if (kind !== match.rival) match.choose(kind).then(() => { if (phase === "pick") ready(); });
     ready();
+  }
+
+  function setPane(next) {
+    if (phase !== "pick" || next === pane || asking) return;
+    pane = next;
+    if (pane === "city" && (!town || town.failed)) loadTown();
+    else if (pane === "city") paintTown();
+    lane(pane === "city" ? foe?.kind || match.rival : kindPick);
+  }
+
+  /* ---------- 우리 동네 ---------- */
+  const voice = (line) => sayHtml(api.city.name, line);
+
+  // The roster and this week's best, asked again each time the town opens; the last one shows meanwhile, and a reply for an older ask is dropped.
+  function loadTown() {
+    const ask = ++townAsk;
+    if (town?.failed) town = null;
+    paintTown();
+    ready();
+    Promise.all([api.city.roster(), api.city.board()]).then(([roster, board]) => {
+      if (ask !== townAsk) return;
+      town = roster || { failed: true };
+      ranks = board?.board || null;
+      const rivals = rosterOf();
+      foe = rivals.find((r) => r.id === foe?.id) || rivals[0] || null;
+      if (phase !== "pick") return;
+      paintTown();
+      if (pane === "city" && foe) lane(foe.kind);
+      else ready();
+    });
+  }
+
+  // A 복수전 rival leads the roster, even one that has moved to another city since.
+  const rosterOf = () => (town?.city ? [...(revenge ? [revenge] : []), ...(town.rivals || []).filter((r) => r.id !== revenge?.id)] : []);
+
+  function paintTown() {
+    const box = $(".r-town");
+    if (!box || !api.city) return;
+    if (!town) box.innerHTML = '<p class="c-wait">동네에 가는 중…</p>';
+    else if (town.failed) box.innerHTML = voice("지금은 동네에 못 가요. 잠시 후에 다시 해 볼까요?");
+    else if (!town.city) {
+      box.innerHTML = `${voice("우리 동네를 골라 주세요! 같은 동네 친구들이랑 달리기 시합을 해요")}
+        ${cityPicker(chosen)}
+        <p class="c-fine">다른 친구들한테는 이름, 동물, 등급, 레벨만 보여요. 우리 기록에서 언제든 바꾸거나 나갈 수 있어요.</p>`;
+    } else {
+      const rivals = rosterOf();
+      const left = town.tickets || 0;
+      const line = !rivals.length ? `아직 ${cityName(town.city)}에는 우리뿐이에요. 친구들이 오면 여기서 만나요!`
+        : left ? "" : api.city.ask(town.tapped);
+      box.innerHTML = `<p class="c-head"><b>${cityName(town.city)}</b>${ticketPips(left)}<span>오늘 티켓 ${left}장</span></p>
+        ${rivals.length ? `<div class="c-row" role="group" aria-label="${cityName(town.city)} 친구들">${rivals.map((r) => cardHtml(r, { attrs: ` data-foe="${esc(r.id)}"`, tag: r === revenge ? "복수전" : "", pressed: false })).join("")}</div>` : ""}
+        ${ranks ? boardHtml(ranks) : ""}
+        ${line ? voice(line) : ""}`;
+    }
+  }
+
+  // The city pane's lane, its picked card and button: join, then pick and race a rival on one of the day's tickets.
+  function readyTown() {
+    const go = $(".r-pick .r-go");
+    for (const b of shell.querySelectorAll(".r-town [data-foe]")) b.setAttribute("aria-pressed", String(b.dataset.foe === foe?.id));
+    for (const b of shell.querySelectorAll(".r-town [data-city]")) b.setAttribute("aria-pressed", String(b.dataset.city === chosen));
+    const joined = Boolean(town?.city);
+    const lined = joined && foe && match.shown === foe.kind && match.rival === foe.kind;
+    // Until a city rival takes the lane, the runner there only stands in, untagged.
+    $(".r-tag.is-rival").textContent = lined ? `${foe.name} Lv.${foe.level}` : "";
+    // The picked card stands in for the versus line.
+    $(".r-versus").hidden = true;
+    const left = town?.tickets || 0;
+    if (shell.querySelector(".r-bonus")) $(".r-bonus").hidden = !(joined && foe && left);
+    go.hidden = joined && (!foe || !left);
+    go.disabled = asking || !town || (!town.failed && !joined && !chosen) || (joined && !lined);
+    go.textContent = asking || (joined && !lined) ? "준비 중…"
+      : !town ? "잠시만요…"
+      : town.failed ? "다시 해 볼래요"
+      : !joined ? (chosen ? `${cityName(chosen)}에서 달릴래요` : "동네를 골라 주세요")
+      : `${foe === revenge ? "복수전" : "도전하기"} · 티켓 1장`;
+  }
+
+  function chooseFoe(id) {
+    const next = rosterOf().find((r) => r.id === id);
+    if (phase !== "pick" || !next || asking) return;
+    foe = next;
+    lane(foe.kind);
+  }
+
+  function chooseCity(id) {
+    if (phase !== "pick" || asking) return;
+    chosen = id;
+    ready();
+  }
+
+  function press() {
+    if (pane !== "city") return start();
+    if (!town || town.failed) return loadTown();
+    if (!town.city) return join();
+    challenge();
+  }
+
+  function join() {
+    if (!chosen || asking) return;
+    asking = true;
+    ready();
+    Promise.resolve(api.city.join(chosen)).then((reply) => {
+      asking = false;
+      if (phase !== "pick") return;
+      if (reply?.ok) loadTown();
+      else {
+        town = { failed: true };
+        paintTown();
+        ready();
+      }
+    });
+  }
+
+  // A city race asks first: the server spends the ticket and hands back the match and the rival's race level.
+  function challenge(again = false) {
+    if (!foe || asking || !(town?.tickets > 0) || match.shown !== foe.kind || match.rival !== foe.kind) return;
+    const g = gen;
+    const want = again ? "result" : "pick";
+    asking = true;
+    if (again) $(".r-card [data-choice=again]").textContent = "준비 중…";
+    else ready();
+    Promise.resolve(api.city.start(foe.id)).then((reply) => {
+      asking = false;
+      if (g !== gen || phase !== want) return;
+      if (!reply?.ok) {
+        // A rival that left or a ticket spent elsewhere: the town tells what is true now.
+        if (again) pick();
+        else loadTown();
+        return;
+      }
+      town.tickets = reply.tickets;
+      if (again) {
+        S.flash.tint = look.shadow;
+        if (!still) S.flash.alpha = 1;
+        pick(true);
+      }
+      bout = { id: reply.id, foe: reply.rival };
+      level = reply.level;
+      start();
+    });
   }
 
   function start() {
@@ -827,7 +1005,14 @@ export async function createRace(api) {
     $(".r-hud").hidden = false;
     motion($(".r-hud"), [{ transform: "translateY(-46px)", opacity: 0 }, { transform: "none", opacity: 1 }], 520, 120);
     stripW = $(".r-strip").clientWidth;
-    $(".r-lv").textContent = `${PETS[match.rival]} Lv.${level}`;
+    $(".r-lv").textContent = `${rivalName()} Lv.${bout ? bout.foe.level : level}`;
+    if (bout) {
+      const card = $(".r-foe");
+      card.innerHTML = `<p class="r-vs">도전!</p>${cardHtml(bout.foe, { still: true })}`;
+      unfill(card);
+      card.hidden = false;
+      motion(card, [{ transform: "translateY(40px) rotate(8deg) scale(.6)", opacity: 0 }, { transform: "none", opacity: 1 }], 520, 160);
+    }
     $(".r-head.is-me").src = pics[own].url;
     $(".r-head.is-rival").src = pics[match.rival].url;
     if (!hintSeen) {
@@ -854,6 +1039,14 @@ export async function createRace(api) {
   }
 
   function go() {
+    if (bout) {
+      const card = $(".r-foe");
+      fillTo(card, still ? [{ opacity: 1 }, { opacity: 0 }] : [{ transform: "none" }, { transform: "translateY(60px) rotate(-6deg) scale(.7)", opacity: 0 }], { duration: 260, easing: "ease-in" });
+      after(280, () => {
+        card.hidden = true;
+        unfill(card);
+      });
+    }
     say("땅!", "is-go");
     sound("go", 0.9);
     api.buzz([20, 40, 20]);
@@ -1005,10 +1198,11 @@ export async function createRace(api) {
     const g = gen;
     saved = null;
     // A race left before its card still saves: the app paints the reply, only this card is gone.
-    Promise.resolve(api.finish(match.rival, won)).then((reply) => {
+    Promise.resolve(bout ? api.city.finish(bout.id, won) : api.finish(match.rival, won)).then((reply) => {
       if (g !== gen) return;
       saved = reply || false;
       if (reply?.race) state = reply.race;
+      if (bout && reply && town) Object.assign(town, { tickets: reply.tickets, tapped: reply.tapped, wins: reply.wins });
       if (phase === "result") fillCard();
     }, () => { if (g === gen) { saved = false; if (phase === "result") fillCard(); } });
     // Reduced motion keeps the photo and drops only its slow-mo and flash.
@@ -1119,8 +1313,8 @@ export async function createRace(api) {
     $(".r-card").innerHTML = `<div class="g-badge r-medal${result.won ? " is-win" : ""}">${result.won ? "1등" : "2등"}</div>
       <p class="g-place">${result.won ? "멋지게 달렸어요!" : "끝까지 달렸어요!"}</p>
       <p class="g-meters r-time"><b>${result.time.toFixed(2)}</b>초</p>
-      <p class="g-prev">${result.gap.toFixed(2)}초 차이 · 상대 Lv.${level}</p>
-      <p class="r-flex"></p><div class="r-saved"></div>
+      <p class="g-prev">${result.gap.toFixed(2)}초 차이 · ${bout ? `${esc(bout.foe.name)} Lv.${bout.foe.level}` : `상대 Lv.${level}`}</p>
+      <p class="r-flex"></p><div class="r-saved"></div>${bout ? '<div class="r-spent" hidden></div>' : ""}
       <div class="g-actions"><button type="button" class="g-again" data-choice="again">한 번 더</button></div>
       <div class="g-actions r-more"><button type="button" class="g-quit" data-choice="pick">상대 바꾸기</button><button type="button" class="g-quit" data-choice="quit">그만할래요</button></div>`;
     fillCard();
@@ -1132,12 +1326,20 @@ export async function createRace(api) {
   // The server's reply fills in the level-up line, XP and the buttons that need a saved record.
   function fillCard() {
     const next = state[match.rival]?.level || level;
-    $(".r-flex").textContent = !result.won ? "다음엔 꼭 이길 거예요!" : saved && level < RACE.cap ? `${PETS[match.rival]} 친구가 더 빨라졌어요! Lv.${level} → Lv.${next}` : level >= RACE.cap ? "최고 레벨에서 이겼어요!" : "";
+    $(".r-flex").textContent = !result.won ? "다음엔 꼭 이길 거예요!" : bout ? `${bout.foe.name}에게 이겼어요!${saved ? ` 이번 주 ${saved.wins}승` : ""}` : saved && level < RACE.cap ? `${PETS[match.rival]} 친구가 더 빨라졌어요! Lv.${level} → Lv.${next}` : level >= RACE.cap ? "최고 레벨에서 이겼어요!" : "";
     $(".r-saved").innerHTML = saved === null ? '<p class="g-xp">기록을 남기는 중이에요…</p>'
       : !saved ? '<p class="g-xp">기록을 못 남겼어요</p>'
       : `${saved.xpGain > 0 ? `<p class="g-xp"><b>+${saved.xpGain} XP</b><span>오늘 ${3 - saved.xpLeft}/3</span></p>` : '<p class="g-xp">오늘 XP는 다 받았어요</p>'}${saved.leveledUp ? `<p class="g-level">쑥쑥 컸어요! 이제 Lv. ${saved.level}!</p>` : ""}`;
     for (const b of shell.querySelectorAll(".r-card [data-choice=again], .r-card [data-choice=pick]")) b.disabled = !saved;
-    if (saved && result.won && level < RACE.cap && !flexAt) flexAt = clock;
+    if (bout) {
+      const again = $(".r-card [data-choice=again]");
+      const spent = Boolean(saved) && !(town?.tickets > 0);
+      again.textContent = "한 번 더 · 티켓 1장";
+      again.closest(".g-actions").hidden = spent;
+      $(".r-card .r-spent").hidden = !spent;
+      if (spent) $(".r-card .r-spent").innerHTML = voice(api.city.ask(town.tapped));
+    }
+    if (saved && result.won && level < RACE.cap && !flexAt && !bout) flexAt = clock;
   }
 
   /* ---------- frame ---------- */
@@ -1539,7 +1741,7 @@ export async function createRace(api) {
     edge.hidden = !out;
     if (out) {
       const gap = Math.abs(model.distance[1] - model.distance[0]).toFixed(1);
-      const text = rx < 0 ? `◀ ${PETS[match.rival]} ${gap}m` : `${PETS[match.rival]} ${gap}m ▶`;
+      const text = rx < 0 ? `◀ ${rivalName()} ${gap}m` : `${rivalName()} ${gap}m ▶`;
       if (edge.textContent !== text) edge.textContent = text;
       edge.classList.toggle("is-right", rx > 0);
       edge.style.top = `${Math.round(Y(D.rival, L.size * 0.7))}px`;
@@ -1553,7 +1755,7 @@ export async function createRace(api) {
     const under = card ? card.offsetTop + card.offsetHeight + TAG_ROOM : 0;
     for (const r of runners) {
       const el = $(r.id ? ".r-tag.is-rival" : ".r-tag.is-me");
-      const on = (phase === "pick" || (flex && r.id)) && r.head;
+      const on = (phase === "pick" || (flex && r.id)) && r.head && Boolean(el.textContent);
       el.hidden = !on;
       // Left/top, not transform: the flex pop scales the tag, and a scaled translate would throw it off the head.
       if (on) {
@@ -1605,6 +1807,7 @@ export async function createRace(api) {
     for (const id of timers) clearTimeout(id);
     timers.clear();
     for (const p of parts.splice(0)) { p.s.visible = false; p.s.removeFromParent(); pool.push(p.s); }
+    asking = false;
     shell.style.pointerEvents = "none";
     const close = () => {
       if (g !== gen) return;
@@ -1629,10 +1832,13 @@ export async function createRace(api) {
 
   // Faces, stage and scene for a race, made while the room still shows 준비 중…: the app takes the screen only once this
   // has settled, and play() shows it at once.
-  async function make(race, kind, raced) {
+  async function make(race, kind, raced, rematch = null) {
     const g = gen;
     const next = kindOf(kind).id;
-    const wanted = raced && raced !== next ? raced : kindOf(next).rival;
+    const back = raced && raced !== next ? raced : kindOf(next).rival;
+    // A 복수전, or a race reopened in 우리 동네, lines up the city rival; the built-in pick waits for its own pane.
+    const lead = rematch || (pane === "city" ? foe : null);
+    const wanted = lead ? kindOf(lead.kind).id : back;
     // The pet's own faces are a must; a rival whose art is late races as an animal whose art is here, when there is one.
     const spare = Object.keys(pics).some((k) => k !== next && k !== wanted);
     const [mine, theirs] = await Promise.allSettled([loadFaces([next]), spare ? inTime(loadFaces([wanted]), RIVAL_MS) : loadFaces([wanted])]);
@@ -1643,6 +1849,12 @@ export async function createRace(api) {
     state = race || {};
     own = next;
     match = picker(rival, (k) => loadFaces([k]));
+    kindPick = lead ? back : rival;
+    revenge = rematch;
+    if (rematch) {
+      pane = "city";
+      foe = rematch;
+    }
     still = Boolean(api.still());
     shell.classList.toggle("r-still", still);
     // Laid out for its size but unseen until play(): the iris opens on a drawn scene.
@@ -1701,13 +1913,20 @@ export async function createRace(api) {
   document.addEventListener("keydown", key);
   $(".r-close").addEventListener("click", () => exit(true));
   $(".r-pick").addEventListener("click", (event) => {
+    const tab = event.target.closest("[data-pane]");
     const tile = event.target.closest("[data-rival]");
-    if (tile) choose(tile.dataset.rival);
-    else if (event.target.closest(".r-go")) start();
+    const card = event.target.closest("[data-foe]");
+    const city = event.target.closest("[data-city]");
+    if (tab) setPane(tab.dataset.pane);
+    else if (tile) choose(tile.dataset.rival);
+    else if (card) chooseFoe(card.dataset.foe);
+    else if (city) chooseCity(city.dataset.city);
+    else if (event.target.closest(".r-go")) press();
   });
   $(".r-card").addEventListener("click", (event) => {
     const choice = event.target.closest("[data-choice]")?.dataset.choice;
     if (choice === "quit") exit(true);
+    else if (choice === "again" && saved && bout) challenge(true);
     else if (choice && saved) {
       // The camera cuts back to the start line under a quick dip to the world's shade.
       S.flash.tint = look.shadow;
@@ -1739,11 +1958,12 @@ export async function createRace(api) {
     get phase() { return phase; },
     tap,
     exit,
-    async open(race, kind, raced) {
+    // `rematch` is a city rival's card for a 복수전: the race opens on it in 우리 동네.
+    async open(race, kind, raced, rematch) {
       const g = gen;
       while (opening) await opening.catch(() => {});
       if (g !== gen) throw STOP;
-      opening = make(race, kind, raced);
+      opening = make(race, kind, raced, rematch);
       try {
         await opening;
       } finally {
