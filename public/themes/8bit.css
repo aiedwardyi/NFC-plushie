@@ -70,6 +70,14 @@ html[data-theme="8bit"] .level-pin {
   box-shadow: -3px 0 0 0 var(--cream), 3px 0 0 0 var(--cream), 0 -3px 0 0 var(--cream), 0 3px 0 0 var(--cream);
 }
 html[data-theme="8bit"] .level-pin::after { display: none; }
+html[data-theme="8bit"] .level-pin svg {
+  width: 18px;
+  height: 16px;
+  fill: none;
+  filter: none;
+  background: url("/themes/px/heart-full.svg") center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+}
 
 /* The window: a pixel frame, banded sky, grass */
 html[data-theme="8bit"] .window {
@@ -438,7 +446,8 @@ html[data-theme="8bit"] .copy {
   font-weight: 700;
   box-shadow: inset 0 0 0 3px var(--gold-light);
 }
-html[data-theme="8bit"] .copy.is-done { background: var(--gold-light); color: var(--ink); }
+html[data-theme="8bit"] .copy.is-done,
+html[data-theme="8bit"] .copy.is-go { background: var(--gold-light); color: var(--ink); }
 html[data-theme="8bit"] label { font-weight: 700; }
 html[data-theme="8bit"] .nameplate.is-placeholder { color: rgba(255, 241, 232, 0.45); }
 

@@ -58,9 +58,10 @@ html[data-theme="milk"] .level-pin {
   color: #fff;
   font-family: "Cafe24Ssurround", sans-serif;
   font-weight: 400;
-  box-shadow: 0 3px 0 #d94a72, inset 0 2px 0 rgba(255, 255, 255, 0.6), 0 6px 12px rgba(242, 87, 127, 0.3);
+  box-shadow: 0 0 0 2.5px #fff, 0 3px 0 2.5px #d94a72, inset 0 2px 0 rgba(255, 255, 255, 0.6), 0 6px 12px rgba(242, 87, 127, 0.3);
 }
 html[data-theme="milk"] .level-pin::after { background: rgba(255, 255, 255, 0.7); }
+html[data-theme="milk"] .level-pin svg { fill: #fff; filter: drop-shadow(0 1px 0 #d94a72); }
 
 /* Window: plush frame with stitching, pink sky, gingham floor */
 html[data-theme="milk"] .window {
@@ -264,7 +265,8 @@ html[data-theme="milk"] .copy {
   font-weight: 800;
   box-shadow: inset 0 0 0 2px var(--straw);
 }
-html[data-theme="milk"] .copy.is-done { background: var(--straw-deep); color: #fff; box-shadow: none; }
+html[data-theme="milk"] .copy.is-done,
+html[data-theme="milk"] .copy.is-go { background: var(--straw-deep); color: #fff; box-shadow: none; }
 html[data-theme="milk"] .nameplate.is-placeholder { color: rgba(242, 87, 127, 0.42); }
 html[data-theme="milk"] .nameplate.is-placeholder::after,
 html[data-theme="milk"] .nameplate.is-typing::after { background: var(--straw-deep); }

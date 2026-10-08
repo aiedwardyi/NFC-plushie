@@ -224,16 +224,16 @@ for (const kind of KINDS) {
   });
 }
 
-test("a pet races its zodiac neighbour; the saved animal picks the side", async (t) => {
+test("a picked animal races any rival, each with its own level", async (t) => {
   const ctx = await setup(t);
   const jar = await meet(ctx, A, "Mochi");
   await post(ctx, "/demo/kind", jar, { uid: A, kind: "tiger" });
-  for (const rival of ["horse", "sheep", "tiger", "rat"]) {
-    assert.equal((await post(ctx, "/arcade", jar, { uid: A, game: "race", rival, won: true })).status, 400, rival);
-  }
+  assert.equal((await post(ctx, "/arcade", jar, { uid: A, game: "race", rival: "unicorn", won: true })).status, 400);
   const won = await post(ctx, "/arcade", { ...jar, mascot: "sheep" }, { uid: A, game: "race", rival: "rabbit", won: true });
   assert.equal(won.status, 200);
   assert.deepEqual(won.body.race.rabbit, { level: 2, best: 1 });
   assert.deepEqual(Object.keys(won.body.race), KIND_IDS);
+  const horse = await post(ctx, "/arcade", jar, { uid: A, game: "race", rival: "horse", won: true });
+  assert.deepEqual([horse.status, horse.body.race.horse, horse.body.race.rabbit], [200, { level: 2, best: 1 }, { level: 2, best: 1 }]);
   assert.match(await home(ctx, jar), /data-race="[^"]*rabbit&quot;:\{&quot;level&quot;:2/);
 });

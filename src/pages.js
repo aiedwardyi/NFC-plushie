@@ -61,6 +61,7 @@ const ICONS = {
   keyhole: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9.6" r="3.4"/><path d="M10.4 11.8 9.2 18.4h5.6l-1.2-6.6z"/></svg>`,
   close: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>`,
   copy: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="2.2"/><path d="M15.5 8.5V6.7a2.2 2.2 0 0 0-2.2-2.2H6.7a2.2 2.2 0 0 0-2.2 2.2v6.6a2.2 2.2 0 0 0 2.2 2.2h1.8"/></svg>`,
+  share: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14.5v-11M8 7.5l4-4 4 4"/><path d="M8.5 10.5H7.2A2.2 2.2 0 0 0 5 12.7v5.6a2.2 2.2 0 0 0 2.2 2.2h9.6a2.2 2.2 0 0 0 2.2-2.2v-5.6a2.2 2.2 0 0 0-2.2-2.2h-1.3"/></svg>`,
   arcade: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.6 8.5h8.8a4.6 4.6 0 0 1 4.4 5.9l-.8 2.9a2.3 2.3 0 0 1-3.9 1L14.4 16H9.6l-1.7 2.3a2.3 2.3 0 0 1-3.9-1l-.8-2.9a4.6 4.6 0 0 1 4.4-5.9z"/><path d="M8 10.9v3.4M6.3 12.6h3.4M15.4 11.6h.01M17.4 13.6h.01"/></svg>`,
   mic: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5"/></svg>`,
   send: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19.5V5M6 10.5 12 4.5l6 6"/></svg>`,
@@ -383,7 +384,7 @@ function farmAttrs(farm) {
   return ` data-farm-dot="${farm.dot ? 1 : 0}" data-farm-now="${farm.now}"${next}${visit}`;
 }
 
-export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = DEFAULT_KIND, wake = false, morning = false, asleep = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, meet = false, theme = "classic", farm = null, owner = false, card = null, edition = "classic" } = {}) {
+export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = DEFAULT_KIND, wake = false, morning = false, asleep = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, days = null, meet = false, theme = "classic", farm = null, owner = false, card = null, edition = "classic" } = {}) {
   const look = themeOf(theme);
   const title = escapeHtml(row?.pet_name || "새 친구");
   const timeEl = timeLine ? `<p class="time-line" data-time-line></p>` : "";
@@ -391,14 +392,9 @@ export function page(row, content, { waving = false, away = false, lonely = fals
     ? ` data-celebrate="${celebrate}"`
     : "";
   const kind = mascotKind(row?.kind || mascot);
-  const toggle = `<aside class="mascot-toggle" data-mascot-toggle${owner ? ' data-owner="1"' : ""} role="group" aria-label="친구 바꾸기">
-    ${TOGGLE.map((k) => `<button type="button" class="mascot-tog${k.id === kind ? " is-active" : ""}" data-mascot="${k.id}" aria-label="${k.name} 친구" aria-pressed="${k.id === kind}">
-      <img src="/mascot-${k.id}-512-v3.png" width="32" height="32" alt="" decoding="async" draggable="false">
-    </button>`).join("\n    ")}
-  </aside>`;
   const pin = level ? `<span class="level-pin">Lv. ${level}</span>` : "";
   const topEnd = dock
-    ? `<span class="topbar-end"><button type="button" class="theme-btn" data-open="theme" aria-haspopup="dialog" aria-label="꾸미기"><span class="swatch" aria-hidden="true"></span></button>${level ? `<button type="button" class="level-pin" data-open="record" aria-haspopup="dialog" aria-label="우리 기록, Lv. ${level}">Lv. ${level}</button>` : ""}</span>`
+    ? `<span class="topbar-end"><button type="button" class="theme-btn" data-open="theme" aria-haspopup="dialog" aria-label="꾸미기"><span class="swatch" aria-hidden="true"></span></button>${days ? `<button type="button" class="level-pin" data-open="record" aria-haspopup="dialog" aria-label="우리 기록, 함께한 지 ${days}일">${ICONS.heart}${days}일</button>` : ""}</span>`
     : pin;
   const themed = look.id !== "classic";
   const unnamed = meet && !row?.pet_name;
@@ -430,7 +426,6 @@ export function page(row, content, { waving = false, away = false, lonely = fals
   <main>
     <header class="topbar">
       <span class="wordmark">POKKEY</span>
-      ${toggle}
       ${topEnd}
     </header>
     <section class="plate">
@@ -463,6 +458,25 @@ function keyCard(code) {
   </aside>`;
 }
 
+// The server keeps only the code's hash, so 우리 기록 hands out a new one; the page shows it here until the sheet closes.
+function recordKey() {
+  return `<aside class="recovery" data-recovery>
+        <h2>안심 코드</h2>
+        <p>폰을 바꿔도 이 코드로 다시 만날 수 있어요.</p>
+        <p class="recovery-fail" data-recovery-fail role="alert" hidden>지금은 못 바꿨어요. 잠시 후 다시 해볼까요?</p>
+        <div class="recovery-acts" data-recovery-idle><button type="button" class="copy" data-recovery-ask>새 안심 코드 받기</button></div>
+        <div class="recovery-ask" data-recovery-confirm hidden>
+          <p>새 코드를 받으면 예전 코드는 더 이상 쓸 수 없어요.</p>
+          <div class="recovery-acts"><button type="button" class="copy is-go" data-recovery-go>새 코드 받기</button><button type="button" class="copy" data-recovery-cancel>취소</button></div>
+        </div>
+        <div class="recovery-new" data-recovery-shown hidden>
+          <strong class="code" data-recovery-code tabindex="-1"></strong>
+          <div class="recovery-acts"><button type="button" class="copy" data-recovery-copy>${ICONS.copy}<span>복사</span></button><button type="button" class="copy" data-recovery-share hidden>${ICONS.share}<span>보내기</span></button></div>
+          <p>꼭 적어두거나 나에게 보내두세요.</p>
+        </div>
+      </aside>`;
+}
+
 function talkBar(name) {
   const label = `${escapeHtml(name)}에게 말 걸기`;
   return `<form class="talk-bar" data-talk-bar hidden>
@@ -478,18 +492,18 @@ function talkBar(name) {
 const SHOP = sheetHtml("shop", "씨앗 가게", `<p class="shop-purse"><span class="shop-coins" data-shop-coins></span><span class="shop-bag" data-shop-bag></span></p>
       <ul class="shop-list" data-shop-list></ul>`);
 
-function homeExtras(row, pet, found, mascot, talk) {
+function homeExtras(row, pet, found, mascot, talk, keyed) {
   return {
     dock: dockHtml({ gift: Boolean(pet?.gift), want: pet?.want, meals: pet?.meals, plays: pet?.plays, uid: row.uid, combo: pet?.combo, later: pet?.comboLaterLine, arcadeLeft: pet?.arcadeLeft, giBest: pet?.giBest, farmDot: Boolean(pet?.farm?.dot) }),
     sheets: arcadeSheet(pet, found, mascot)
       + sheetHtml("gifts", "선물함", giftCollection(found, pet?.gift || null))
-      + sheetHtml("record", "우리 기록", recordSheet(row, pet))
+      + sheetHtml("record", "우리 기록", `${recordSheet(row, pet)}${keyed ? `\n      ${recordKey()}` : ""}`)
       + SHOP
       + (talk ? talkBar(row.pet_name) : ""),
   };
 }
 
-export function petPage(row, code = null, { celebrate = "", pet = null, mascot = DEFAULT_KIND, demo = "", found = [], theme = "classic", talk = false, ask = "", guest = false, card = null } = {}) {
+export function petPage(row, code = null, { celebrate = "", pet = null, mascot = DEFAULT_KIND, demo = "", found = [], theme = "classic", talk = false, ask = "", guest = false, keyed = true, card = null } = {}) {
   mascot = row.kind || mascot;
   const firstMeet = celebrate === "claim" || celebrate === "named";
   let greeting = row.pet_name
@@ -523,13 +537,13 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
   const talking = talk && Boolean(row.pet_name);
   const mic = talking ? `<button type="button" class="talk-mic" data-talk-mic aria-label="말 걸기" aria-expanded="false" aria-pressed="false" hidden>${ICONS.mic}</button>` : "";
   const dialog = `<p class="intro"${pet ? petAttr : ""}>${greeting}</p>${moments}${giftHtml}${mic}`;
-  const extras = row.pet_name ? homeExtras(row, pet, found, mascot, talking) : { dock: "", sheets: "" };
+  const extras = row.pet_name ? homeExtras(row, pet, found, mascot, talking, keyed && !guest) : { dock: "", sheets: "" };
   return page(
     row,
     `${recovery}${prompt}`,
     {
       waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet, mascot, wake: Boolean(code), morning: Boolean(pet?.morning), asleep: Boolean(pet?.asleep), demo,
-      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, meet: !row.pet_name, theme, farm: row.pet_name ? pet?.farm : null, owner: Boolean(row.pet_name), card: row.pet_name ? card : null, edition: card?.edition, ...extras,
+      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, days: pet ? pet.days : null, meet: !row.pet_name, theme, farm: row.pet_name ? pet?.farm : null, owner: Boolean(row.pet_name), card: row.pet_name ? card : null, edition: card?.edition, ...extras,
     },
   );
 }
@@ -542,7 +556,7 @@ export function strangerPage(row, message = "", { mascot = DEFAULT_KIND, demo = 
       <input type="hidden" name="uid" value="${escapeHtml(row.uid)}">
       <label for="code">안심 코드</label>
       <input id="code" name="code" required autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="claim-help">
-      <p id="claim-help">처음 만났을 때 적어둔 안심 코드를 넣어주세요.</p>
+      <p id="claim-help">처음 받은 코드나 우리 기록에서 새로 받은 안심 코드를 넣어주세요.</p>
       <button type="submit" class="primary">내 친구를 데려올래요!</button>
     </form>`, { away: true, mascot, demo, theme, card, edition: card?.edition, dialog: `<p class="intro">이 작은 친구는 이미 주인이 있어요.</p>` });
 }
@@ -598,7 +612,7 @@ export function previewPetPage({ kind, count, tier = "common", reason = "", masc
       timeLine: true, celebrate: visual, countHtml, lonely: kind === "lonely", mascot, theme,
       card: { kind: mascot, edition: "classic", sheet: statSheet(parseStats(""), mascot, "classic") },
       dialog: `<p class="intro">${greeting}</p>${momentsHtml}${giftHtml}`, speaker: row.pet_name,
-      stats: `<section class="pet-stats" aria-label="돌봄 상태">${stats}</section>`, level,
+      stats: `<section class="pet-stats" aria-label="돌봄 상태">${stats}</section>`, level, days: previewPet.days,
       dock: dockHtml({ gift: showGift, arcadeLeft: 3 }),
       sheets: arcadeSheet({ arcadeLeft: 3, gift: previewGift }, previewFound, mascot)
         + sheetHtml("gifts", "선물함", giftCollection(previewFound, previewGift))

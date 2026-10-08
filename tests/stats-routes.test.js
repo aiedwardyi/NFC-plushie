@@ -174,15 +174,15 @@ test("RARE_UIDS and LEGENDARY_UIDS read like DEMO_UIDS", async (t) => {
   assert.deepEqual(await sheet(C), [50, 40, 70, 60]);
 });
 
-test("only the owner's own page marks the toggle to save the animal", async (t) => {
+test("only the owner's own page carries the uid the animal fill saves to", async (t) => {
   const ctx = await setup(t);
   const jar = await meet(ctx, A, "Mochi");
   const home = await ctx.request(`/t?uid=${A}&view=1`, { jar });
-  assert.match(home.html, /<aside class="mascot-toggle" data-mascot-toggle data-owner="1" /);
+  assert.match(home.html, /<nav class="dock"[^>]* data-care-uid="04AAAAAAAAAAA1"/);
   const stranger = await ctx.request(`/t?uid=${A}`);
-  assert.match(stranger.html, /<aside class="mascot-toggle" data-mascot-toggle role="group"/);
+  assert.match(stranger.html, /이미 주인이 있어요/);
   const unnamed = await ctx.request(`/t?uid=${B}`);
   for (const html of [stranger.html, unnamed.html, (await ctx.request("/dev/preview?kind=gift&count=10")).html]) {
-    assert.doesNotMatch(html, /data-owner/);
+    assert.doesNotMatch(html, /data-care-uid|data-owner/);
   }
 });

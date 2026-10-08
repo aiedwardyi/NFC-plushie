@@ -83,11 +83,11 @@ const visit = (ctx, jar) => ctx.request(`/t?uid=${A}`, { jar: { ...jar, pet_skip
 const fresh = Object.fromEntries(KIND_IDS.map((k) => [k, { level: 1, best: 0 }]));
 const count = (html, re) => (html.match(re) || []).length;
 
-test("race rejects locked, own and malformed rivals without writing", async (t) => {
+test("race rejects unknown and malformed rivals without writing", async (t) => {
   const ctx = await setup(t);
   const { jar } = await meet(ctx, A, "Mochi");
   const before = ctx.row();
-  for (const body of [{ rival: "horse" }, { rival: "rat" }, { rival: "__proto__" }, { rival: null }, { won: 1 }, { won: "true" }, { won: undefined }]) {
+  for (const body of [{ rival: "unicorn" }, { rival: "__proto__" }, { rival: "" }, { rival: null }, { won: 1 }, { won: "true" }, { won: undefined }]) {
     const out = await play(ctx, jar, { game: "race", rival: "sheep", won: true, ...body });
     assert.equal(out.status, 400, JSON.stringify(body));
     assert.deepEqual(ctx.row(), before);
@@ -122,14 +122,29 @@ test("race persists wins, preserves losses and caps each rival independently", a
   for (let i = 0; i < 22; i++) await play(ctx, jar, body);
   const saved = JSON.parse(ctx.row().race);
   assert.deepEqual(saved, { ...fresh, sheep: { level: 20, best: 20 } });
-  // The saved animal picks the side, not this browser's toggle.
-  assert.equal((await ctx.request("/kind", { jar, body: { uid: A, kind: "horse", fill: true } })).status, 200);
-  assert.equal((await play(ctx, { ...jar, mascot: "sheep" }, { ...body, rival: "horse" })).status, 400);
+});
+
+test("race takes any rival and keeps each one's own level", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
+  const body = { game: "race", rival: "tiger", won: true };
+  const tiger = await play(ctx, jar, body);
+  assert.equal(tiger.status, 200);
+  assert.deepEqual([tiger.body.rivalLevel, tiger.body.race.tiger], [1, { level: 2, best: 1 }]);
+  assert.equal((await play(ctx, jar, { ...body, rival: "rat", won: false })).status, 200);
+  const again = await play(ctx, jar, body);
+  assert.deepEqual([again.body.rivalLevel, again.body.race.tiger], [2, { level: 3, best: 2 }]);
+  assert.equal((await play(ctx, jar, { ...body, rival: "sheep" })).status, 200);
+  assert.deepEqual(JSON.parse(ctx.row().race), { ...fresh, tiger: { level: 3, best: 2 }, sheep: { level: 2, best: 1 } });
+});
+
+test("a tab left open still races after another browser changes the pet's animal", async (t) => {
+  const ctx = await setup(t);
+  const { jar } = await meet(ctx, A, "Mochi");
   assert.equal((await ctx.request("/kind", { jar, body: { uid: A, kind: "sheep" } })).status, 200);
-  const swapped = await play(ctx, jar, { ...body, rival: "horse" });
-  assert.equal(swapped.status, 200);
-  assert.deepEqual(swapped.body.race.horse, { level: 2, best: 1 });
-  assert.equal((await play(ctx, jar, body)).status, 400);
+  const stale = await play(ctx, jar, { game: "race", rival: "sheep", won: true });
+  assert.equal(stale.status, 200);
+  assert.deepEqual(stale.body.race.sheep, { level: 2, best: 1 });
 });
 
 test("the race card shows the pet, its line and the saved rival levels", async (t) => {

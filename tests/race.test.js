@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { applyRace, raceState } from "../src/arcade.js";
-import { newRace, raceTap, stepRace } from "../public/game/race-model.js";
+import { newRace, picker, raceTap, stepRace } from "../public/game/race-model.js";
 import { KIND_IDS } from "../public/kinds.js";
 
 const T0 = Date.parse("2026-05-01T10:00:00+09:00");
@@ -126,6 +126,51 @@ test("NFC guard rejects duplicate reads and later reads extend a dash", () => {
   stepRace(r, 0.26);
   assert.equal(raceTap(r, "nfc"), true);
   assert.equal(r.boost, end + 1.2);
+});
+
+// Rival art that arrives, or fails, when the test says so.
+function art() {
+  const due = {};
+  return {
+    load: (kind) => new Promise((resolve, reject) => { due[kind] = { resolve, reject }; }),
+    async arrive(kind, ok = true) {
+      if (ok) due[kind].resolve();
+      else due[kind].reject(new Error(kind));
+      await new Promise((resolve) => setImmediate(resolve));
+    },
+  };
+}
+
+test("a tapped rival is picked at once and takes the lane once its art is in", async () => {
+  const { load, arrive } = art();
+  const match = picker("sheep", load);
+  match.choose("tiger");
+  assert.deepEqual([match.rival, match.shown], ["tiger", "sheep"]);
+  await arrive("tiger");
+  assert.deepEqual([match.rival, match.shown], ["tiger", "tiger"]);
+});
+
+test("fast taps end on the last tile and an older load never lands over it", async () => {
+  const { load, arrive } = art();
+  const match = picker("sheep", load);
+  for (const kind of ["tiger", "rat", "dragon", "pig", "ox"]) match.choose(kind);
+  await arrive("rat");
+  assert.deepEqual([match.rival, match.shown], ["ox", "sheep"]);
+  await arrive("ox");
+  assert.deepEqual([match.rival, match.shown], ["ox", "ox"]);
+  for (const kind of ["tiger", "dragon", "pig"]) await arrive(kind);
+  assert.deepEqual([match.rival, match.shown], ["ox", "ox"]);
+});
+
+test("a rival whose art fails falls back to the one in the lane", async () => {
+  const { load, arrive } = art();
+  const match = picker("sheep", load);
+  match.choose("tiger");
+  match.choose("rat");
+  await arrive("tiger", false);
+  assert.deepEqual([match.rival, match.shown], ["rat", "sheep"]);
+  await arrive("rat", false);
+  assert.deepEqual([match.rival, match.shown], ["sheep", "sheep"]);
 });
 
 test("idle players finish a loss and frame rates do not change rival time", () => {
