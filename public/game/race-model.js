@@ -23,7 +23,8 @@ function track(top, level, keep) {
   }
 }
 
-export function newRace(level) {
+// `agi` is the pet's 민첩 bonus in percent: it lifts the pet's top speed, never the rival's.
+export function newRace(level, agi = 0) {
   const goal = rivalTime(level);
   let lo = 4;
   let hi = 40;
@@ -33,7 +34,7 @@ export function newRace(level) {
     else hi = mid;
   }
   const { time, out } = track(hi, level, true);
-  return { level, time: 0, energy: 0, boost: 0, lastTap: -1, lastNfc: -1, distance: [0, 0], speed: [0, 0], finish: [null, null], held: null, rival: Float64Array.from(out), goal: time };
+  return { level, agi, time: 0, energy: 0, boost: 0, lastTap: -1, lastNfc: -1, distance: [0, 0], speed: [0, 0], finish: [null, null], held: null, rival: Float64Array.from(out), goal: time };
 }
 
 export const decided = (race) => race.held !== null;
@@ -83,7 +84,7 @@ export function stepRace(race, dt) {
   const energy = race.energy * (1 - fade) / dt;
   race.energy *= fade;
   const boost = Math.max(0, Math.min(dt, race.boost - t0)) / dt;
-  const goal = (3.5 + 1.15 * energy) * (1 + 0.6 * boost);
+  const goal = (3.5 + 1.15 * energy) * (1 + 0.6 * boost) * (1 + (race.agi || 0) / 100);
   const ease = Math.exp(-dt / 0.15);
   const v0 = race.speed[0];
   race.speed[0] = goal + (v0 - goal) * ease;

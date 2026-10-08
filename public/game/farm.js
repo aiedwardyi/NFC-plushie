@@ -4,16 +4,16 @@ const ART_V = 1;
 const MIN = 60 * 1000;
 const DAY = 24 * 60 * MIN;
 const SEOUL_MS = 9 * 60 * MIN;
-// `items` is only how many fly to the basket; `next` is the wait after the 맛보기.
+// `next` is the wait after the 맛보기. Each picked crop flies to the basket as one item, as the pantry counts it.
 const CROPS = {
-  sprout: { name: "새싹", items: 2 },
-  lettuce: { name: "상추", items: 2, next: "반나절" },
-  potato: { name: "감자", items: 2, next: "하룻밤" },
-  carrot: { name: "당근", items: 2, next: "하룻밤" },
-  tomato: { name: "토마토", items: 3, next: "하룻밤" },
-  sweet: { name: "고구마", items: 2, next: "3밤" },
-  melon: { name: "수박", items: 1, next: "3밤" },
-  gold: { name: "황금 감자", items: 0 },
+  sprout: { name: "새싹" },
+  lettuce: { name: "상추", next: "반나절" },
+  potato: { name: "감자", next: "하룻밤" },
+  carrot: { name: "당근", next: "하룻밤" },
+  tomato: { name: "토마토", next: "하룻밤" },
+  sweet: { name: "고구마", next: "3밤" },
+  melon: { name: "수박", next: "3밤" },
+  gold: { name: "황금 감자" },
 };
 // 3 x 2, back row first, so plots 4 and 5 (Lv 2 and 3) sit front right as in the mockup.
 const LAYOUT = [
@@ -27,7 +27,8 @@ const LAYOUT = [
 const ROW = { back: 0.64, front: 0.9 };
 const LOCK_AT = [1, 1, 1, 1, 2, 3];
 const PENTA = [1, 1.122, 1.26, 1.498, 1.682, 2, 2.245, 2.52];
-const PILE_MAX = 14;
+// The pantry holds 12, and a full harvest can briefly stack a few more before the bus takes them.
+const PILE_MAX = 16;
 const LINES = {
   gift: "선물이에요! 씨앗이 들어 있어요!",
   goldSeed: "씨앗이에요! 황금 감자 씨앗도 있어요!",
@@ -37,13 +38,19 @@ const LINES = {
   ripe: "인형을 톡 해 볼래요?",
   growing: "아직 자라는 중이에요!",
   bus: "포키 버스 도착! 빵빵!",
-  load: "바구니를 눌러 버스에 실어요!",
+  busFull: "바구니가 꽉 찼어요! 남은 건 버스가 가져가요",
+  basket: "바구니에 담았어요! 먹이거나 버스로 보내요",
   gold: "황금 감자다!",
-  yum: "냠냠! 황금 감자 최고예요!",
+  goldKeep: "기분이 반짝반짝! 바구니에 소중히 담을게요",
   plot: "새 밭이 열렸어요!",
   giftSeeds: "선물 씨앗이 왔어요! 다음 수확 때 심을게요",
   prompt: "수확했어요! 화면을 눌러 바구니를 열어요",
+  empty: "수확하면 여기 바구니에 담겨요",
+  shopLater: "씨앗 가게는 Lv 3부터 열려요",
 };
+const STAT_WORDS = { str: "힘", int: "지능", agi: "민첩", cha: "매력" };
+// What each snack boost waits for, for the line after feeding.
+const SNACK_FOR = { str: "기 모으기", int: "수확", agi: "달리기", cha: "버스", all: "놀이" };
 const KEY_SVG = `<svg viewBox="0 0 132 56" aria-hidden="true"><circle cx="26" cy="28" r="17" fill="#f1c75a" stroke="#9a7228" stroke-width="3"/><circle cx="26" cy="28" r="6" fill="#fff6dc" stroke="#9a7228" stroke-width="2"/><rect x="40" y="22" width="86" height="11" rx="3.5" fill="#f1c75a" stroke="#9a7228" stroke-width="2.6"/><rect x="60" y="31" width="13" height="16" rx="2.5" fill="#f1c75a" stroke="#9a7228" stroke-width="2.4"/><rect x="81" y="31" width="13" height="11" rx="2.5" fill="#f1c75a" stroke="#9a7228" stroke-width="2.4"/><rect x="102" y="31" width="13" height="19" rx="2.5" fill="#f1c75a" stroke="#9a7228" stroke-width="2.4"/></svg>`;
 const E = {
   lin: (t) => t,
@@ -66,7 +73,7 @@ const ART = [
   "box", "lid", "can", "basket-back", "basket-front", "bus", "stop", "lock", "cloud", "spark", "heart", "drop", "leaf", "seed-gold", "seed-light", "packet", "packet-gold",
 ];
 
-const artUrl = (name) => `/game/art/farm/${name}.svg?v=${ART_V}`;
+export const artUrl = (name) => `/game/art/farm/${name}.svg?v=${ART_V}`;
 // 새싹's item reads thin when small, so it never flies under 30 px.
 const flySize = (crop, px) => (crop === "sprout" ? Math.max(30, px) : px);
 const seoulMidnight = (ms) => Math.floor((ms + SEOUL_MS) / DAY) * DAY - SEOUL_MS;
@@ -190,7 +197,7 @@ export async function createFarm(api) {
       }
     });
   }
-  // Pet faces exactly as the app shows them, so worlds and horse/sheep follow.
+  // Pet faces exactly as the app shows them, so worlds and every animal follow.
   function faceUrl(name) {
     const el = petEl.querySelector(`[data-frame="${name}"]`);
     const c = getComputedStyle(el).content;
@@ -817,10 +824,72 @@ export async function createFarm(api) {
     L.cta.classList.toggle("is-ripe", ctaRipe);
     if (ctaRipe && !showing && !guideDone && !guideStep && !busState) guide(1);
     L.cta.hidden = !text || showing || guideStep > 0 || Boolean(busState);
+    paintBusy();
   }
   function nudgeCta() {
     if (calm || L.cta.hidden) return;
     domAnim(L.cta, [{ transform: "translateX(-50%) scale(1)" }, { transform: "translateX(-50%) scale(1.08)" }, { transform: "translateX(-50%) scale(1)" }], { duration: 360, fill: "none" });
+  }
+
+  /* ---------- the basket row under the field: the pantry's crops, each to feed or send ---------- */
+  let basket = [];
+  let coins = 0;
+  let acting = false;
+  let chosen = null;
+  const rowList = api.basket?.querySelector(".fb-list");
+
+  function paintBusy() {
+    api.basket?.classList.toggle("is-busy", showing || acting);
+  }
+  function paintBasket() {
+    if (!rowList) return;
+    const counts = new Map();
+    for (const crop of basket) counts.set(crop, (counts.get(crop) || 0) + 1);
+    if (chosen && !counts.has(chosen)) chosen = null;
+    const was = document.activeElement?.closest?.(".fb-list") ? document.activeElement.dataset.crop || document.activeElement.dataset.act : "";
+    const chip = (crop, n) => `<button type="button" class="fb-crop${crop === chosen ? " is-chosen" : ""}" data-crop="${crop}" aria-pressed="${crop === chosen}" aria-label="${CROPS[crop].name} ${n}개"><img src="${artUrl(`item-${crop}`)}" alt=""><b>${n}</b></button>`;
+    rowList.innerHTML = chosen
+      ? `${chip(chosen, counts.get(chosen))}<button type="button" class="fb-act is-feed" data-act="feed">먹이기</button><button type="button" class="fb-act is-bus" data-act="send">버스로 보내기</button>`
+      : counts.size
+        ? `${[...counts].map(([crop, n]) => chip(crop, n)).join("")}<button type="button" class="fb-act is-all" data-act="all">모두 보내기</button>`
+        : `<p class="fb-empty">${LINES.empty}</p>`;
+    if (was) rowList.querySelector(`[data-crop="${was}"], [data-act="${was}"]`)?.focus({ preventScroll: true });
+    api.basket.classList.toggle("is-chosen", Boolean(chosen));
+    paintBusy();
+  }
+  function onBasket(event) {
+    const btn = event.target.closest("button");
+    if (!btn || !entered) return;
+    if (showing || acting || flights.size || api.picking()) return;
+    sfx("press", { gain: 0.7 });
+    buzz(8);
+    if (btn.dataset.crop) {
+      chosen = chosen === btn.dataset.crop ? null : btn.dataset.crop;
+      paintBasket();
+      return;
+    }
+    const act = btn.dataset.act;
+    if (act === "feed") pantryAct("feed", { crop: chosen });
+    else if (act === "send") pantryAct("send", { crops: [chosen] });
+    else if (act === "all") pantryAct("send", { crops: [...basket] });
+  }
+  rowList?.addEventListener("click", onBasket);
+  // The app posts and paints stats; the stage shows the snack or the bus once the server agreed.
+  async function pantryAct(act, body) {
+    acting = true;
+    chosen = null;
+    paintBasket();
+    const g = gen;
+    const { reply } = await api.act(act, body);
+    acting = false;
+    paintBusy();
+    if (g !== gen || !entered || !reply) return;
+    latestReply = reply;
+    setTruth(reply.farm);
+    await show(() => (act === "feed" ? feedShow(reply) : sendShow(reply)));
+    if (g !== gen) return;
+    syncPile();
+    api.acted(reply);
   }
 
   /* ---------- runs: one show at a time, chores queue behind ---------- */
@@ -849,13 +918,15 @@ export async function createFarm(api) {
     guideStep = 0;
     clearTimeout(busTimer);
     busState = "";
-    loadBus = null;
     order = null;
+    cargo.length = 0;
+    acting = false;
+    // The basket is the pantry, so a cut leaves it as the server last said; whoever cut redraws the rest.
     if (!keepRound) {
       round.length = 0;
-      cargo.length = 0;
       roundNote = 0;
-      for (const it of [...S.pile.children]) it.destroy();
+      basket = [...(truth?.pantry || [])];
+      if (S.pile) drawPile();
     }
     gen += 1;
     tweens.length = 0;
@@ -899,6 +970,7 @@ export async function createFarm(api) {
   }
   function show(fn) {
     showing = true;
+    paintBusy();
     if (L.cta) L.cta.hidden = true;
     const g = gen;
     return fn().catch((e) => {
@@ -1015,26 +1087,57 @@ export async function createFarm(api) {
       S.basketFront.scale.set(b * (1 + q), b * (1 - q));
     });
   }
+  // Where the nth crop sits: the heap rises a little as the basket fills.
+  const pileSpot = (n) => ({ x: S.basketTop.x + rnd(-14, 14), y: S.basketTop.y + rnd(-2, 6) - Math.min(9, n * 0.75) });
   function addToPile(crop, x, y) {
     const pi = sprite(itemTex(crop), S.pile, x, y, 0.5, 0.5, 24);
     pi.rotation = rnd(-0.6, 0.6);
     pi.crop = crop;
     while (S.pile.children.length > PILE_MAX) S.pile.children[0].destroy();
   }
+  function drawPile() {
+    for (const it of [...S.pile.children]) it.destroy();
+    basket.forEach((crop, n) => {
+      const at = pileSpot(n);
+      addToPile(crop, at.x, at.y + 4);
+    });
+    paintBasket();
+  }
+  // A crop lands: one more in the heap and in the row.
+  function land(crop, at) {
+    addToPile(crop, at.x, at.y + 4);
+    basket.push(crop);
+    paintBasket();
+    bumpBasket();
+  }
+  // A crop leaves as the server takes it, so the basket keeps the pantry's order: a send takes its first,
+  // and a full harvest's extras are the newest ones.
+  function takeFromPile(crop, newest = false) {
+    const i = newest ? basket.lastIndexOf(crop) : basket.indexOf(crop);
+    if (i >= 0) basket.splice(i, 1);
+    const it = newest ? S.pile.children.findLast((s) => s.crop === crop) : S.pile.children.find((s) => s.crop === crop);
+    const at = it ? { x: it.x, y: it.y } : { ...S.basketTop };
+    it?.destroy();
+    paintBasket();
+    return at;
+  }
+  // The heap redrawn from the server's pantry, only when the shown one went astray.
+  function syncPile() {
+    if (truth?.pantry && basket.join() !== truth.pantry.join()) {
+      basket = [...truth.pantry];
+      drawPile();
+    }
+  }
   // One crop item hops from the plot into the basket.
   function toBasket(p, crop, note, size) {
     const it = sprite(itemTex(crop), S.fx, p.cx + rnd(-8, 8), p.cy - 6, 0.5, 0.5, flySize(crop, size ?? (p.row === "back" ? 26 : 30)));
     const s0 = it.scale.x;
     if (note !== null) game("note-c6", { rate: PENTA[Math.min(7, note)] * 0.75, gain: 0.7 });
-    const tx = S.basketTop.x + rnd(-14, 14);
-    const ty = S.basketTop.y + rnd(-2, 6);
-    return arc(it, it.x, it.y, tx, ty, 560, 70 + rnd(0, 30), { spin: rnd(-6, 6), s0, s1: crop === "sprout" ? s0 : s0 * 0.85 }).then(() => {
+    const at = pileSpot(basket.length);
+    return arc(it, it.x, it.y, at.x, at.y, 560, 70 + rnd(0, 30), { spin: rnd(-6, 6), s0, s1: crop === "sprout" ? s0 : s0 * 0.85 }).then(() => {
       it.destroy();
       thump({ gain: 0.5, rate: 1.3 });
-      addToPile(crop, tx, ty + 4);
-      cargo.push(crop);
-      paintOrder();
-      bumpBasket();
+      land(crop, at);
     });
   }
   function leafBurst(p) {
@@ -1373,23 +1476,47 @@ export async function createFarm(api) {
     tween(400, (k) => {
       rays.alpha = 0.45 * (1 - k);
     }).then(() => rays.destroy());
-    // The pet holds it under its chin and lifts it to its mouth (texture y 262 of 512) for each bite.
+    // Too good to eat right away: the hearts fill, and it waits in the basket for a snack or the bus.
+    face("react");
+    voice("happy", { rate: 1.05 });
+    heartsUp();
+    api.hearts(hearts);
+    sfx("sparkle", { gain: 0.7 });
+    say(LINES.goldKeep);
+    glow.destroy();
+    const at = pileSpot(basket.length);
+    await hold(arc(gold, gold.x, gold.y, at.x, at.y, 620, 70, { spin: 6.3 }));
+    gold.destroy();
+    thump({ gain: 0.6, rate: 1.1 });
+    land("gold", at);
+    await hold(pause(1400));
+    face("canon");
+  }
+
+  function heartsUp() {
+    for (let h = 0; h < 6; h++) emit(T.art.heart, { x: S.petC.x + rnd(-30, 30), y: S.petC.y - petH * 0.7, vx: rnd(-20, 20), vy: rnd(-90, -60), life: 1.2, s0: 0.3, s1: 0.5 });
+  }
+
+  // The pet takes a crop in its paw and eats it in three bites, lifting it to its mouth (texture y 262 of 512) each time.
+  async function munch(crop, from) {
     await hold(hop(xOf(0.2), yOf(0.875), 300, 16, 1));
     const CHIN = -0.42 * petH;
     const MOUTH = -0.475 * petH;
     const handAt = (y) => S.farm.toLocal(S.hand.toGlobal(new P.Point(0, y)));
     const holdAt = handAt(CHIN);
-    glow.destroy();
-    await hold(arc(gold, gold.x, gold.y, holdAt.x, holdAt.y, 420, 16, { spin: 6.3 }));
-    const snack = new P.Sprite(itemTex("gold"));
+    const item = sprite(itemTex(crop), S.fx, from.x, from.y, 0.5, 0.5, flySize(crop, 30));
+    sfx("whistle-up", { gain: 0.5, rate: 1.3 });
+    await hold(arc(item, from.x, from.y, holdAt.x, holdAt.y, 460, 60, { spin: 6.3 }));
+    const snack = new P.Sprite(itemTex(crop));
     snack.anchor.set(0.5);
     snack.width = 30 / S.hand.scale.x;
     snack.scale.y = snack.scale.x;
     snack.position.set(0, CHIN);
     S.hand.addChild(snack);
-    gold.destroy();
+    item.destroy();
     face("react");
     const sn = snack.scale.x;
+    const crumb = crop === "gold" ? 0xffd75a : 0xfff1d6;
     for (let b = 0; b < 3; b++) {
       await hold(tween(90, (k) => {
         snack.y = lerp(CHIN, MOUTH, k);
@@ -1400,7 +1527,7 @@ export async function createFarm(api) {
       spring.vy += 0.7;
       snack.scale.set(sn * (1 - (b + 1) * 0.3));
       const m = handAt(MOUTH);
-      for (let c = 0; c < 4; c++) emit(T.art.spark, { x: m.x + rnd(-6, 6), y: m.y + 4, vx: rnd(-40, 40), vy: rnd(-40, 10), ay: 520, life: 0.5, s0: 0.22, s1: 0.1, a0: 1, a1: 0.2, tint: 0xffd75a, spin: 5 });
+      for (let c = 0; c < 4; c++) emit(T.art.spark, { x: m.x + rnd(-6, 6), y: m.y + 4, vx: rnd(-40, 40), vy: rnd(-40, 10), ay: 520, life: 0.5, s0: 0.22, s1: 0.1, a0: 1, a1: 0.2, tint: crumb, spin: 5 });
       await hold(pause(150));
       face("react");
       await hold(tween(110, (k) => {
@@ -1413,13 +1540,6 @@ export async function createFarm(api) {
     sfx("gulp", { at: 260, gain: 0.8 });
     await hold(pause(520));
     face("canon");
-    voice("happy", { rate: 1.05 });
-    for (let h = 0; h < 6; h++) emit(T.art.heart, { x: S.petC.x + rnd(-30, 30), y: S.petC.y - petH * 0.7, vx: rnd(-20, 20), vy: rnd(-90, -60), life: 1.2, s0: 0.3, s1: 0.5 });
-    api.hearts(hearts);
-    sfx("sparkle", { gain: 0.7 });
-    say(LINES.yum);
-    await hold(pause(1600));
-    await hold(home());
   }
 
   // Lines for seeds that arrived; gift seeds only while some still wait in the bag.
@@ -1441,12 +1561,10 @@ export async function createFarm(api) {
     }
   }
 
-  // Everything after the picks: level line, new plots, 황금 감자, unlock seeds, planting, gift seeds.
+  // Everything after the picks and the basket: level line, new plots, unlock seeds, planting, gift seeds.
   async function aftermath(r, { levelShown = false } = {}) {
     if (r.leveledUp && !levelShown) await levelLine(r.level);
     for (const i of r.opened) await openPlot(i);
-    const gold = r.picked.find((pk) => pk.crop === "gold");
-    if (gold) await golden(gold.plot, r.hearts);
     await unlockLines(r);
     await plantAll(r, r.planted);
     for (const i of [...r.opened, ...r.picked.map((pk) => pk.plot)]) if (pending.has(i)) settlePlot(r, i);
@@ -1521,54 +1639,45 @@ export async function createFarm(api) {
       const p = plots[pk.plot];
       squash(p);
       leafBurst(p);
-      for (let j = 0; j < CROPS[pk.crop].items; j++) {
-        landed.push(toBasket(p, pk.crop, note++));
-        await hold(pause(70));
-      }
+      landed.push(toBasket(p, pk.crop, note++));
       p.plant.visible = false;
       p.stage = -1;
       p.data = { plot: pk.plot, crop: null };
       pending.add(pk.plot);
-      await hold(pause(110));
+      await hold(pause(150));
     }
     await hold(Promise.all(landed));
     await hold(pause(regular.length ? 600 : 200));
     face("canon");
-    await bus(true);
+    await settle(roundReply());
   }
 
   const round = [];
+  // What the bus loads right now, for its order bubble.
   const cargo = [];
   const flights = new Set();
   let busTimer = 0;
   let busState = "";
-  let loadBus = null;
   let order = null;
   let roundNote = 0;
   let lastPick = 0;
+  let basketTold = false;
 
+  // Step 1 shows the swipe on the first ripe field; step 3 points at the plushie once the picks are in.
   function guide(step) {
     guideStep = step;
     L.guide?.remove();
     L.hand?.remove();
-    const text = step === 1 ? "쓱 밀어서 수확해요!" : step === 2 ? LINES.load : "다음엔 인형을 톡! 한 번에 수확해요";
+    const text = step === 1 ? "쓱 밀어서 수확해요!" : "다음엔 인형을 톡! 한 번에 수확해요";
     say(text);
     L.cta.hidden = true;
     L.guide = domAdd("f-guide", `${step === 3 ? KEY_SVG : ""}<b>${text}</b>`);
     L.guide.setAttribute("role", "status");
     if (step === 3) return;
-    L.hand = domAdd(`f-hand is-${step === 1 ? "swipe" : "basket"}`, '<svg viewBox="0 0 80 88" aria-hidden="true"><path d="M25 43V13c0-10 13-10 13 0v23c3-8 13-5 13 2 5-6 13-2 13 5 8-3 13 2 11 11l-5 19c-2 8-9 11-21 11-13 0-21-4-27-12L8 53c-5-8 4-16 11-9l9 9" fill="#fffaf0" stroke="#4a2c20" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>→</span>');
-    L.hand.style.left = `${step === 1 ? plots[0].cx : S.basketTop.x}px`;
-    L.hand.style.top = `${step === 1 ? plots[0].cy - 30 : S.basketTop.y - 20}px`;
+    L.hand = domAdd("f-hand is-swipe", '<svg viewBox="0 0 80 88" aria-hidden="true"><path d="M25 43V13c0-10 13-10 13 0v23c3-8 13-5 13 2 5-6 13-2 13 5 8-3 13 2 11 11l-5 19c-2 8-9 11-21 11-13 0-21-4-27-12L8 53c-5-8 4-16 11-9l9 9" fill="#fffaf0" stroke="#4a2c20" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>→</span>');
+    L.hand.style.left = `${plots[0].cx}px`;
+    L.hand.style.top = `${plots[0].cy - 30}px`;
     L.hand.style.setProperty("--swipe", `${plots[2].cx - plots[0].cx}px`);
-    if (step === 2) {
-      const repeat = () => {
-        if (guideStep !== 2) return;
-        say(text);
-        guideTimer = setTimeout(repeat, 8000);
-      };
-      guideTimer = setTimeout(repeat, 8000);
-    }
   }
   async function finishGuide() {
     if (!guideStep) return;
@@ -1599,7 +1708,11 @@ export async function createFarm(api) {
   function roundReply() {
     const newest = round.at(-1);
     const unique = (key) => [...new Map(round.flatMap((r) => r[key]).map((p) => [p.plot, p])).values()];
-    return { ...newest, picked: unique("picked"), planted: unique("planted"), opened: [...new Set(round.flatMap((r) => r.opened))], seeds: round.flatMap((r) => r.seeds), leveledUp: round.some((r) => r.leveledUp), xpGain: round.reduce((n, r) => n + (r.painted ? 0 : r.xpGain), 0) };
+    return {
+      ...newest, picked: unique("picked"), planted: unique("planted"), opened: [...new Set(round.flatMap((r) => r.opened))], seeds: round.flatMap((r) => r.seeds),
+      leveledUp: round.some((r) => r.leveledUp), xpGain: round.reduce((n, r) => n + (r.painted ? 0 : r.xpGain), 0),
+      bused: round.flatMap((r) => r.bused || []), coinsGain: round.reduce((n, r) => n + (r.coinsGain || 0), 0),
+    };
   }
   function paintOrder(loaded = {}) {
     if (!order) return;
@@ -1607,17 +1720,22 @@ export async function createFarm(api) {
     for (const crop of cargo) totals[crop] = (totals[crop] || 0) + 1;
     order.innerHTML = Object.entries(totals).map(([crop, n]) => `<span class="f-chip"><img src="${artUrl(`item-${crop}`)}" alt="${CROPS[crop].name}"><span>${loaded[crop] || 0}/${n}</span></span>`).join("");
   }
-  function scheduleBus() {
+  // Picks gather into one round: once the picking stops, the round settles like a harvest.
+  function scheduleSettle() {
     clearTimeout(busTimer);
     if (!entered || !round.length || busState) return;
     const ripe = plots.some((p) => p.stage === 3 && !pending.has(p.i));
     const delay = ripe ? Math.max(0, lastPick + 2500 - performance.now()) : 600;
     busTimer = setTimeout(async () => {
       if (api.picking() || flights.size) {
-        scheduleBus();
+        scheduleSettle();
         return;
       }
-      try { await bus(); } catch (e) { if (e !== STOP) api.fail(e); }
+      busState = "settling";
+      showing = true;
+      paintBusy();
+      L.cta.hidden = true;
+      try { await settle(roundReply()); } catch (e) { if (e !== STOP) api.fail(e); }
     }, delay);
   }
   async function xpFlight(r) {
@@ -1640,73 +1758,47 @@ export async function createFarm(api) {
     flushRound();
     await finishGuide();
     round.length = 0;
-    cargo.length = 0;
     roundNote = 0;
+    const gold = r.picked.find((pk) => pk.crop === "gold");
+    if (gold) await golden(gold.plot, r.hearts);
+    // A full pantry sends the extras on the bus for coins, so nothing is lost.
+    if (r.bused?.length) await busRide(r.bused, r.coinsGain, { line: LINES.busFull, newest: true });
     await aftermath(r);
+    syncPile();
+    if (!basketTold && r.picked.length && !r.bused?.length) {
+      basketTold = true;
+      say(LINES.basket);
+    }
     busState = "";
     showing = false;
     paintCta();
     schedule();
   }
-  async function bus(auto = false) {
-    clearTimeout(busTimer);
-    // 황금 감자 never rides in the basket: a round of only gold skips the bus and keeps the guide for the next crop.
-    if (!cargo.length) {
-      clearTimeout(guideTimer);
-      guideStep = 0;
-      L.hand?.remove();
-      L.guide?.remove();
-      showing = true;
-      L.cta.hidden = true;
-      return settle(roundReply());
-    }
+  // The bus comes for crops from the basket; once it is gone, their coins fly down to the counter.
+  async function busRide(crops, coinsGain, { line = LINES.bus, newest = false } = {}) {
     busState = "arriving";
     L.cta.hidden = true;
-    say(LINES.bus);
+    say(line);
     const busX = xOf(0.64);
     const bx0 = W + S.bus.width;
     S.bus.x = bx0;
+    cargo.length = 0;
+    cargo.push(...crops);
     order = domAdd("f-bubble f-order", "", L.field);
     order.style.left = `${busX}px`;
     order.style.top = `${Math.max(66, S.bus.y - S.bus.height - 44)}px`;
     paintOrder();
     await hold(tween(400, (k) => { S.bus.x = lerp(bx0, busX, k); }, E.out3));
-    busState = "waiting";
-    order.dataset.state = busState;
-    if (!auto) {
-      if (guideStep === 1) guide(2);
-      else say(LINES.load);
-      const bounce = (dt, t) => {
-        S.basketGlow.alpha = 0.5 + Math.sin(t * 4) * 0.2;
-        S.basketFront.scale.set(S.basketBase * (1 + (calm ? 0 : Math.sin(t * 5) * 0.06)));
-      };
-      tickers.add(bounce);
-      await hold(new Promise((resolve) => {
-        loadBus = resolve;
-        if (guideStep !== 2) busTimer = setTimeout(() => { say("제가 실을게요!"); resolve(); }, 5000);
-      }));
-      tickers.delete(bounce);
-      clearTimeout(busTimer);
-    }
-    loadBus = null;
-    clearTimeout(guideTimer);
-    L.hand?.remove();
-    L.guide?.remove();
-    showing = true;
-    L.cta.hidden = true;
     busState = "loading";
     order.dataset.state = busState;
-    while (api.picking() || flights.size) await hold(pause(40));
-    S.basketGlow.alpha = 0;
-    S.basketFront.scale.set(S.basketBase);
-    const r = roundReply();
     const loaded = {};
-    for (const [i, crop] of cargo.entries()) {
-      const it = S.pile.children[0];
-      if (it) it.destroy();
-      const fly = sprite(itemTex(crop), S.fx, S.basketTop.x, S.basketTop.y, 0.5, 0.5, flySize(crop, 30));
+    // A whole basket loads quicker per crop, so twelve still take about two seconds.
+    const ms = Math.max(120, Math.min(280, 2200 / crops.length));
+    for (const [i, crop] of crops.entries()) {
+      const from = takeFromPile(crop, newest);
+      const fly = sprite(itemTex(crop), S.fx, from.x, from.y, 0.5, 0.5, flySize(crop, 30));
       game("note-c6", { rate: PENTA[Math.min(i, 7)], gain: 0.7 });
-      await hold(arc(fly, fly.x, fly.y, busX, S.bus.y - S.bus.height * 0.45, 280, 65, { spin: 5 }));
+      await hold(arc(fly, fly.x, fly.y, busX, S.bus.y - S.bus.height * 0.45, ms, 65, { spin: 5 }));
       fly.destroy();
       loaded[crop] = (loaded[crop] || 0) + 1;
       paintOrder(loaded);
@@ -1714,7 +1806,7 @@ export async function createFarm(api) {
     domAdd("f-check", "✓", order);
     game("ding");
     buzz([25, 40, 65]);
-    await hold(pause(650));
+    await hold(pause(550));
     farmSfx("honk");
     voice("happy", { at: 120 });
     busState = "leaving";
@@ -1722,7 +1814,68 @@ export async function createFarm(api) {
     await hold(tween(900, (k) => { S.bus.x = lerp(busX, -S.bus.width, k); }, E.in2));
     order.remove();
     order = null;
-    await settle(r);
+    cargo.length = 0;
+    await coinFlight(coinsGain);
+  }
+  async function coinFlight(gain) {
+    if (!(gain > 0)) return;
+    const box = win.getBoundingClientRect();
+    const to = api.coinBox()?.getBoundingClientRect();
+    const x0 = box.left + xOf(0.5);
+    const y0 = box.top + yOf(0.36);
+    const flying = [];
+    if (to?.width) {
+      const n = Math.min(6, Math.max(2, Math.round(gain / 5)));
+      for (let i = 0; i < n; i++) {
+        const el = domAdd("f-coin f-delivery", "", document.body);
+        el.setAttribute("aria-hidden", "true");
+        el.style.left = `${x0 + rnd(-24, 24)}px`;
+        el.style.top = `${y0 + rnd(-6, 6)}px`;
+        const dx = to.left + to.height / 2 - x0;
+        const dy = to.top + to.height / 2 - y0;
+        game("note-c6", { rate: PENTA[Math.min(7, i + 2)], gain: 0.5, at: 120 * i });
+        flying.push(domAnim(el, calm
+          ? [{ opacity: 0 }, { opacity: 1, offset: 0.3 }, { opacity: 0 }]
+          : [{ transform: "translate(-50%, -50%) scale(.4)", opacity: 0 }, { transform: "translate(-50%, -80%) scale(1.15)", opacity: 1, offset: 0.25 }, { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.7)`, opacity: 1 }],
+        { duration: calm ? 400 : 760, delay: 120 * i, easing: "ease-in-out" }).then(() => el.remove()));
+      }
+    }
+    await hold(Promise.all(flying));
+    game("result", { gain: 0.8 });
+    coins += gain;
+    api.coins(coins, gain);
+    say(`빵빵! 코인 ${gain}개를 받았어요!`);
+  }
+
+  // The words after a snack: what it waits for, or that this stat already has one.
+  function snackLine(b) {
+    if (!b) return "냠냠! 맛있어요!";
+    const what = b.stat === "all" ? "모든 능력" : STAT_WORDS[b.stat];
+    return b.set ? `냠냠! 다음 ${SNACK_FOR[b.stat]} ${what} +${b.amount}` : `냠냠! ${what}은 벌써 든든해요`;
+  }
+  async function feedShow(r) {
+    const from = takeFromPile(r.crop);
+    await munch(r.crop, from);
+    const line = snackLine(r.boost);
+    say(line);
+    if (r.boost?.set) {
+      sfx("sparkle", { gain: 0.8 });
+      burst(S.petC.x, S.petC.y - petH * 0.6, 14, { tint: [0xffe39a, 0xffffff], blend: "add", v0: 60, v1: 160, s0: 0.25, s1: 0.5 });
+    }
+    if (r.meal) {
+      heartsUp();
+      api.hearts(r.hearts);
+    }
+    bigText(line, "is-snack", 1200);
+    await hold(pause(900));
+    await xpFlight(r);
+    if (r.leveledUp) await levelLine(r.level);
+    await hold(home());
+  }
+  async function sendShow(r) {
+    await busRide(r.crops, r.coinsGain);
+    await xpFlight(r);
+    if (r.leveledUp) await levelLine(r.level);
   }
 
   /* ---------- a screen pick ---------- */
@@ -1872,6 +2025,7 @@ export async function createFarm(api) {
     for (const t of Object.values(T.pet || {})) t.destroy(true);
     T.pet = null;
     facesFrom = "";
+    ctaText = "";
   }
   async function ready() {
     if (!built || changed()) {
@@ -1901,6 +2055,12 @@ export async function createFarm(api) {
       entered = true;
       latestReply = r;
       setTruth(r.farm);
+      // The basket as it stood before `r`: this reply's own picks still have to fly in.
+      const kept = r.picked.length - (r.bused?.length || 0);
+      basket = r.farm.pantry.slice(0, Math.max(0, r.farm.pantry.length - kept));
+      drawPile();
+      coins = r.farm.coins - (r.coinsGain || 0);
+      api.coins(coins, 0);
       paintSky();
       const drawn = r.created ? r.farm.plots.map((p, i) => (r.planted.some((pl) => pl.plot === i) ? { plot: i, crop: null } : p)) : before(r);
       drawn.forEach((d, i) => drawPlot(i, d));
@@ -1957,7 +2117,7 @@ export async function createFarm(api) {
       for (const pk of r.picked) pending.add(pk.plot);
       return show(() => harvestShow(r));
     },
-    // Pick replies wait in the basket until delivery.
+    // Pick replies gather into one round, which settles once the picking stops.
     picked(r) {
       latestReply = r;
       setTruth(r.farm);
@@ -1974,19 +2134,11 @@ export async function createFarm(api) {
       flights.add(flight);
       flight.catch((e) => { if (e !== STOP) api.fail(e); }).finally(() => {
         flights.delete(flight);
-        scheduleBus();
+        scheduleSettle();
       });
       for (const pl of r.planted) pending.add(pl.plot);
       for (const i of r.opened) pending.add(i);
       paintCta();
-    },
-    loadAt(x, y) {
-      if (!loadBus) return false;
-      const basket = x < W * 0.3 && y > H * 0.7;
-      const busHit = Math.abs(x - S.bus.x) < S.bus.width / 2 && y > S.bus.y - S.bus.height && y < S.bus.y + 12;
-      if (!basket && !busHit) return false;
-      loadBus();
-      return true;
     },
     trail(x, y) {
       if (!entered || showing) return;
@@ -2018,8 +2170,28 @@ export async function createFarm(api) {
       cut();
       setTruth(view);
       view.plots.forEach((d, i) => drawPlot(i, d));
+      basket = [...view.pantry];
+      drawPile();
+      coins = view.coins;
+      api.coins(coins, 0);
       paintCta();
       schedule();
+    },
+    // A seed bought in the shop: the coins drop and the seed waits in the bag for the next planting.
+    bought(r) {
+      latestReply = r;
+      setTruth(r.farm);
+      coins = r.farm.coins;
+      api.coins(coins, 0);
+    },
+    // An open after a snack or the bus leveled the pet up: new plots and seeds take their turn.
+    grew(r) {
+      latestReply = r;
+      setTruth(r.farm);
+      if (!r.planted.length && !r.opened.length && !r.seeds.length) return;
+      for (const pl of r.planted) pending.add(pl.plot);
+      for (const i of r.opened) pending.add(i);
+      chore(() => aftermath(r, { levelShown: true }));
     },
     // The window changed size under an open farm: rebuild at the new size and redraw from the truth.
     async refit() {
@@ -2038,6 +2210,8 @@ export async function createFarm(api) {
       wake();
       tickers.add(twinkle);
       truth.plots.forEach((d, i) => drawPlot(i, d));
+      basket = [...truth.pantry];
+      drawPile();
       paintCta();
       schedule();
     },
@@ -2074,11 +2248,12 @@ export async function createFarm(api) {
       sleep();
     },
     get busy() {
-      return showing;
+      return showing || acting;
     },
     destroy() {
       if (built) cut();
       teardown();
+      rowList?.removeEventListener("click", onBasket);
     },
   };
 }

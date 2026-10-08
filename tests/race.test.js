@@ -2,13 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { applyRace, raceState } from "../src/arcade.js";
 import { newRace, raceTap, stepRace } from "../public/game/race-model.js";
+import { KIND_IDS } from "../public/kinds.js";
 
 const T0 = Date.parse("2026-05-01T10:00:00+09:00");
 const state = { arcadeDay: null, arcadePlays: 0, giBest: 5000 };
 
 test("race state survives missing and malformed old rows", () => {
-  for (const text of [null, "", "bad", "null", "[]", "{}"] ) assert.deepEqual(raceState(text), { horse: { level: 1, best: 0 }, sheep: { level: 1, best: 0 } });
-  assert.deepEqual(raceState('{"horse":{"best":50},"sheep":{"best":-2}}'), { horse: { level: 20, best: 20 }, sheep: { level: 1, best: 0 } });
+  const fresh = Object.fromEntries(KIND_IDS.map((k) => [k, { level: 1, best: 0 }]));
+  for (const text of [null, "", "bad", "null", "[]", "{}"] ) assert.deepEqual(raceState(text), fresh);
+  assert.deepEqual(raceState('{"horse":{"best":50},"sheep":{"best":-2},"tiger":{"best":3},"unicorn":{"best":4}}'), { ...fresh, horse: { level: 20, best: 20 }, tiger: { level: 4, best: 3 } });
 });
 
 test("wins advance only that rival, losses keep the record, level 20 caps", () => {
@@ -34,8 +36,8 @@ test("a zero step mid-race leaves the race running", () => {
   assert.ok(race.finish.every(Number.isFinite));
 });
 
-function simulate(rate, level, dashes = []) {
-  const race = newRace(level);
+function simulate(rate, level, dashes = [], agi = 0) {
+  const race = newRace(level, agi);
   let tap = 0;
   let dash = 0;
   while (race.time < 40 && race.finish.some((t) => t === null)) {
@@ -82,6 +84,30 @@ test("the first crossing decides both times and later taps change nothing", () =
 test("slowed-down taps pay the same per second of race", () => {
   const run = (scale) => {
     const r = newRace(1);
+    let next = 0;
+    for (let real = 0; r.time < 3; real += 1 / 240) {
+      if (real >= next) { raceTap(r, "screen", scale); next += 1 / 6; }
+      stepRace(r, scale / 240);
+    }
+    return r.distance[0];
+  };
+  assert.ok(Math.abs(run(1) - run(0.2)) < 0.5);
+});
+
+test("민첩 lifts only the pet's top speed, and slow motion still pays the same", () => {
+  const plain = simulate(6, 5);
+  const quick = simulate(6, 5, [], 8.3);
+  assert.ok(quick.finish[0] < plain.finish[0]);
+  assert.deepEqual([quick.goal, quick.rival], [plain.goal, plain.rival]);
+  const [a, b] = [newRace(1), newRace(1, 15)];
+  for (const r of [a, b]) {
+    raceTap(r, "screen");
+    stepRace(r, 0.5);
+  }
+  assert.ok(Math.abs(b.speed[0] / a.speed[0] - 1.15) < 1e-9);
+  assert.equal(newRace(1).agi, 0);
+  const run = (scale) => {
+    const r = newRace(1, 10);
     let next = 0;
     for (let real = 0; r.time < 3; real += 1 / 240) {
       if (real >= next) { raceTap(r, "screen", scale); next += 1 / 6; }

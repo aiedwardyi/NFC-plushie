@@ -7,15 +7,20 @@ export const FARM = {
   plots: 6,
   plotsByLevel: [4, 5, 6],
   bagMax: 9,
+  pantryMax: 12,
+  shopLevel: 3,
+  goldSeedLevel: 6,
+  daily: { feedXp: 10, feedXpTimes: 3, sendXp: 5, sendXpCrops: 6 },
   crops: {
-    sprout: { name: "새싹", quickMs: MIN, xp: 40 },
-    lettuce: { name: "상추", quickMs: 5 * MIN, waitMs: 6 * 60 * MIN, level: 1, tier: "common", xp: 2 },
-    potato: { name: "감자", quickMs: 30 * MIN, nights: 1, level: 1, tier: "common", xp: 5 },
-    carrot: { name: "당근", quickMs: 30 * MIN, nights: 1, level: 2, tier: "common", xp: 5 },
-    tomato: { name: "토마토", quickMs: 30 * MIN, nights: 1, level: 3, tier: "common", xp: 5 },
-    sweet: { name: "고구마", quickMs: 60 * MIN, nights: 3, level: 4, tier: "special", xp: 15 },
-    melon: { name: "수박", quickMs: 60 * MIN, nights: 3, level: 5, tier: "special", xp: 15 },
-    gold: { name: "황금 감자", nights: 7, tier: "rare", xp: 0 },
+    sprout: { name: "새싹", quickMs: MIN, xp: 40, coins: 5, snack: { stat: "cha", amount: 10 } },
+    lettuce: { name: "상추", quickMs: 5 * MIN, waitMs: 6 * 60 * MIN, level: 1, tier: "common", xp: 2, coins: 5, snack: { stat: "int", amount: 10 }, price: 5 },
+    potato: { name: "감자", quickMs: 30 * MIN, nights: 1, level: 1, tier: "common", xp: 5, coins: 5, snack: { stat: "str", amount: 10 }, price: 5 },
+    carrot: { name: "당근", quickMs: 30 * MIN, nights: 1, level: 2, tier: "common", xp: 5, coins: 5, snack: { stat: "agi", amount: 10 }, price: 10 },
+    tomato: { name: "토마토", quickMs: 30 * MIN, nights: 1, level: 3, tier: "common", xp: 5, coins: 5, snack: { stat: "cha", amount: 10 }, price: 10 },
+    sweet: { name: "고구마", quickMs: 60 * MIN, nights: 3, level: 4, tier: "special", xp: 15, coins: 15, snack: { stat: "str", amount: 20 }, price: 30 },
+    melon: { name: "수박", quickMs: 60 * MIN, nights: 3, level: 5, tier: "special", xp: 15, coins: 15, snack: { stat: "agi", amount: 20 }, price: 30 },
+    // No level: a 황금 감자 never arrives as an unlock seed, only from gifts or the shop.
+    gold: { name: "황금 감자", nights: 7, tier: "rare", xp: 0, coins: 50, snack: { stat: "all", amount: 20 }, price: 200 },
   },
   starter: ["sprout", "lettuce", "potato", "gold"],
   spare: ["potato"],
@@ -26,6 +31,9 @@ export const FARM = {
 
 const isCrop = (id) => typeof id === "string" && Object.hasOwn(FARM.crops, id);
 const seoulMidnight = (ms) => Date.parse(`${seoulDayKey(ms)}T00:00:00Z`) - PET.seoulOffsetMs;
+const newDay = () => ({ key: null, feeds: 0, sent: 0 });
+const busCoins = (crops, chaBonus) => Math.round(crops.reduce((sum, id) => sum + FARM.crops[id].coins, 0) * (1 + 2 * chaBonus / 100));
+const seedLevel = (id) => (id === "gold" ? FARM.goldSeedLevel : FARM.crops[id].level);
 
 export function plotsFor(level) {
   return FARM.plotsByLevel[Math.min(Math.max(level, 1), FARM.plotsByLevel.length) - 1];
@@ -63,11 +71,14 @@ export function parseFarm(text) {
   } catch {
     return null;
   }
-  if (!v || typeof v !== "object" || v.v !== 1 || !Array.isArray(v.plots)) return null;
+  if (!v || typeof v !== "object" || (v.v !== 1 && v.v !== 2) || !Array.isArray(v.plots)) return null;
   const crops = (a) => (Array.isArray(a) ? a.filter(isCrop) : []);
   const count = (n) => (Number.isInteger(n) && n >= 0 ? n : 0);
+  // v1 had no pantry, coins or day, so it moves up empty.
+  const v2 = v.v === 2 ? v : {};
+  const day = v2.day && typeof v2.day === "object" ? v2.day : {};
   return {
-    v: 1,
+    v: 2,
     plots: Array.from({ length: FARM.plots }, (_, i) => {
       const p = v.plots[i];
       if (!p || typeof p !== "object" || !isCrop(p.crop) || !Number.isFinite(p.at)) return null;
@@ -81,6 +92,9 @@ export function parseFarm(text) {
       : [],
     harvested: count(v.harvested),
     golden: count(v.golden),
+    pantry: crops(v2.pantry).slice(0, FARM.pantryMax),
+    coins: Number.isFinite(v2.coins) ? Math.max(0, Math.floor(v2.coins)) : 0,
+    day: { key: typeof day.key === "string" && /^\d{4}-\d{2}-\d{2}$/.test(day.key) ? day.key : null, feeds: count(day.feeds), sent: count(day.sent) },
   };
 }
 
@@ -93,17 +107,17 @@ function sow(farm, plot, crop, now) {
 }
 
 export function createFarm(now) {
-  const farm = { v: 1, plots: Array(FARM.plots).fill(null), bag: [...FARM.spare], tasted: [], unlockedTo: 1, arrived: [], harvested: 0, golden: 0 };
+  const farm = { v: 2, plots: Array(FARM.plots).fill(null), bag: [...FARM.spare], tasted: [], unlockedTo: 1, arrived: [], harvested: 0, golden: 0, pantry: [], coins: 0, day: newDay() };
   FARM.starter.forEach((crop, i) => sow(farm, i, crop, now));
   return farm;
 }
 
 export function addSeeds(bag, seeds, front = false) {
-  const out = front ? [...seeds, ...bag] : [...bag, ...seeds];
-  for (let i = out.length - 1; out.length > FARM.bagMax && i >= 0; i--) {
-    if (out[i] !== "gold") out.splice(i, 1);
+  const added = [];
+  for (const crop of seeds) {
+    if (crop === "gold" || bag.length + added.length < FARM.bagMax) added.push(crop);
   }
-  return out;
+  return front ? [...added, ...bag] : [...bag, ...added];
 }
 
 export function giftSeeds(tier, level, rng) {
@@ -120,15 +134,16 @@ export function giftSeeds(tier, level, rng) {
 }
 
 export function addGiftSeeds(farm, seeds) {
+  const bag = addSeeds(farm.bag, seeds);
   return {
     ...farm,
-    bag: addSeeds(farm.bag, seeds),
-    arrived: [...farm.arrived, ...seeds.map((crop) => ({ crop, from: "gift" }))].slice(-FARM.bagMax),
+    bag,
+    arrived: [...farm.arrived, ...bag.slice(farm.bag.length).map((crop) => ({ crop, from: "gift" }))].slice(-FARM.bagMax),
   };
 }
 
 // Every farm action: pay the picks, grant unlocks, fill plots that were empty, replant the picks.
-function tend(farm, xp, now, picks) {
+function tend(farm, xp, now, picks, { intBonus = 0, chaBonus = 0 } = {}) {
   const f = structuredClone(farm);
   const picked = [];
   for (const i of picks) {
@@ -137,14 +152,22 @@ function tend(farm, xp, now, picks) {
     picked.push({ plot: i, crop: p.crop, xp: FARM.crops[p.crop].xp, quick: p.quick });
     f.plots[i] = null;
   }
-  const xpGain = picked.reduce((sum, p) => sum + p.xp, 0);
+  const xpGain = Math.round(picked.reduce((sum, p) => sum + p.xp, 0) * (1 + 2 * intBonus / 100));
+  // A full pantry sends the rest on the bus, so no crop is lost.
+  const room = Math.max(0, FARM.pantryMax - f.pantry.length);
+  f.pantry.push(...picked.slice(0, room).map((p) => p.crop));
+  const bused = picked.slice(room).map((p) => p.crop);
+  const coinsGain = busCoins(bused, chaBonus);
+  f.coins += coinsGain;
   const level = levelForXp(xp + xpGain);
   const opened = [];
   for (let i = plotsFor(f.unlockedTo); i < plotsFor(level); i++) opened.push(i);
   const unlocked = Object.keys(FARM.crops).filter((id) => FARM.crops[id].level > f.unlockedTo && FARM.crops[id].level <= level);
-  f.bag = addSeeds(f.bag, unlocked, true);
+  const bag = addSeeds(f.bag, unlocked, true);
+  const added = bag.slice(0, bag.length - f.bag.length);
+  f.bag = bag;
   f.unlockedTo = Math.max(f.unlockedTo, level);
-  const seeds = [...f.arrived, ...unlocked.map((crop) => ({ crop, from: "unlock" }))];
+  const seeds = [...f.arrived, ...added.map((crop) => ({ crop, from: "unlock" }))];
   f.arrived = [];
   const planted = [];
   const emptied = new Set(picked.map((p) => p.plot));
@@ -157,23 +180,63 @@ function tend(farm, xp, now, picks) {
   }
   f.harvested += picked.length;
   f.golden += picked.filter((p) => p.crop === "gold").length;
-  return { farm: f, created: false, picked, planted, opened, seeds, xpGain, xpAfter: xp + xpGain };
+  return { farm: f, created: false, picked, planted, opened, seeds, xpGain, xpAfter: xp + xpGain, pantry: [...f.pantry], bused, coinsGain, coins: f.coins };
 }
 
-export function openFarm(farm, xp, now) {
-  if (farm) return tend(farm, xp, now, []);
+export function openFarm(farm, xp, now, bonus) {
+  if (farm) return tend(farm, xp, now, [], bonus);
   const fresh = createFarm(now);
-  const out = tend(fresh, xp, now, []);
+  const out = tend(fresh, xp, now, [], bonus);
   const starter = FARM.starter.map((crop, i) => ({ plot: i, crop, quick: fresh.plots[i].quick }));
   return { ...out, created: true, planted: [...starter, ...out.planted] };
 }
 
-export function pickPlot(farm, xp, now, plot) {
-  return tend(farm, xp, now, [plot]);
+export function pickPlot(farm, xp, now, plot, bonus) {
+  return tend(farm, xp, now, [plot], bonus);
 }
 
-export function harvestFarm(farm, xp, now) {
-  return tend(farm, xp, now, farm.plots.map((_, i) => i));
+export function harvestFarm(farm, xp, now, bonus) {
+  return tend(farm, xp, now, farm.plots.map((_, i) => i), bonus);
+}
+
+// The day's feed and bus counts start over at Seoul midnight.
+function today(farm, now) {
+  const key = seoulDayKey(now);
+  return farm.day.key === key ? { ...farm.day } : { ...newDay(), key };
+}
+
+export function feedCrop(farm, crop, now) {
+  const i = farm.pantry.indexOf(crop);
+  if (i < 0) return null;
+  const f = structuredClone(farm);
+  f.pantry.splice(i, 1);
+  f.day = today(farm, now);
+  f.day.feeds += 1;
+  const xpGain = f.day.feeds <= FARM.daily.feedXpTimes ? FARM.daily.feedXp : 0;
+  return { farm: f, crop, xpGain, snack: { ...FARM.crops[crop].snack } };
+}
+
+export function sendCrops(farm, crops, chaBonus, now) {
+  const f = structuredClone(farm);
+  for (const crop of crops) {
+    const i = f.pantry.indexOf(crop);
+    if (i < 0) return null;
+    f.pantry.splice(i, 1);
+  }
+  f.day = today(farm, now);
+  const paid = Math.max(0, Math.min(crops.length, FARM.daily.sendXpCrops - f.day.sent));
+  f.day.sent += crops.length;
+  const coinsGain = busCoins(crops, chaBonus);
+  f.coins += coinsGain;
+  return { farm: f, coinsGain, xpGain: paid * FARM.daily.sendXp };
+}
+
+export function buySeed(farm, crop, level) {
+  if (!isCrop(crop) || !FARM.crops[crop].price || seedLock(farm, crop, level)) return null;
+  const f = structuredClone(farm);
+  f.coins -= FARM.crops[crop].price;
+  f.bag.push(crop);
+  return { farm: f, price: FARM.crops[crop].price };
 }
 
 export function nextRipeAt(farm, now) {
@@ -188,6 +251,15 @@ export function farmDot(farm, level, now) {
   return unlock || farm.arrived.length > 0 || farm.plots.some((p) => p && isRipe(p, now));
 }
 
+// Why a seed can't be bought now, or "" when it can.
+function seedLock(farm, crop, level) {
+  const need = Math.max(FARM.shopLevel, seedLevel(crop));
+  if (level < need) return `Lv ${need}부터`;
+  if (farm.coins < FARM.crops[crop].price) return "코인이 모자라요";
+  if (farm.bag.length >= FARM.bagMax) return "씨앗 주머니가 가득해요";
+  return "";
+}
+
 export function farmView(farm, level, now) {
   const open = plotsFor(level);
   const plots = farm.plots.map((p, i) => {
@@ -197,7 +269,11 @@ export function farmView(farm, level, now) {
   });
   const growing = plots.filter((p) => p.crop && !p.ripe).sort((a, b) => a.ripeAt - b.ripeAt);
   const next = growing.length ? { plot: growing[0].plot, crop: growing[0].crop, name: growing[0].name, ripeAt: growing[0].ripeAt, eta: growing[0].eta } : null;
-  return { now, plots, next, ripe: plots.filter((p) => p.ripe).length, bag: [...farm.bag], harvested: farm.harvested, golden: farm.golden };
+  const shop = Object.keys(FARM.crops).filter((id) => FARM.crops[id].price).map((id) => {
+    const reason = seedLock(farm, id, level);
+    return { crop: id, name: FARM.crops[id].name, price: FARM.crops[id].price, locked: reason !== "", reason };
+  });
+  return { now, plots, next, ripe: plots.filter((p) => p.ripe).length, bag: [...farm.bag], harvested: farm.harvested, golden: farm.golden, pantry: [...farm.pantry], coins: farm.coins, shopOpen: level >= FARM.shopLevel, shop };
 }
 
 // Dev only: shift plant times back so every plot is ripe now.

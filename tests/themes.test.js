@@ -168,6 +168,11 @@ test("theme css is never cached, theme art and sounds are cached for a day", asy
   assert.equal(css.status, 200);
   assert.match(css.headers.get("content-type"), /^text\/css/);
   assert.equal(css.headers.get("cache-control"), "no-store");
+  const kinds = await request("/kinds.css");
+  assert.equal(kinds.status, 200);
+  assert.match(kinds.headers.get("content-type"), /^text\/css/);
+  assert.equal(kinds.headers.get("cache-control"), "no-store");
+  assert.match(kinds.html, /\[data-mascot="tiger"\] \{ --px: url\("\/themes\/px\/tiger-px\.png"\);/);
   const art = await request("/themes/px/horse-px.png");
   assert.equal(art.headers.get("cache-control"), "public, max-age=86400");
   const cry = await request("/sfx/cry-classic-happy.mp3");

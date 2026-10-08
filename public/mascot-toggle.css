@@ -1,4 +1,4 @@
-/* Dad demo: horse/sheep switch, a compact pill in the top bar */
+/* Dad demo: the 말/양 switch, a compact pill in the top bar */
 .mascot-toggle {
   display: flex;
   gap: 2px;
@@ -47,6 +47,8 @@
   user-select: none;
   -webkit-user-drag: none;
 }
+/* A pet off the switch keeps the bar's spacing but not the switch. */
+.mascot-toggle[data-mascot-toggle]:not(:has(.is-active)) { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .mascot-tog { transition: none; }
 }

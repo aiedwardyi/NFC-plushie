@@ -85,6 +85,7 @@ test("two browsers own an open pet, including care, farm, combo, arcade and talk
     const home = await ctx.request(`/t?uid=${A}`, { jar });
     assert.match(home.html, /data-care-uid="04AAAAAAAAAAA1"/);
     assert.match(home.html, /data-talk-mic/);
+    assert.match(home.html, /data-sheet="stats"[\s\S]*<b class="st-total">\d+<\/b>/);
     assert.doesNotMatch(home.html, /id="claim-form"/);
     assert.equal(ctx.row().tap_count, taps + 1);
     for (const [path, body] of [
@@ -184,6 +185,7 @@ test("guest pets open on any browser, hide the code and the dad menu, and lock o
     const home = await ctx.request(`/t?uid=${A}`, { jar });
     assert.match(home.html, /data-care-uid="04AAAAAAAAAAA1"/);
     assert.match(home.html, /data-talk-mic/);
+    assert.match(home.html, /data-sheet="stats"[\s\S]*<b class="st-total">\d+<\/b>/);
     assert.doesNotMatch(home.html, /data-demo/);
     for (const [path, body] of [["/farm", { act: "open" }], ["/talk", { text: "안녕" }]]) {
       assert.equal((await ctx.request(path, { jar, body: { uid: A, ...body } })).status, 200, path);

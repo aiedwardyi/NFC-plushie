@@ -686,6 +686,32 @@ html[data-time="night"] .stars { opacity: 1; }
 @keyframes key-shimmer {
   to { transform: translateX(100%); }
 }
+/* The key is a button to the stat card; under it, what the next level brings. */
+.level-line { flex-wrap: wrap; }
+.level-line .level-open {
+  all: unset;
+  display: flex;
+  align-items: center;
+  flex: 1 1 100%;
+  min-width: 0;
+  min-height: 44px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.level-line .level-open:focus-visible { outline: 3px solid var(--gold-light); outline-offset: 2px; border-radius: 999px; }
+.level-line .level-open:active .level-badge { transform: scale(.94); }
+.level-next {
+  flex: 1 1 100%;
+  margin-top: -3px;
+  padding-left: 40px;
+  overflow: hidden;
+  font-size: .75rem;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--gold-light);
+}
 
 /* Dialog: the one retro touch */
 .dialog {
@@ -802,6 +828,30 @@ html[data-time="night"] .stars { opacity: 1; }
 @keyframes dialog-nudge {
   from { transform: translateY(0); }
   to { transform: translateY(4px); }
+}
+/* The first line's typing bubble, held until the page's first touch */
+.dialog-dots {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(74, 44, 32, 0.08);
+  vertical-align: -2px;
+}
+.dialog-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cocoa);
+  opacity: .3;
+  animation: dialog-dots 1.2s ease-in-out infinite;
+}
+.dialog-dots i:nth-child(2) { animation-delay: .18s; }
+.dialog-dots i:nth-child(3) { animation-delay: .36s; }
+@keyframes dialog-dots {
+  0%, 60%, 100% { opacity: .3; transform: translateY(0); }
+  30% { opacity: .85; transform: translateY(-2px); }
 }
 
 /* Dock: gift box and records at the edges, the three care verbs between */
@@ -1268,6 +1318,129 @@ button.tile:active { transform: translateY(2px); }
   color: var(--cream);
   font-variant-numeric: tabular-nums;
 }
+
+/* 능력치: the pet card from the level line. Each bar is base, then edition (gold), then training. */
+.st-who {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.st-animal {
+  font-size: 1.75rem;
+  font-weight: 900;
+  color: var(--cream);
+}
+.st-edition {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: .8125rem;
+  font-weight: 800;
+  color: var(--navy);
+  background: var(--cream);
+}
+/* The edition stays real gold in every world: the themes remap --gold. */
+.st-edition.is-rare { color: #4a2c20; background: linear-gradient(135deg, #fceab2, #e2b252); }
+.st-edition.is-legendary {
+  color: #f3e2a8;
+  background: linear-gradient(135deg, #2e2a66, #18264f);
+  box-shadow: inset 0 0 0 1px #e2c27a, 0 0 14px rgba(226, 194, 122, .2);
+}
+.st-list {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+}
+.st-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  grid-template-areas: "icon label total boost" "icon job job job" "bar bar bar bar";
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 2px;
+  padding: 8px 12px 10px;
+  border-radius: 16px;
+  background: linear-gradient(110deg, color-mix(in srgb, var(--st) 12%, transparent), transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--st) 25%, transparent);
+}
+.st-row[data-stat="str"] { --st: #e4694f; --st-light: #f5a38c; }
+.st-row[data-stat="int"] { --st: #6c7fd8; --st-light: #a9b5f0; }
+.st-row[data-stat="agi"] { --st: #35a887; --st-light: #86d6bd; }
+.st-row[data-stat="cha"] { --st: #e0719a; --st-light: #f3afc7; }
+.st-icon {
+  grid-area: icon;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 36px;
+  border-radius: 10px;
+  color: var(--st-light);
+  background: color-mix(in srgb, var(--st) 18%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--st-light) 20%, transparent);
+}
+.st-icon svg { width: 22px; height: 22px; fill: currentColor; }
+.st-label { grid-area: label; font-size: .9375rem; font-weight: 800; color: var(--cream); }
+.st-bar {
+  grid-area: bar;
+  display: flex;
+  height: 12px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(8, 11, 19, .45);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .25);
+}
+.st-bar i { display: block; flex: none; width: 0; height: 100%; transition: width .7s var(--ease-out); }
+.st-bar .st-base { background: linear-gradient(90deg, var(--st-light), var(--st)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35); }
+.st-bar .st-plus { background: linear-gradient(90deg, #d9982b, #f2c451, #ffe9a8); box-shadow: inset 1px 0 0 #fff0be, inset 0 1px 0 #fff0be; transition-delay: .14s; }
+.st-bar .st-trained { background: repeating-linear-gradient(115deg, #8fd18a 0 4px, #b7e5a8 4px 6px); transition-delay: .28s; }
+.st-total {
+  grid-area: total;
+  text-align: right;
+  font-size: 1.375rem;
+  font-weight: 900;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--st-light);
+}
+.st-boost {
+  grid-area: boost;
+  justify-self: start;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 900;
+  color: #4a2c20;
+  background: linear-gradient(135deg, #fceab2, #e2b252);
+  box-shadow: 0 2px 6px rgba(214, 165, 70, .25);
+}
+.st-job { grid-area: job; margin: 0; font-size: .75rem; font-weight: 600; color: color-mix(in srgb, var(--cream) 76%, var(--navy2)); }
+.st-snack { margin-top: 18px; }
+.stat-peek { margin-top: 0; }
+
+/* A stat that grew, coins that landed: a short line floating up. */
+@media (prefers-reduced-motion: reduce) {
+  .st-bar i { transition: none; }
+}
+.stat-pop {
+  position: fixed;
+  z-index: 160;
+  margin: 0;
+  padding: 4px 13px;
+  transform: translate(-50%, 0);
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: 1.0625rem;
+  font-weight: 900;
+  line-height: 1.4;
+  color: var(--navy);
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  border-radius: 999px;
+  box-shadow: 0 3px 0 var(--gold-deep), 0 8px 18px rgba(0, 0, 0, 0.35);
+}
 .mini-hearts {
   display: inline-flex;
   gap: 2px;
@@ -1330,14 +1503,11 @@ button.tile:active { transform: translateY(2px); }
   aspect-ratio: 36 / 25;
   background: center 25% / cover no-repeat;
 }
-[data-pick="classic"] .theme-thumb { background-image: url("/themes/thumbs/classic-horse.webp"); }
-[data-pick="8bit"] .theme-thumb { background-image: url("/themes/thumbs/8bit-horse.webp"); }
-[data-pick="milk"] .theme-thumb { background-image: url("/themes/thumbs/milk-horse.webp"); }
-[data-pick="najeon"] .theme-thumb { background-image: url("/themes/thumbs/najeon-horse.webp?v=2"); }
-html[data-mascot="sheep"] [data-pick="classic"] .theme-thumb { background-image: url("/themes/thumbs/classic-sheep.webp"); }
-html[data-mascot="sheep"] [data-pick="8bit"] .theme-thumb { background-image: url("/themes/thumbs/8bit-sheep.webp"); }
-html[data-mascot="sheep"] [data-pick="milk"] .theme-thumb { background-image: url("/themes/thumbs/milk-sheep.webp"); }
-html[data-mascot="sheep"] [data-pick="najeon"] .theme-thumb { background-image: url("/themes/thumbs/najeon-sheep.webp?v=2"); }
+/* Each kind's previews come from /kinds.css */
+[data-pick="classic"] .theme-thumb { background-image: var(--thumb-classic); }
+[data-pick="8bit"] .theme-thumb { background-image: var(--thumb-8bit); }
+[data-pick="milk"] .theme-thumb { background-image: var(--thumb-milk); }
+[data-pick="najeon"] .theme-thumb { background-image: var(--thumb-najeon); }
 .theme-name {
   position: absolute;
   left: 0;
@@ -1928,17 +2098,60 @@ body.is-still-celebrate main {
   border-radius: 999px;
   background: rgba(241, 214, 140, 0.45);
 }
+/* All 12 animals in two rows, then the edition row */
 .demo-card .mascot-toggle {
-  justify-content: center;
-  gap: 16px;
-  width: max-content;
-  margin: 0 auto 6px;
-  padding: 6px;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 5px;
+  border-radius: 20px;
 }
 .demo-card .mascot-tog {
-  width: 76px;
-  height: 76px;
-  padding: 8px;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 5px 0 4px;
+  border-radius: 15px;
+  line-height: 1;
+}
+.demo-card .mascot-tog img {
+  width: 40px;
+  height: 40px;
+}
+.demo-card .mascot-tog span {
+  font-size: .6875rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  white-space: nowrap;
+}
+.demo-tier {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(8, 11, 19, 0.55);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(241, 214, 140, 0.16);
+}
+.demo-card .demo-tier button {
+  min-height: 38px;
+  margin: 0;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .875rem;
+  box-shadow: none;
+}
+.demo-card .demo-tier button[aria-pressed="true"] {
+  background: radial-gradient(circle at 50% 32%, #2c3858, var(--midnight, #1c2538));
+  color: var(--gold-light);
+  box-shadow: inset 0 0 0 1.5px var(--gold, #d6a546), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 .demo-card form { margin: 0; }
 .demo-close {
@@ -1951,6 +2164,7 @@ body.is-still-celebrate main {
 @media (prefers-reduced-motion: reduce) {
   .dialog-cursor,
   .dialog-cursor.is-done { animation: none; }
+  .dialog-dots i { animation: none; opacity: .6; }
   .demo-sheet,
   .demo-card,
   .sheet,
@@ -2682,6 +2896,8 @@ html.g-on .window { touch-action: none; }
 .g-height span { margin-left: 2px; font-size: 18px; }
 .g-hud.is-flight .g-height b { font-size: 36px; }
 .g-hud.is-done .g-height { opacity: 0; transition: opacity .3s; }
+.g-bonus { position: absolute; left: 22px; top: 36px; margin: 0; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 900; white-space: nowrap; color: var(--g-accent-ink); background: var(--g-accent); box-shadow: 0 2px 0 rgba(0, 0, 0, .18); }
+.g-hud.is-done .g-bonus { opacity: 0; transition: opacity .3s; }
 /* A short window (a phone browser's bars) pulls the meter in and shrinks its icons, so the tiers never stack. */
 .g-meter { position: absolute; right: 16px; top: min(82px, 22cqh); bottom: min(54px, 10cqh); width: 12px; border-radius: 999px; background: var(--g-track); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .45); transition: opacity .35s, transform .35s; }
 .g-meter.is-away, .g-timer.is-away { opacity: 0; transform: translateX(14px); }
@@ -2766,6 +2982,8 @@ html.f-on .window { touch-action: none; }
 html.f-layout main { padding-left: 20px; padding-right: 20px; }
 html.f-layout .plate, html.f-layout .pet-stats { display: none; }
 html.f-layout .window { max-height: none; min-height: 300px; margin: 4px 0; }
+/* The basket row takes the footer's room, so a 655 px phone still fits the whole farm. */
+html.f-layout main > footer { display: none; }
 
 .dock-btn.is-loading .dock-cap { animation: f-load .7s ease-in-out infinite alternate; }
 @keyframes f-load { to { transform: translateY(2px) scale(.94); } }
@@ -2894,6 +3112,173 @@ html.f-layout .window { max-height: none; min-height: 300px; margin: 4px 0; }
 }
 .f-prompt:focus-visible { outline: none; }
 @keyframes f-prompt { 50% { transform: scale(1.04); } }
+.f-big.is-snack { top: 26%; padding: 0 14px; font-size: 23px; line-height: 1.3; color: #fff4c8; -webkit-text-stroke-color: #6b4410; }
+
+/* The basket row under the field: the pantry's crops (tap one to feed it or send it), 모두 보내기, and the coins */
+.f-basket { display: none; }
+html.f-layout .f-basket {
+  order: -2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 52px;
+  margin: -2px 0 0;
+  padding: 2px 4px 2px 5px;
+  color: #4a2c20;
+  font-family: "Pretendard Variable", Pretendard, system-ui, sans-serif;
+  background: linear-gradient(180deg, #fffaf0, #f6e6c6);
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 2px #d6a546, 0 6px 14px rgba(0, 0, 0, .3);
+}
+.fb-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 2px 2px 4px;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.fb-list::-webkit-scrollbar { display: none; }
+.f-basket.is-busy .fb-list { opacity: .5; pointer-events: none; transition: opacity .2s; }
+.f-basket .fb-crop {
+  all: unset;
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 2px 0 #e0c99c, inset 0 0 0 2px #f1e3c8;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.fb-crop img { width: 32px; height: 32px; pointer-events: none; }
+.fb-crop b {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 18px;
+  text-align: center;
+  color: #fff8e6;
+  background: #8a5a2a;
+}
+.f-basket .fb-crop.is-chosen { background: #fff6dc; box-shadow: 0 2px 0 #9a7228, inset 0 0 0 2.5px #d6a546, 0 0 0 3px rgba(214, 165, 70, .35); }
+.f-basket .fb-act {
+  all: unset;
+  flex: none;
+  min-height: 44px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 44px;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  color: #4a2c20;
+  background: linear-gradient(180deg, #ffe58f, #f5c542);
+  box-shadow: 0 3px 0 #b9821c;
+}
+.f-basket .fb-act.is-feed { color: #fff; background: linear-gradient(180deg, #f39a86, #e8806b); box-shadow: 0 3px 0 #b4503d; }
+/* 모두 보내기 stays in reach however many crops scroll under it. */
+.f-basket .fb-act.is-all { position: sticky; right: 0; margin-left: auto; box-shadow: 0 3px 0 #b9821c, 0 0 0 7px #f9eed8, -16px 0 10px -2px #f9eed8; }
+/* A chosen crop needs the room for both buttons, so the coins drop their 가게 label meanwhile. */
+.f-basket.is-chosen .fb-shop { display: none; }
+.f-basket .fb-act:active, .f-basket .fb-crop:active { transform: translateY(2px); }
+.f-basket .fb-act:focus-visible, .f-basket .fb-crop:focus-visible, .f-basket .fb-coins:focus-visible { outline: 3px solid #9a7228; outline-offset: 2px; }
+.fb-empty { margin: 0; padding: 0 6px; font-size: 13px; font-weight: 700; line-height: 1.35; color: #8a6a4a; }
+.f-basket .fb-coins {
+  all: unset;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 10px 0 8px;
+  box-sizing: border-box;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #6b4410;
+  background: rgba(255, 255, 255, .6);
+  box-shadow: inset 0 0 0 1.5px #e0c99c;
+  -webkit-tap-highlight-color: transparent;
+}
+.f-basket .fb-coins.is-shop { cursor: pointer; background: #fff; box-shadow: 0 2px 0 #e0c99c, inset 0 0 0 2px #f1c75a; }
+.fb-shop { margin-left: 2px; padding: 2px 6px; border-radius: 999px; font-size: 11px; color: #fff8e6; background: #8a5a2a; }
+.f-coin-ic {
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6c4, #f5c542 55%, #b9821c);
+  box-shadow: inset 0 0 0 1.5px #a8741a;
+}
+.f-coin {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6c4, #f5c542 55%, #b9821c);
+  box-shadow: inset 0 0 0 2px #a8741a, 0 2px 6px rgba(0, 0, 0, .3);
+}
+
+/* 씨앗 가게: seeds for coins from Lv 3; a row that can't buy says why */
+.shop-purse {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: -4px 0 14px;
+  font-size: .9375rem;
+  font-weight: 800;
+  color: var(--cream);
+}
+.shop-coins { display: flex; align-items: center; gap: 6px; }
+.shop-coins b { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.shop-bag { padding: 4px 11px; border-radius: 999px; font-size: .8125rem; color: var(--gold-light); box-shadow: inset 0 0 0 1.5px rgba(241, 214, 140, 0.45); }
+.shop-list { display: grid; gap: 8px; margin: 0 0 4px; padding: 0; list-style: none; }
+.shop-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 10px;
+  border-radius: 16px;
+  background: rgba(8, 11, 19, 0.45);
+  box-shadow: inset 0 0 0 1.5px rgba(241, 214, 140, 0.2);
+}
+.shop-row img { width: 40px; height: 40px; }
+.shop-row.is-locked img { opacity: .55; filter: grayscale(.5); }
+.shop-name b { display: block; font-size: 1rem; font-weight: 800; color: var(--cream); }
+.shop-name small { margin: 0; font-size: .8125rem; font-weight: 600; color: var(--muted); }
+.shop-row.is-locked .shop-name small { color: var(--gold-light); }
+.shop-row .shop-buy {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 14px;
+  font-variant-numeric: tabular-nums;
+}
+.shop-row .shop-buy:disabled { opacity: .4; cursor: default; filter: saturate(.4); }
+.shop-drop { position: fixed; z-index: 140; width: 36px; height: 36px; pointer-events: none; transform: translate(-50%, -50%); }
 
 @media (prefers-reduced-motion: reduce) {
   .f-cta.is-ripe, .f-prompt p, .f-seed.is-gold::after, .dock-btn.is-loading .dock-cap { animation: none; }
@@ -3202,6 +3587,7 @@ html[data-theme="najeon"] .talk-bar {
 .r-versus b { font-size: 16px; font-weight: 900; }
 .r-versus span { font-size: 14px; font-weight: 900; color: var(--g-xp); }
 .r-versus small { flex-basis: 100%; font-size: 12px; font-weight: 700; opacity: .65; }
+.r-bonus { display: block; width: max-content; margin: -4px auto 12px; padding: 3px 12px; border-radius: 999px; font-size: 14px; font-weight: 900; color: var(--g-accent-ink); background: var(--g-accent); }
 .r-go { width: 100%; min-height: 48px; border: 0; border-radius: 999px; font-size: 17px !important; font-weight: 900; background: var(--g-accent); color: var(--g-accent-ink); box-shadow: 0 3px 0 rgba(0, 0, 0, .2); }
 .r-game .r-card { z-index: 5; top: calc(var(--r-top) + 64px); left: 0; right: 0; width: min(280px, calc(100% - 44px)); margin: 0 auto; }
 .r-medal { display: grid; place-items: center; padding: 0; font-size: 21px; font-weight: 900; color: var(--g-card-ink); }

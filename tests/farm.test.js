@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { FARM, addGiftSeeds, addSeeds, createFarm, etaWords, farmDot, farmView, giftSeeds, harvestFarm, isRipe, nextRipeAt, openFarm, parseFarm, pickPlot, plotsFor, ripeAt, ripenFarm } from "../src/farm.js";
+import { FARM, addGiftSeeds, addSeeds, buySeed, createFarm, etaWords, farmDot, farmView, feedCrop, giftSeeds, harvestFarm, isRipe, nextRipeAt, openFarm, parseFarm, pickPlot, plotsFor, ripeAt, ripenFarm, sendCrops } from "../src/farm.js";
 import { xpForLevel } from "../src/pet.js";
 
 const MIN = 60 * 1000;
@@ -9,7 +9,7 @@ const seoul = (s) => Date.parse(`${s}+09:00`);
 const T0 = seoul("2026-05-01T10:00:00");
 const plant = (crop, at, quick = false) => ({ crop, at, quick });
 const crops = (farm) => farm.plots.map((p) => p && p.crop);
-const blank = (over = {}) => ({ v: 1, plots: Array(6).fill(null), bag: [], tasted: Object.keys(FARM.crops), unlockedTo: 1, arrived: [], harvested: 0, golden: 0, ...over });
+const blank = (over = {}) => ({ v: 2, plots: Array(6).fill(null), bag: [], tasted: Object.keys(FARM.crops), unlockedTo: 1, arrived: [], harvested: 0, golden: 0, pantry: [], coins: 0, day: { key: null, feeds: 0, sent: 0 }, ...over });
 const seq = (...values) => { let i = 0; return () => values[i++ % values.length]; };
 
 test("plots open 4, then 5, then 6 by level", () => {
@@ -165,13 +165,44 @@ test("gift seeds follow the tier and the pet's level", () => {
   assert.deepEqual(out.farm.arrived, []);
 });
 
-test("the bag holds 9 and drops from the tail, never 황금 감자", () => {
+test("the bag keeps every seed and admits free seeds only while there is room, except 황금 감자", () => {
   const p = (n) => Array(n).fill("potato");
   assert.deepEqual(addSeeds([...p(7), "gold"], ["lettuce", "carrot"]), [...p(7), "gold", "lettuce"]);
-  assert.deepEqual(addSeeds([...p(8), "gold"], ["gold"]), [...p(7), "gold", "gold"]);
-  assert.deepEqual(addSeeds(p(9), ["carrot"], true), ["carrot", ...p(8)]);
+  assert.deepEqual(addSeeds([...p(8), "gold"], ["gold"]), [...p(8), "gold", "gold"]);
+  assert.deepEqual(addSeeds(p(9), ["carrot"], true), p(9));
   assert.deepEqual(addSeeds(Array(9).fill("gold"), ["gold", "lettuce"]), Array(10).fill("gold"));
   assert.deepEqual(addSeeds(["tomato"], ["carrot", "sweet"], true), ["carrot", "sweet", "tomato"]);
+  assert.deepEqual(addSeeds(p(10), ["carrot", "gold", "gold"], true), ["gold", "gold", ...p(10)]);
+  assert.deepEqual(addSeeds(p(8), ["gold", "carrot"], true), ["gold", ...p(8)]);
+});
+
+test("a full paid bag survives a level unlock with its coins unchanged", () => {
+  let farm = blank({ plots: Array(6).fill(plant("potato", T0)), unlockedTo: 3, coins: 100 });
+  for (let i = 0; i < FARM.bagMax; i++) farm = buySeed(farm, i % 2 ? "carrot" : "tomato", 3).farm;
+  const out = openFarm(farm, xpForLevel(4), T0);
+  assert.deepEqual(out.farm.bag, farm.bag);
+  assert.equal(out.farm.coins, 10);
+  assert.deepEqual(out.seeds, []);
+  assert.equal(out.farm.unlockedTo, 4);
+});
+
+test("unlock notices name only the seeds that fit", () => {
+  const bag = Array(8).fill("potato");
+  const out = openFarm(blank({ plots: Array(6).fill(plant("potato", T0)), bag, unlockedTo: 3 }), xpForLevel(5), T0);
+  assert.deepEqual(out.farm.bag, ["sweet", ...bag]);
+  assert.deepEqual(out.seeds, [{ crop: "sweet", from: "unlock" }]);
+  assert.deepEqual(openFarm(out.farm, xpForLevel(5), T0).seeds, []);
+});
+
+test("gift notices name only admitted seeds and gold never displaces a seed", () => {
+  for (const size of [8, 9, 10]) {
+    const bag = Array(size).fill("tomato");
+    const farm = addGiftSeeds(blank({ bag }), ["carrot", "gold", "lettuce", "gold"]);
+    const added = size === 8 ? ["carrot", "gold", "gold"] : ["gold", "gold"];
+    assert.deepEqual(farm.bag, [...bag, ...added]);
+    assert.deepEqual(farm.arrived, added.map((crop) => ({ crop, from: "gift" })));
+    assert.deepEqual(bag, Array(size).fill("tomato"));
+  }
 });
 
 test("pick takes only a ripe plot", () => {
@@ -201,7 +232,7 @@ test("a harvest takes every ripe plot, pays XP per crop and counts golden", () =
 });
 
 test("corrupt or missing farm JSON reads as no farm", () => {
-  for (const text of [null, undefined, "", "{", "null", "42", "[]", '"x"', '{"v":2,"plots":[]}', '{"v":1}', '{"v":1,"plots":"no"}']) {
+  for (const text of [null, undefined, "", "{", "null", "42", "[]", '"x"', '{"v":3,"plots":[]}', '{"v":1}', '{"v":2}', '{"v":1,"plots":"no"}']) {
     assert.equal(parseFarm(text), null, String(text));
   }
   const farm = createFarm(T0);
@@ -244,4 +275,169 @@ test("ripen makes every plot ripe now and touches nothing else", () => {
   assert.deepEqual(out.plots.map((p) => [p.crop, p.quick]), farm.plots.map((p) => [p.crop, p.quick]));
   assert.ok(out.plots.every((p, i) => ripeAt(p) > now - 2 * 24 * HOUR && p.at <= farm.plots[i].at));
   assert.deepEqual({ ...out, plots: null }, { ...farm, plots: null });
+});
+
+test("every crop has bus coins and a snack; the shop sells all but 새싹", () => {
+  const table = Object.fromEntries(Object.entries(FARM.crops).map(([id, c]) => [id, [c.coins, c.snack.stat, c.snack.amount, c.price ?? null]]));
+  assert.deepEqual(table, {
+    sprout: [5, "cha", 10, null],
+    lettuce: [5, "int", 10, 5],
+    potato: [5, "str", 10, 5],
+    carrot: [5, "agi", 10, 10],
+    tomato: [5, "cha", 10, 10],
+    sweet: [15, "str", 20, 30],
+    melon: [15, "agi", 20, 30],
+    gold: [50, "all", 20, 200],
+  });
+  assert.deepEqual([FARM.pantryMax, FARM.shopLevel, FARM.goldSeedLevel], [12, 3, 6]);
+  assert.deepEqual(FARM.daily, { feedXp: 10, feedXpTimes: 3, sendXp: 5, sendXpCrops: 6 });
+});
+
+test("a v1 farm reads as v2 with nothing lost", () => {
+  const v1 = { v: 1, plots: [plant("potato", T0), null, plant("gold", T0), plant("lettuce", T0, true), null, null], bag: ["carrot", "gold"], tasted: ["potato", "gold", "lettuce"], unlockedTo: 2, arrived: [{ crop: "carrot", from: "gift" }], harvested: 7, golden: 1 };
+  const farm = parseFarm(JSON.stringify(v1));
+  assert.deepEqual(farm, { ...v1, v: 2, pantry: [], coins: 0, day: { key: null, feeds: 0, sent: 0 } });
+  assert.deepEqual(parseFarm(JSON.stringify({ ...v1, pantry: ["potato"], coins: 9 })).pantry, []);
+  const out = harvestFarm(farm, 0, seoul("2026-05-02T00:00:00"));
+  assert.deepEqual([out.farm.v, out.farm.pantry, out.farm.coins], [2, ["potato", "lettuce"], 0]);
+  assert.deepEqual(parseFarm(JSON.stringify(out.farm)), out.farm);
+});
+
+test("a v2 farm keeps known pantry crops, at most 12, and whole coins", () => {
+  const pantry = ["potato", "rock", 3, "gold", ...Array(12).fill("carrot")];
+  const farm = parseFarm(JSON.stringify({ ...blank(), pantry, coins: 41.7, day: { key: "2026-05-01", feeds: 2, sent: 4 } }));
+  assert.deepEqual(farm.pantry, ["potato", "gold", ...Array(10).fill("carrot")]);
+  assert.deepEqual([farm.coins, farm.day], [41, { key: "2026-05-01", feeds: 2, sent: 4 }]);
+  for (const coins of [-5, "50", null, Infinity]) assert.equal(parseFarm(JSON.stringify({ ...blank(), coins })).coins, 0, String(coins));
+  const odd = parseFarm(JSON.stringify({ ...blank(), pantry: "no", day: { key: "today", feeds: -1, sent: 1.5 } }));
+  assert.deepEqual([odd.pantry, odd.day], [[], { key: null, feeds: 0, sent: 0 }]);
+  assert.deepEqual(parseFarm(JSON.stringify({ ...blank(), day: null })).day, { key: null, feeds: 0, sent: 0 });
+  const fresh = createFarm(T0);
+  assert.deepEqual([fresh.v, fresh.pantry, fresh.coins, fresh.day], [2, [], 0, { key: null, feeds: 0, sent: 0 }]);
+});
+
+test("a harvest puts the crops in the pantry, not on the bus", () => {
+  const field = [plant("lettuce", T0), plant("potato", T0), plant("gold", T0), plant("carrot", T0), null, null];
+  const out = harvestFarm(blank({ plots: field, pantry: ["tomato"], coins: 3 }), 0, seoul("2026-05-08T00:00:00"));
+  assert.deepEqual(out.farm.pantry, ["tomato", "lettuce", "potato", "gold", "carrot"]);
+  assert.deepEqual([out.pantry, out.bused, out.coinsGain, out.coins, out.farm.coins], [out.farm.pantry, [], 0, 3, 3]);
+  const one = pickPlot(blank({ plots: field }), 0, seoul("2026-05-08T00:00:00"), 3);
+  assert.deepEqual([one.farm.pantry, one.bused], [["carrot"], []]);
+  const none = harvestFarm(blank({ plots: field, pantry: ["tomato"] }), 0, T0);
+  assert.deepEqual([none.pantry, none.bused, none.coinsGain], [["tomato"], [], 0]);
+  assert.deepEqual(openFarm(null, 0, T0).farm.pantry, []);
+});
+
+test("a full pantry sends the extras on the bus for coins", () => {
+  const field = [plant("potato", T0), plant("carrot", T0), plant("sweet", T0), null, null, null];
+  const ripe = seoul("2026-05-04T00:00:00");
+  const out = harvestFarm(blank({ plots: field, pantry: Array(11).fill("lettuce"), coins: 7 }), 0, ripe);
+  assert.deepEqual(out.farm.pantry, [...Array(11).fill("lettuce"), "potato"]);
+  assert.deepEqual([out.bused, out.coinsGain, out.coins, out.farm.coins], [["carrot", "sweet"], 20, 27, 27]);
+  assert.equal(out.farm.harvested, 3);
+  const charm = harvestFarm(blank({ plots: field, pantry: Array(11).fill("lettuce") }), 0, ripe, { chaBonus: 8.3 });
+  assert.deepEqual([charm.bused, charm.coinsGain], [["carrot", "sweet"], 23]);
+  const full = harvestFarm(blank({ plots: field, pantry: Array(12).fill("lettuce") }), 0, ripe);
+  assert.deepEqual([full.farm.pantry.length, full.bused, full.coinsGain], [12, ["potato", "carrot", "sweet"], 25]);
+});
+
+test("지능 raises harvest XP, rounded", () => {
+  const field = [plant("lettuce", T0), plant("potato", T0), plant("sweet", T0), null, null, null];
+  const ripe = seoul("2026-05-04T00:00:00");
+  assert.equal(harvestFarm(blank({ plots: field }), 0, ripe).xpGain, 22);
+  const smart = harvestFarm(blank({ plots: field }), 0, ripe, { intBonus: 15 });
+  assert.deepEqual([smart.xpGain, smart.xpAfter], [29, 29]);
+  assert.deepEqual(smart.picked.map((p) => p.xp), [2, 5, 15]);
+  assert.equal(pickPlot(blank({ plots: field }), 0, ripe, 1, { intBonus: 15 }).xpGain, 7);
+  assert.equal(openFarm(blank({ plots: field }), 0, ripe, { intBonus: 15 }).xpGain, 0);
+  assert.equal(harvestFarm(blank({ plots: field }), xpForLevel(2) - 25, ripe, { intBonus: 15 }).farm.unlockedTo, 2);
+});
+
+test("the view shows the pantry, coins and the seed shop from Lv 3", () => {
+  const farm = blank({ pantry: ["carrot", "gold"], coins: 8, bag: ["potato"] });
+  const low = farmView(farm, 2, T0);
+  assert.deepEqual([low.pantry, low.coins, low.shopOpen], [["carrot", "gold"], 8, false]);
+  assert.ok(low.shop.every((s) => s.locked));
+  assert.deepEqual(low.shop.map((s) => s.reason), ["Lv 3부터", "Lv 3부터", "Lv 3부터", "Lv 3부터", "Lv 4부터", "Lv 5부터", "Lv 6부터"]);
+  const view = farmView(farm, 3, T0);
+  assert.equal(view.shopOpen, true);
+  assert.deepEqual(view.shop, [
+    { crop: "lettuce", name: "상추", price: 5, locked: false, reason: "" },
+    { crop: "potato", name: "감자", price: 5, locked: false, reason: "" },
+    { crop: "carrot", name: "당근", price: 10, locked: true, reason: "코인이 모자라요" },
+    { crop: "tomato", name: "토마토", price: 10, locked: true, reason: "코인이 모자라요" },
+    { crop: "sweet", name: "고구마", price: 30, locked: true, reason: "Lv 4부터" },
+    { crop: "melon", name: "수박", price: 30, locked: true, reason: "Lv 5부터" },
+    { crop: "gold", name: "황금 감자", price: 200, locked: true, reason: "Lv 6부터" },
+  ]);
+  const rich = farmView(blank({ coins: 500 }), 6, T0);
+  assert.ok(rich.shop.every((s) => !s.locked));
+  const full = farmView(blank({ coins: 500, bag: Array(9).fill("potato") }), 6, T0);
+  assert.deepEqual([...new Set(full.shop.map((s) => s.reason))], ["씨앗 주머니가 가득해요"]);
+  assert.deepEqual(farmView(farm, 3, T0).pantry, farm.pantry);
+  assert.notEqual(farmView(farm, 3, T0).pantry, farm.pantry);
+});
+
+test("feeding takes one crop from the pantry and gives its snack", () => {
+  const farm = blank({ pantry: ["carrot", "potato", "carrot"] });
+  const out = feedCrop(farm, "carrot", T0);
+  assert.deepEqual([out.crop, out.xpGain, out.snack], ["carrot", 10, { stat: "agi", amount: 10 }]);
+  assert.deepEqual([out.farm.pantry, out.farm.day], [["potato", "carrot"], { key: "2026-05-01", feeds: 1, sent: 0 }]);
+  assert.deepEqual(farm.pantry, ["carrot", "potato", "carrot"]);
+  assert.deepEqual(feedCrop(blank({ pantry: ["gold"] }), "gold", T0).snack, { stat: "all", amount: 20 });
+  for (const crop of ["tomato", "rock", "__proto__", undefined]) assert.equal(feedCrop(farm, crop, T0), null, String(crop));
+});
+
+test("the first 3 feeds of a Seoul day give XP, again after Seoul midnight", () => {
+  const late = seoul("2026-05-01T23:50:00");
+  const early = seoul("2026-05-02T00:05:00");
+  assert.equal(new Date(late).getUTCDate(), new Date(early).getUTCDate());
+  let farm = blank({ pantry: Array(6).fill("lettuce") });
+  const gains = [];
+  for (let i = 0; i < 4; i++) {
+    const out = feedCrop(farm, "lettuce", late + i * 1000);
+    gains.push(out.xpGain);
+    farm = out.farm;
+  }
+  assert.deepEqual(gains, [10, 10, 10, 0]);
+  const next = feedCrop(farm, "lettuce", early);
+  assert.deepEqual([next.xpGain, next.farm.day], [10, { key: "2026-05-02", feeds: 1, sent: 0 }]);
+});
+
+test("the bus takes only crops in the pantry, counting each one", () => {
+  const farm = blank({ pantry: ["potato", "carrot", "potato", "gold"], coins: 4 });
+  const out = sendCrops(farm, ["potato", "gold", "potato"], 0, T0);
+  assert.deepEqual([out.farm.pantry, out.coinsGain, out.farm.coins, out.xpGain], [["carrot"], 60, 64, 15]);
+  assert.equal(sendCrops(farm, ["potato", "potato", "potato"], 0, T0), null);
+  assert.equal(sendCrops(farm, ["tomato"], 0, T0), null);
+  assert.equal(sendCrops(farm, ["potato", "rock"], 0, T0), null);
+  assert.deepEqual(farm.pantry, ["potato", "carrot", "potato", "gold"]);
+  assert.equal(sendCrops(blank({ pantry: ["potato", "potato"] }), ["potato", "potato"], 8.3, T0).coinsGain, 12);
+});
+
+test("the bus pays XP for the first 6 crops of a Seoul day", () => {
+  let farm = blank({ pantry: Array(12).fill("lettuce") });
+  const first = sendCrops(farm, Array(4).fill("lettuce"), 0, T0);
+  const second = sendCrops(first.farm, Array(4).fill("lettuce"), 0, T0 + 1000);
+  assert.deepEqual([first.xpGain, second.xpGain, second.farm.day.sent], [20, 10, 8]);
+  assert.equal(sendCrops(second.farm, ["lettuce"], 0, T0 + 2000).xpGain, 0);
+  farm = sendCrops(second.farm, ["lettuce"], 0, seoul("2026-05-02T00:00:00")).farm;
+  assert.deepEqual(farm.day, { key: "2026-05-02", feeds: 0, sent: 1 });
+});
+
+test("seeds sell from Lv 3 to whoever has the coins and the room", () => {
+  const farm = blank({ coins: 10, bag: ["potato"] });
+  const out = buySeed(farm, "carrot", 3);
+  assert.deepEqual([out.price, out.farm.coins, out.farm.bag], [10, 0, ["potato", "carrot"]]);
+  assert.deepEqual([farm.coins, farm.bag], [10, ["potato"]]);
+  assert.equal(buySeed(farm, "carrot", 2), null);
+  assert.equal(buySeed(farm, "lettuce", 2), null);
+  assert.equal(buySeed(farm, "sweet", 3), null);
+  assert.equal(buySeed(farm, "sprout", 9), null);
+  assert.equal(buySeed(farm, "rock", 9), null);
+  assert.equal(buySeed(blank({ coins: 9 }), "carrot", 3), null);
+  assert.equal(buySeed(blank({ coins: 999 }), "gold", 5), null);
+  assert.deepEqual(buySeed(blank({ coins: 999 }), "gold", 6).farm.bag, ["gold"]);
+  assert.equal(buySeed(blank({ coins: 999, bag: Array(9).fill("potato") }), "lettuce", 9), null);
+  assert.equal(buySeed(blank({ coins: 999, bag: Array(8).fill("potato") }), "lettuce", 9).farm.bag.length, 9);
 });
