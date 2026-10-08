@@ -184,6 +184,17 @@ test("a desk F5 or a Web NFC read that harvests in place counts as the farm tour
   }
 });
 
+test("the farm tour's grow line fits both the first sprout and a replay's next crop", async () => {
+  for (const ms of [45000, 110000]) {
+    const p = await page({ done: ["care", "pet", "farm"] });
+    p.root.classList.add("f-on");
+    p.s.grow = { left: 40, top: 200, width: 60, height: 40, ms, words: "2분 남았어요" };
+    p.run(800);
+    assert.equal(p.on(), "grow");
+    assert.equal(p.said.at(-1), "쑥쑥 자라는 중! 다 자라면 알려 줄게요", `wait ${ms}`);
+  }
+});
+
 test("a plushie harvest during the soft wait that picks nothing keeps the wait; one that picks after the sprout ripens is the pick", async () => {
   const p = await page({ done: ["care", "pet", "farm"] });
   p.root.classList.add("f-on");

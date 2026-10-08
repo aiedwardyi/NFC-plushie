@@ -49,7 +49,7 @@ test("a pet without the mic skips the talk step", () => {
   assert.deepEqual(walk(startGuide(null, { named: true }), HOME_STEPS, { talk: false }), ["care", "pet", "farm", "arcade", "race", "bye"]);
 });
 
-test("leaving mid-guide resumes each tour at its next unfinished step", () => {
+test("leaving mid-guide resumes each tour until the home's goodbye", () => {
   let guide = ["care", "pet", "crop"].reduce(finishStep, startGuide(null, { named: true }));
   const raw = JSON.stringify(guide);
   guide = startGuide(raw);
@@ -58,7 +58,19 @@ test("leaving mid-guide resumes each tour at its next unfinished step", () => {
   assert.equal(finishStep(guide, "care"), guide);
   guide = ["talk", "farm", "arcade", "race", "bye"].reduce(finishStep, guide);
   assert.equal(nextStep(guide, HOME_STEPS), null);
-  assert.equal(nextStep(guide, FARM_STEPS), "send");
+  assert.equal(nextStep(guide, FARM_STEPS), null);
+});
+
+test("the home goodbye ends leftover farm steps on later visits and reloads", () => {
+  const home = HOME_STEPS.filter((step) => step !== "bye");
+  for (let n = 0; n <= FARM_STEPS.length; n++) {
+    const guide = [...home, ...FARM_STEPS.slice(0, n)].reduce(finishStep, startGuide(null, { named: true }));
+    const done = finishStep(guide, "bye");
+    for (const saved of [done, startGuide(JSON.stringify(done))]) {
+      assert.equal(nextStep(saved, HOME_STEPS), null, `home after ${n} farm steps`);
+      assert.equal(nextStep(saved, FARM_STEPS), null, `farm after ${n} farm steps`);
+    }
+  }
 });
 
 test("only the named page starts a guide; any other page only resumes one", () => {

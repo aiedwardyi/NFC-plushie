@@ -789,6 +789,7 @@ export async function createFarm(api) {
     el.style.left = `${Math.max(half + 4, Math.min(W - half - 4, x))}px`;
   }
   function plotTag(p, text, cls = "", ms = 3200) {
+    L.field.querySelector(".f-tag.is-say")?.remove();
     const el = domAdd(`f-tag is-say ${cls}`, "", L.field);
     el.textContent = text;
     placeTag(el, p.cx);

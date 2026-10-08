@@ -4791,6 +4791,7 @@ const farm = (function farmRoom() {
     win.removeEventListener("pointercancel", onUp);
     drag = null;
     root.classList.remove("f-on");
+    care.fx.say("재밌었어요! 또 놀아요!");
     paintButton(false);
     playSfx(`care-${kit()}-press`);
     buzz(10);
@@ -6247,7 +6248,7 @@ const coach = (function coachLayer() {
     // Not a step of its own: the crop step's wait, a soft ring on the growing plot until it ripens.
     grow: {
       rect: () => farm?.growRect(),
-      line: () => "새싹이 쑥쑥 자라는 중! 다 자라면 알려 줄게요",
+      line: () => "쑥쑥 자라는 중! 다 자라면 알려 줄게요",
       farm: true,
       soft: true,
       tag: () => {

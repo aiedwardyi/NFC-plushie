@@ -453,6 +453,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
   <meta name="theme-color" content="${look.color}">
   <meta name="color-scheme" content="light dark">
   <title>${title} | 인형 친구</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"></noscript>
   <link rel="stylesheet" href="/style.css">
