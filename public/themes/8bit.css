@@ -212,17 +212,17 @@ html[data-theme="8bit"] .xp-bar {
   height: 14px;
   margin-left: 2px;
   border-radius: 0;
-  background: var(--ink);
-  box-shadow: 0 -3px 0 0 var(--cream), 0 3px 0 0 var(--cream), 3px 0 0 0 var(--cream);
+  background: rgba(255, 241, 232, 0.12);
+  box-shadow: none;
 }
 html[data-theme="8bit"] .xp-bar::after {
-  top: calc(100% + 3px);
-  background: linear-gradient(90deg, var(--cream) 0 4px, transparent 4px 8px, var(--cream) 8px);
+  background: linear-gradient(90deg, rgba(255, 241, 232, 0.25) 0 4px, transparent 4px 8px, rgba(255, 241, 232, 0.25) 8px);
   border-radius: 0;
 }
 html[data-theme="8bit"] .xp-fill {
   border-radius: 0;
-  background: repeating-linear-gradient(90deg, var(--gold-light) 0 6px, var(--gold) 6px 8px);
+  background: linear-gradient(var(--gold-light) calc(100% - 3px), var(--gold) 0);
+  box-shadow: none;
 }
 
 /* Dialog: the RPG text box, now the whole world speaks it */
@@ -299,7 +299,7 @@ html[data-theme="8bit"] .dock-label { color: var(--cream); font-size: 11px; }
 html[data-theme="8bit"] footer { color: #83769c; font-size: 11px; }
 
 /* Buttons and fields */
-html[data-theme="8bit"] :where(main, .sheet, .demo-sheet) :where(button:not(.pet-hit, .dock-btn, .mascot-tog, .tile, .sheet-close, .copy, .demo-close, .theme-btn, .theme-card), .button) {
+html[data-theme="8bit"] :where(main, .sheet, .demo-sheet) :where(button:not(.pet-hit, .dock-btn, .mascot-tog, .tile, .sheet-close, .st-share, .copy, .demo-close, .theme-btn, .theme-card), .button) {
   border-radius: 0;
   background: var(--gold-light);
   color: var(--ink);
@@ -598,7 +598,8 @@ html[data-theme="8bit"] .g-pip { border-radius: 0; background: #ffec27; box-shad
 html[data-theme="8bit"] .g-pip.is-used { box-shadow: none; }
 html[data-theme="8bit"] .g-card, html[data-theme="8bit"] .g-thumb, html[data-theme="8bit"] .g-start { border-radius: 0; }
 html[data-theme="8bit"] .g-start { font-family: "Galmuri11", monospace; background: #ffec27; color: #1d2b53; box-shadow: 3px 3px 0 #ab5236; }
-html[data-theme="8bit"] .g-gifts { border-radius: 0; background: none; color: var(--muted); box-shadow: none; }
+html[data-theme="8bit"] .g-gifts,
+html[data-theme="8bit"] .record-guide { border-radius: 0; background: none; color: var(--muted); box-shadow: none; }
 html[data-theme="8bit"] .g-gifts.has-new .g-gift-ic::after { border-radius: 0; }
 html[data-theme="8bit"] .g-thumb-pet { image-rendering: pixelated; }
 html[data-theme="8bit"] .g-thumb-pet { content: var(--px); }
@@ -614,40 +615,95 @@ html[data-theme="8bit"] .g-timer, html[data-theme="8bit"] .g-timer i, html[data-
 html[data-theme="8bit"] .g-fill { background: repeating-linear-gradient(0deg, #ffec27 0 6px, #ffa300 6px 8px); }
 
 /* Stats, the basket row and the 씨앗 가게: square corners, hard pixel edges, the PICO-8 palette */
-html[data-theme="8bit"] .st-row,
+html[data-theme="8bit"] {
+  --tier-gold-1: #ffa300;
+  --tier-gold-2: #ffec27;
+  --tier-gold-3: #fff1e8;
+  --tier-night-1: #000;
+  --tier-night-2: #1d2b53;
+  --tier-star: #fff1e8;
+}
 html[data-theme="8bit"] .st-icon,
 html[data-theme="8bit"] .st-edition,
 html[data-theme="8bit"] .st-boost,
 html[data-theme="8bit"] .st-bar,
+html[data-theme="8bit"] .st-fill,
 html[data-theme="8bit"] .shop-row,
 html[data-theme="8bit"] .shop-bag,
 html[data-theme="8bit"] .r-bonus,
 html[data-theme="8bit"] .g-bonus,
 html[data-theme="8bit"] .level-line .level-open:focus-visible { border-radius: 0; }
-html[data-theme="8bit"] .st-edition.is-rare { color: var(--ink); background: var(--gold-light); }
-html[data-theme="8bit"] .st-edition.is-legendary { color: var(--gold-light); background: var(--ink); box-shadow: inset 0 0 0 2px var(--gold-light); }
-html[data-theme="8bit"] .st-row { background: none; box-shadow: none; }
-html[data-theme="8bit"] .st-icon { background: none; box-shadow: none; }
+html[data-theme="8bit"] .st-row { padding: 10px 0; }
+html[data-theme="8bit"] .st-row + .st-row { border-top: 2px solid rgba(255, 241, 232, .07); }
 html[data-theme="8bit"] .st-row[data-stat="str"] { --st: #ff004d; --st-light: #ffa300; }
 html[data-theme="8bit"] .st-row[data-stat="int"] { --st: #83769c; --st-light: #29adff; }
 html[data-theme="8bit"] .st-row[data-stat="agi"] { --st: #008751; --st-light: #00e436; }
-html[data-theme="8bit"] .st-row[data-stat="cha"] { --st: #ff77a8; --st-light: #ff77a8; }
-html[data-theme="8bit"] .st-bar .st-base { background: linear-gradient(var(--st-light), var(--st-light)); box-shadow: none; }
-html[data-theme="8bit"] .st-bar i { transition: none; }
+html[data-theme="8bit"] .st-row[data-stat="cha"] { --st: #ff77a8; --st-light: #ffccaa; }
+html[data-theme="8bit"] .st-total { font-weight: 700; letter-spacing: 0; text-shadow: 2px 2px 0 var(--ink); }
+html[data-theme="8bit"][data-edition="legendary"] .st-total { background: none; color: var(--tier-gold-2); }
+html[data-theme="8bit"] .st-boost { box-shadow: inset 0 0 0 2px var(--st-light); }
+/* 18 straight cells with ink gaps; the fill lights whole cells: base, then trained with a cream top row, then gold. */
 html[data-theme="8bit"] .st-bar {
   height: 12px;
-  margin: 6px 2px 0;
-  transform: skewX(-14deg);
-  background:
-    linear-gradient(var(--st-light), var(--st-light)) top / 100% 1px no-repeat,
-    linear-gradient(var(--st-light), var(--st-light)) bottom / 100% 1px no-repeat,
-    linear-gradient(90deg, var(--st-light) 0 1px, transparent 1px calc(100% - 4px), var(--st-light) calc(100% - 4px) calc(100% - 3px), transparent calc(100% - 3px)) left / calc(100% / 18) 100% repeat-x;
-  mask: linear-gradient(90deg, #000 0 calc(100% - 3px), transparent calc(100% - 3px)) left / calc(100% / 18) 100% repeat-x;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--st-light) 16%, var(--ink)) calc(100% - 2px), var(--ink) 0) 0 0 / calc(100% / 18) 100%;
   box-shadow: none;
 }
-html[data-theme="8bit"] .st-bar .st-plus,
-html[data-theme="8bit"] .st-bar .st-trained { background: var(--st-light); box-shadow: none; }
-html[data-theme="8bit"] .st-boost { color: var(--ink); background: var(--gold-light); box-shadow: none; }
+html[data-theme="8bit"] .st-fill {
+  width: calc(var(--cells, 0) / 18 * 100%);
+  background:
+    linear-gradient(90deg, transparent var(--px-g), #fff1e8 0 var(--px-s), transparent 0) top / 100% 2px no-repeat,
+    linear-gradient(90deg, var(--st) var(--px-s), var(--tier-gold-1) 0) bottom / 100% 2px no-repeat,
+    linear-gradient(90deg, var(--st-light) var(--px-s), var(--tier-gold-2) 0);
+  box-shadow: none;
+  clip-path: inset(0 calc((1 - var(--grow, 1)) * 100%) 0 0);
+  -webkit-mask: linear-gradient(90deg, #000 calc(100% - 2px), transparent 0) 0 0 / calc(100% / var(--cells, 18)) 100%;
+  mask: linear-gradient(90deg, #000 calc(100% - 2px), transparent 0) 0 0 / calc(100% / var(--cells, 18)) 100%;
+}
+html[data-theme="8bit"] .st-fill::before,
+html[data-theme="8bit"][data-edition="rare"] .st-fill::after { content: none; }
+html[data-theme="8bit"] .is-opening .st-fill { animation: none; }
+html[data-theme="8bit"] .is-opening .st-who,
+html[data-theme="8bit"] .is-opening .st-edition,
+html[data-theme="8bit"] .is-opening .st-row { animation-timing-function: steps(1, end); }
+/* A legendary's gold cells keep one cream pixel flipping between two spots. */
+html[data-theme="8bit"][data-edition="legendary"] .st-fill::after {
+  left: var(--px-s);
+  background:
+    linear-gradient(#fff1e8, #fff1e8) 30% 2px / 2px 2px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) 72% 6px / 2px 2px no-repeat;
+  opacity: 1;
+  animation: px-glint .8s steps(1, end) infinite;
+}
+@keyframes px-glint { 50% { background-position: 70% 6px, 28% 2px; } }
+html[data-theme="8bit"] .st-edition { color: var(--cream); background: var(--ink); box-shadow: inset 0 0 0 2px rgba(255, 241, 232, .35); }
+html[data-theme="8bit"][data-edition] .st-edition { color: var(--tier-gold-2); background: var(--ink); box-shadow: inset 0 0 0 2px var(--tier-gold-2); }
+html[data-theme="8bit"][data-edition] .st-edition > span { background: none; color: inherit; }
+html[data-theme="8bit"] .st-edition::after { content: none; }
+html[data-theme="8bit"][data-edition="legendary"] .st-edition::before {
+  content: "";
+  position: relative;
+  z-index: 1;
+  width: 11px;
+  height: 11px;
+  margin-right: 5px;
+  background: url("/themes/px/star.svg") center / 11px 11px no-repeat;
+  image-rendering: pixelated;
+}
+html[data-theme="8bit"][data-edition="rare"] .st-sky { background: linear-gradient(180deg, rgba(255, 236, 39, .1) 0 44px, rgba(255, 236, 39, .05) 44px 88px, transparent 88px); }
+html[data-theme="8bit"][data-edition="legendary"] .st-sky {
+  background:
+    linear-gradient(#fff1e8, #fff1e8) 8% 12px / 2px 2px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) 34% 30px / 2px 2px no-repeat,
+    linear-gradient(#ffec27, #ffec27) 57% 18px / 2px 2px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) 63% 96px / 2px 2px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) 77% 42px / 2px 2px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) 95% 8px / 2px 2px no-repeat,
+    linear-gradient(180deg, rgba(0, 0, 0, .3) 0 44px, rgba(0, 0, 0, .15) 44px 88px, transparent 88px);
+}
+html[data-theme="8bit"] .st-sky { -webkit-mask: none; mask: none; }
+html[data-theme="8bit"] .sheet-head .st-share svg { display: none; }
+html[data-theme="8bit"] .sheet-head .st-share::before { content: ""; width: 18px; height: 18px; background: url("/themes/px/share.svg") center / contain no-repeat; image-rendering: pixelated; }
+html[data-theme="8bit"] .share-canvas { border-radius: 0; box-shadow: -4px 0 0 0 var(--cream), 4px 0 0 0 var(--cream), 0 -4px 0 0 var(--cream), 0 4px 0 0 var(--cream), 8px 10px 0 0 rgba(0, 0, 0, 0.35); }
 html[data-theme="8bit"] .stat-pop {
   border-radius: 0;
   color: var(--ink);
@@ -676,3 +732,72 @@ html[data-theme="8bit"] .f-basket .fb-coins { color: var(--ink); background: #ff
 html[data-theme="8bit"] .f-coin-ic,
 html[data-theme="8bit"] .f-coin { border-radius: 0; background: #ffec27; box-shadow: inset -3px -3px 0 #ffa300, inset 0 0 0 2px #ab5236; }
 html[data-theme="8bit"] .f-big.is-snack { font-family: "Galmuri11", monospace; }
+
+/* The edition's finish in pixels: a dithered gold ring for 금실, a night ring with pixel stars for 별밤. */
+html[data-theme="8bit"] .finish {
+  border-radius: 0;
+  clip-path: polygon(4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px), 0 4px, 4px 4px);
+}
+html[data-theme="8bit"][data-edition] .window {
+  box-shadow:
+    -8px 0 0 0 var(--ink), 8px 0 0 0 var(--ink), 0 -8px 0 0 var(--ink), 0 8px 0 0 var(--ink),
+    -4px -4px 0 0 var(--ink), 4px -4px 0 0 var(--ink), -4px 4px 0 0 var(--ink), 4px 4px 0 0 var(--ink),
+    10px 14px 0 0 rgba(0, 0, 0, 0.35);
+}
+html[data-theme="8bit"][data-edition="rare"] .finish { background: repeating-conic-gradient(#ffec27 0 25%, #ffa300 0 50%) 0 0 / 4px 4px; }
+html[data-theme="8bit"][data-edition="legendary"] .finish {
+  padding: 4px;
+  inset: -4px;
+  background:
+    linear-gradient(#ffec27, #ffec27) 22% 1px / 2px 2px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) 61% 1px / 2px 2px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) calc(100% - 1px) 34% / 2px 2px no-repeat,
+    linear-gradient(#ffec27, #ffec27) 40% calc(100% - 1px) / 2px 2px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) 1px 66% / 2px 2px no-repeat,
+    #1d2b53;
+}
+html[data-theme="8bit"][data-edition="legendary"] .finish::before,
+html[data-theme="8bit"][data-edition="legendary"] .finish::after { content: none; }
+html[data-theme="8bit"][data-edition] .nameplate { background: none; color: var(--tier-gold-2); filter: none; text-shadow: 3px 3px 0 var(--ink); }
+html[data-theme="8bit"][data-edition="legendary"] .nameplate::before,
+html[data-theme="8bit"][data-edition="legendary"] .nameplate::after {
+  content: "";
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  margin: 0 8px;
+  vertical-align: .05em;
+  background: url("/themes/px/star.svg") center / 22px 22px no-repeat;
+  image-rendering: pixelated;
+}
+html[data-theme="8bit"][data-edition="rare"] .sparkle { width: 4px; height: 12px; border-radius: 0; background: #ffec27; }
+html[data-theme="8bit"][data-edition="legendary"] .sparkle { background: #fff1e8; filter: none; }
+html[data-theme="8bit"] .sparkle.is-shoot { height: 4px; border-radius: 0; background: linear-gradient(90deg, transparent 0 30%, rgba(255, 241, 232, .5) 30% 60%, #fff1e8 60%); animation-timing-function: steps(6, end); }
+
+/* Guide: a pixel hand and a square stepped ring, nothing blurred */
+html[data-theme="8bit"] {
+  --coach-dim: rgba(0, 0, 0, 0.62);
+  --coach-skip: #1d2b53;
+  --coach-skip-ink: #fff1e8;
+}
+html[data-theme="8bit"] .coach-hole,
+html[data-theme="8bit"] .coach-ring { border-radius: 0; }
+html[data-theme="8bit"] .coach-ring {
+  border: 0;
+  box-shadow: -4px 0 0 0 #ffec27, 4px 0 0 0 #ffec27, 0 -4px 0 0 #ffec27, 0 4px 0 0 #ffec27, -8px 0 0 0 var(--ink), 8px 0 0 0 var(--ink), 0 -8px 0 0 var(--ink), 0 8px 0 0 var(--ink);
+}
+html.has-coach[data-theme="8bit"] .coach-ring { animation: coach-ring-in .3s steps(3) both, coach-breathe 1s steps(2, jump-none) .3s infinite; }
+html.has-coach[data-theme="8bit"] .coach-ring.is-pulse { animation: coach-pulse .4s steps(3); }
+html[data-theme="8bit"] .coach-finger { filter: drop-shadow(3px 3px 0 rgba(0, 0, 0, 0.45)); }
+html[data-theme="8bit"] .coach-hand { --tip-x: 15px; --tip-y: 1px; height: 48px; transform: none; }
+html[data-theme="8bit"] .coach-finger.is-down .coach-hand { transform: scaleY(-1); }
+html[data-theme="8bit"] .coach-hand svg { animation-timing-function: steps(2, jump-none); }
+html[data-theme="8bit"] .coach-hand .px-k { fill: var(--ink); }
+html[data-theme="8bit"] .coach-hand .px-w { fill: #fff1e8; }
+html.has-coach.coach-soft[data-theme="8bit"] .coach-ring { animation-timing-function: steps(2, jump-none); }
+html[data-theme="8bit"] .coach-tag { border-radius: 0; font-weight: 700; box-shadow: -2px 0 0 0 #fff1e8, 2px 0 0 0 #fff1e8, 0 -2px 0 0 #fff1e8, 0 2px 0 0 #fff1e8; }
+html[data-theme="8bit"] .coach-skip {
+  border-radius: 0;
+  font-weight: 700;
+  box-shadow: -3px 0 0 0 #fff1e8, 3px 0 0 0 #fff1e8, 0 -3px 0 0 #fff1e8, 0 3px 0 0 #fff1e8, 4px 6px 0 0 rgba(0, 0, 0, 0.35);
+}

@@ -25,6 +25,14 @@
   --shadow: rgba(74, 44, 32, 0.28);
   --mote: rgba(255, 246, 222, 0.9);
   --glow: rgba(241, 214, 140, 0.16);
+  /* The plushie editions: one gold and one night per world, remapped by the themes. */
+  --tier-gold-1: #e2b252;
+  --tier-gold-2: #f6d98a;
+  --tier-gold-3: #fff1c2;
+  --tier-night-1: #1b2050;
+  --tier-night-2: #2d2a6e;
+  --tier-star: #fff8e6;
+  --tier-thread: repeating-linear-gradient(115deg, rgba(255, 255, 255, .26) 0 .6px, transparent .6px 1.6px, rgba(122, 74, 18, .14) 1.6px 2.2px, transparent 2.2px 3.2px);
   font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   color: var(--cream);
   background: var(--navy);
@@ -664,9 +672,9 @@ html[data-time="night"] .stars { opacity: 1; }
   flex: 1;
   height: 10px;
   margin-left: -4px;
-  border-radius: 0 5px 5px 0;
-  background: rgba(8, 11, 19, 0.6);
-  box-shadow: inset 0 0 0 1.5px rgba(241, 214, 140, 0.5);
+  border-radius: 0 999px 999px 0;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 .xp-bar::after {
   content: "";
@@ -675,7 +683,7 @@ html[data-time="night"] .stars { opacity: 1; }
   right: 7px;
   width: 13px;
   height: 7px;
-  background: linear-gradient(90deg, rgba(241, 214, 140, 0.5) 0 4px, transparent 4px 8px, rgba(241, 214, 140, 0.5) 8px);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 4px, transparent 4px 8px, rgba(255, 255, 255, 0.12) 8px);
   border-radius: 0 0 2px 2px;
 }
 .xp-fill {
@@ -685,7 +693,8 @@ html[data-time="night"] .stars { opacity: 1; }
   height: 100%;
   overflow: hidden;
   border-radius: inherit;
-  background: linear-gradient(180deg, var(--gold-light), var(--gold) 70%);
+  background: linear-gradient(90deg, var(--gold), var(--gold-light));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 10px -3px var(--gold);
 }
 .level-line.is-growing .xp-fill::after {
   content: "";
@@ -1011,7 +1020,7 @@ input:focus-visible {
   transition: transform .08s ease, box-shadow .08s ease;
   touch-action: manipulation;
 }
-:where(button:not(.pet-hit, .dock-btn, .mascot-tog, .tile, .sheet-close, .copy, .demo-close):active, .button:active) {
+:where(button:not(.pet-hit, .dock-btn, .mascot-tog, .tile, .sheet-close, .st-share, .copy, .demo-close):active, .button:active) {
   transform: translateY(3px);
   box-shadow: 0 1px 0 var(--gold-deep), 0 3px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
@@ -1209,7 +1218,8 @@ a { color: var(--gold-light); }
   font-weight: 800;
   color: var(--cream);
 }
-.sheet-close {
+.sheet-close,
+.st-share {
   display: grid;
   place-items: center;
   flex: none;
@@ -1223,7 +1233,8 @@ a { color: var(--gold-light); }
   color: var(--muted);
   box-shadow: none;
 }
-.sheet-close svg {
+.sheet-close svg,
+.st-share svg {
   width: 22px;
   height: 22px;
   fill: none;
@@ -1354,107 +1365,406 @@ button.tile:active { transform: translateY(2px); }
   font-variant-numeric: tabular-nums;
 }
 
-/* 능력치: the pet card from the level line. Each bar is base, then edition (gold), then training. */
-.st-who {
+/* 능력치: the pet card from the level line. One capsule per stat: base, then training, then the edition's gold at the tip. */
+[data-sheet="stats"] .sheet-card { position: relative; isolation: isolate; }
+.st-share { margin: 0 0 0 auto; }
+.st-sky {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: none;
+  height: 140px;
+  border-radius: inherit;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 30%, transparent);
+  mask: linear-gradient(#000 30%, transparent);
+}
+.st-hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin: 0 0 12px;
-}
-.st-animal {
-  font-size: 1.75rem;
-  font-weight: 900;
-  color: var(--cream);
-}
-.st-edition {
-  padding: 5px 12px;
-  border-radius: 999px;
-  font-size: .8125rem;
-  font-weight: 800;
-  color: var(--navy);
-  background: var(--cream);
-}
-/* The edition stays real gold in every world: the themes remap --gold. */
-.st-edition.is-rare { color: #4a2c20; background: linear-gradient(135deg, #fceab2, #e2b252); }
-.st-edition.is-legendary {
-  color: #f3e2a8;
-  background: linear-gradient(135deg, #2e2a66, #18264f);
-  box-shadow: inset 0 0 0 1px #e2c27a, 0 0 14px rgba(226, 194, 122, .2);
-}
-.st-list {
-  display: grid;
-  gap: 8px;
+  gap: 12px;
   margin: 0 0 4px;
-  padding: 0;
-  list-style: none;
 }
-.st-row {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto auto;
-  grid-template-areas: "icon label total boost" "icon job job job" "bar bar bar bar";
+.st-who { display: grid; gap: 2px; min-width: 0; }
+.st-name {
+  font-size: 1.375rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -.02em;
+  color: var(--cream);
+  overflow-wrap: anywhere;
+}
+.st-kind { margin: 0; font-size: .8125rem; font-weight: 600; line-height: 1.35; color: var(--muted); }
+.st-edition {
+  position: relative;
+  flex: none;
+  display: inline-flex;
   align-items: center;
-  column-gap: 8px;
-  row-gap: 2px;
-  padding: 8px 12px 10px;
-  border-radius: 16px;
-  background: linear-gradient(110deg, color-mix(in srgb, var(--st) 12%, transparent), transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--st) 25%, transparent);
+  height: 24px;
+  padding: 0 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 800;
+  white-space: nowrap;
+  color: rgba(248, 240, 227, .78);
+  box-shadow: inset 0 0 0 1px rgba(248, 240, 227, .22);
 }
-.st-row[data-stat="str"] { --st: #e4694f; --st-light: #f5a38c; }
-.st-row[data-stat="int"] { --st: #6c7fd8; --st-light: #a9b5f0; }
-.st-row[data-stat="agi"] { --st: #35a887; --st-light: #86d6bd; }
-.st-row[data-stat="cha"] { --st: #e0719a; --st-light: #f3afc7; }
+.st-edition > span { position: relative; z-index: 1; }
+.st-list { margin: 0; padding: 0; list-style: none; }
+.st-row {
+  --st-hi: color-mix(in srgb, var(--st-light) 72%, #fff);
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  grid-template-areas: "icon label total" "bar bar bar" "foot foot foot";
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 6px;
+  padding: 11px 0;
+}
+.st-row + .st-row { border-top: 1px solid rgba(255, 255, 255, .06); }
+.st-list > :nth-child(2) { --i: 1; }
+.st-list > :nth-child(3) { --i: 2; }
+.st-list > :nth-child(4) { --i: 3; }
+.st-row[data-stat="str"] { --st: #f0634a; --st-light: #ffa06e; }
+.st-row[data-stat="int"] { --st: #6d7cf0; --st-light: #9fb4ff; }
+.st-row[data-stat="agi"] { --st: #22b58b; --st-light: #7ee7c2; }
+.st-row[data-stat="cha"] { --st: #ef5f99; --st-light: #ff9cc5; }
 .st-icon {
   grid-area: icon;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 36px;
-  border-radius: 10px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
   color: var(--st-light);
-  background: color-mix(in srgb, var(--st) 18%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--st-light) 20%, transparent);
+  background: color-mix(in srgb, var(--st) 16%, transparent);
 }
-.st-icon svg { width: 22px; height: 22px; fill: currentColor; }
-.st-label { grid-area: label; font-size: .9375rem; font-weight: 800; color: var(--cream); }
-.st-bar {
-  grid-area: bar;
-  display: flex;
-  height: 12px;
-  margin-top: 6px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(8, 11, 19, .45);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .25);
-}
-.st-bar i { display: block; flex: none; width: 0; height: 100%; transition: width .7s var(--ease-out); }
-.st-bar .st-base { background: linear-gradient(90deg, var(--st-light), var(--st)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35); }
-.st-bar .st-plus { background: linear-gradient(90deg, #d9982b, #f2c451, #ffe9a8); box-shadow: inset 1px 0 0 #fff0be, inset 0 1px 0 #fff0be; transition-delay: .14s; }
-.st-bar .st-trained { background: repeating-linear-gradient(115deg, #8fd18a 0 4px, #b7e5a8 4px 6px); transition-delay: .28s; }
+.st-icon svg { width: 16px; height: 16px; fill: currentColor; }
+.st-label { grid-area: label; font-size: .9375rem; font-weight: 700; color: var(--cream); }
 .st-total {
   grid-area: total;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
   text-align: right;
-  font-size: 1.375rem;
-  font-weight: 900;
-  line-height: 1.1;
+  color: var(--cream);
+}
+/* A pending snack boost: counted in the total, not in the bar. Gold stays the edition's. */
+.st-boost {
+  grid-area: label;
+  justify-self: end;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: .6875rem;
+  font-weight: 800;
+  line-height: 1.4;
   font-variant-numeric: tabular-nums;
   color: var(--st-light);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--st-light) 55%, transparent);
 }
-.st-boost {
-  grid-area: boost;
-  justify-self: start;
-  padding: 2px 7px;
+.st-bar {
+  grid-area: bar;
+  height: 10px;
+  overflow: hidden;
   border-radius: 999px;
-  font-size: .75rem;
-  font-weight: 900;
-  color: #4a2c20;
-  background: linear-gradient(135deg, #fceab2, #e2b252);
-  box-shadow: 0 2px 6px rgba(214, 165, 70, .25);
+  background: rgba(255, 255, 255, .08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .04);
 }
-.st-job { grid-area: job; margin: 0; font-size: .75rem; font-weight: 600; color: color-mix(in srgb, var(--cream) 76%, var(--navy2)); }
-.st-snack { margin-top: 18px; }
+.st-fill {
+  position: relative;
+  display: block;
+  width: calc(var(--grow, 1) * var(--fill, 0) * 100%);
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--stops, var(--st), var(--st-light)));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 0 10px -3px var(--st);
+  transform-origin: left center;
+}
+.st-fill::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 35%, var(--st-shine, rgba(255, 255, 255, .55)) 50%, transparent 65%);
+  transform: translateX(-120%);
+}
+.st-job { grid-area: foot; justify-self: start; margin: 0; font-size: .75rem; font-weight: 600; line-height: 1.35; color: var(--muted); }
+.st-mix {
+  grid-area: foot;
+  justify-self: end;
+  display: flex;
+  gap: 5px;
+  font-size: .75rem;
+  font-weight: 700;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+.st-mix b { font-weight: 700; color: var(--muted); }
+.st-mix i { font-style: normal; }
+.st-mix .is-tier { color: var(--tier-gold-2); }
+.st-mix .is-grow { color: var(--st-light); }
+.st-snack { margin-top: 16px; }
 .stat-peek { margin-top: 0; }
+/* Each open: the name rises, the pill pops, the rows follow, and each tip settles and shines once its bar is full. */
+@media (prefers-reduced-motion: no-preference) {
+  .is-opening .st-who { animation: st-rise 240ms var(--ease-out) 120ms both; }
+  .is-opening .st-edition { animation: st-pop 280ms var(--ease-pop) 200ms both; }
+  .is-opening .st-row { animation: st-row 240ms var(--ease-out) calc(220ms + 70ms * var(--i, 0)) both; }
+  .is-opening .st-fill { animation: st-settle 180ms ease-out calc(1020ms + 70ms * var(--i, 0)) both; }
+  .is-opening .st-fill::before { animation: st-shine 620ms var(--ease-out) calc(1060ms + 70ms * var(--i, 0)) both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-opening .st-row { animation: st-fade 200ms ease-out both; }
+}
+@keyframes st-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes st-pop { from { opacity: 0; transform: scale(.92); } }
+@keyframes st-row { from { opacity: 0; transform: translateY(6px); } }
+@keyframes st-fade { from { opacity: 0; } }
+@keyframes st-settle { 50% { transform: scaleX(1.015); } }
+@keyframes st-shine { to { transform: translateX(120%); } }
+/* 금실 레어: woven gold thread. 별밤 레전더리: night and stars, gold numbers. */
+html[data-edition] .st-fill { --st-shine: rgba(255, 241, 194, .7); }
+html[data-edition] .st-sky { display: block; }
+html[data-edition="rare"] .st-sky {
+  background:
+    repeating-linear-gradient(115deg, rgba(255, 241, 194, .03) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, rgba(226, 178, 82, .1), transparent);
+}
+html[data-edition="rare"] .st-edition {
+  color: #4a2c20;
+  background: linear-gradient(135deg, #fceab2, #e2b252 60%, #d9982b);
+  box-shadow: 0 2px 8px rgba(226, 178, 82, .35);
+}
+html[data-edition="rare"] .st-edition::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--tier-thread);
+  opacity: .6;
+}
+/* On a bar the thread would read as stripes, so the gold is smooth satin with one soft sheen. */
+html[data-edition="rare"] .st-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 var(--seam, 100%);
+  background: linear-gradient(105deg, transparent 22%, rgba(255, 252, 240, .42) 46%, rgba(255, 252, 240, .12) 58%, transparent 70%);
+}
+html[data-edition="legendary"] .st-sky {
+  background:
+    radial-gradient(circle at 6% 12px, var(--tier-star) 0 .7px, transparent 1.3px),
+    radial-gradient(circle at 33% 30px, rgba(255, 248, 230, .6) 0 .6px, transparent 1.1px),
+    radial-gradient(circle at 44% 64px, rgba(255, 248, 230, .5) 0 .5px, transparent 1px),
+    radial-gradient(circle at 58% 22px, var(--tier-star) 0 .9px, transparent 1.5px),
+    radial-gradient(circle at 64% 100px, rgba(255, 248, 230, .55) 0 .6px, transparent 1.1px),
+    radial-gradient(circle at 77% 44px, rgba(255, 248, 230, .7) 0 .6px, transparent 1.2px),
+    radial-gradient(circle at 95% 8px, rgba(255, 248, 230, .6) 0 .5px, transparent 1px),
+    linear-gradient(180deg, rgba(45, 42, 110, .35), transparent);
+}
+html[data-edition="legendary"] .st-edition {
+  background: radial-gradient(120% 140% at 20% 0%, var(--tier-night-2), var(--tier-night-1) 60%);
+  box-shadow: inset 0 0 0 1px #e2c27a, 0 0 16px rgba(226, 194, 122, .25);
+}
+html[data-edition="legendary"] .st-edition > span,
+html[data-edition="legendary"] .st-total {
+  background: linear-gradient(90deg, var(--tier-gold-2), var(--tier-gold-3), var(--tier-gold-1));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+html[data-edition="legendary"] .st-edition::after,
+html[data-edition="legendary"] .st-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+html[data-edition="legendary"] .st-edition::after {
+  background:
+    radial-gradient(circle at 8% 30%, var(--tier-star) 0 .7px, transparent 1.2px),
+    radial-gradient(circle at 93% 70%, var(--tier-star) 0 .7px, transparent 1.2px),
+    radial-gradient(circle at 88% 22%, var(--tier-star) 0 .5px, transparent 1px);
+}
+/* Three glints on the deep gold, off the white tip where they would vanish, placed and timed per row so no two bars match. */
+html[data-edition="legendary"] .st-list > :nth-child(1) { --ax: 30%; --ay: 45%; --bx: 56%; --by: 66%; --cx: 76%; --cy: 34%; }
+html[data-edition="legendary"] .st-list > :nth-child(2) { --ax: 60%; --ay: 38%; --bx: 26%; --by: 62%; --cx: 78%; --cy: 64%; }
+html[data-edition="legendary"] .st-list > :nth-child(3) { --ax: 42%; --ay: 60%; --bx: 70%; --by: 30%; --cx: 18%; --cy: 38%; }
+html[data-edition="legendary"] .st-list > :nth-child(4) { --ax: 68%; --ay: 52%; --bx: 38%; --by: 34%; --cx: 50%; --cy: 70%; }
+html[data-edition="legendary"] .st-fill::after {
+  left: var(--seam, 100%);
+  background:
+    radial-gradient(circle at var(--ax) var(--ay), var(--tier-star) 0 .6px, rgba(255, 250, 240, .4) 1px, transparent 2px),
+    linear-gradient(90deg, transparent calc(var(--ax) - 4px), rgba(255, 250, 240, .8) var(--ax), transparent calc(var(--ax) + 4px)) 0 var(--ay) / 100% .8px no-repeat,
+    linear-gradient(180deg, transparent 15%, rgba(255, 250, 240, .7) 45%, transparent 75%) var(--ax) 0 / .8px 100% no-repeat,
+    radial-gradient(circle at var(--bx) var(--by), var(--tier-star) 0 .5px, transparent 1.4px),
+    radial-gradient(circle at var(--cx) var(--cy), var(--tier-star) 0 .5px, rgba(255, 250, 240, .4) .9px, transparent 1.8px),
+    linear-gradient(90deg, transparent calc(var(--cx) - 3px), rgba(255, 250, 240, .7) var(--cx), transparent calc(var(--cx) + 3px)) 0 var(--cy) / 100% .8px no-repeat;
+  opacity: .8;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html[data-edition="legendary"] .is-opening .st-fill::after { animation: st-specks 400ms ease-out calc(1080ms + 70ms * var(--i, 0)) both, st-twinkle 2.6s ease-in-out calc(1480ms + 650ms * var(--i, 0)) infinite; }
+}
+@keyframes st-specks { from { opacity: 0; } to { opacity: .55; } }
+@keyframes st-twinkle { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
+/* The edition's finish beyond the card: the window frame, the nameplate and the tap sparkles. 포근 클래식 keeps the gold-light ring. */
+.finish { display: none; }
+html[data-edition] .finish {
+  position: absolute;
+  inset: -4px;
+  z-index: 2;
+  display: block;
+  padding: 4px;
+  border-radius: 36px;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+html[data-edition="rare"] .window {
+  box-shadow:
+    0 0 0 4px #c99436,
+    0 0 0 8px var(--navy2),
+    0 0 0 9px rgba(226, 178, 82, .3),
+    0 22px 40px -10px rgba(0, 0, 0, .6),
+    0 0 90px -12px var(--glow);
+}
+html[data-edition="rare"] .finish {
+  background:
+    var(--tier-thread),
+    conic-gradient(from 210deg, #e2b252, #fff1c2 10%, #c99436 28%, #f6d98a 46%, #b8862e 64%, #fff1c2 80%, #e2b252);
+}
+html[data-edition="legendary"] .window {
+  box-shadow:
+    0 0 0 1.5px #e2c27a,
+    0 0 0 8px var(--tier-night-1),
+    0 0 0 9.5px rgba(226, 194, 122, .7),
+    0 22px 40px -10px rgba(0, 0, 0, .6),
+    0 0 90px -12px rgba(120, 110, 220, .25);
+}
+/* The night band between two gold hairlines, with seven stars that twinkle in two sets. */
+html[data-edition="legendary"] .finish {
+  inset: -8px;
+  --band: 3.25px;
+  padding: 6.5px;
+  border-radius: 40px;
+  background: radial-gradient(140% 120% at 30% 0%, var(--tier-night-2), var(--tier-night-1) 70%);
+}
+html[data-edition="legendary"] .finish::before,
+html[data-edition="legendary"] .finish::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  animation: finish-twinkle 3.2s ease-in-out infinite;
+}
+html[data-edition="legendary"] .finish::before {
+  background:
+    radial-gradient(circle at 18% var(--band), var(--tier-star) 0 .9px, rgba(255, 248, 230, .35) 1.4px, transparent 2.4px),
+    radial-gradient(circle at calc(100% - var(--band)) 30%, var(--tier-star) 0 .8px, rgba(255, 248, 230, .3) 1.3px, transparent 2.2px),
+    radial-gradient(circle at 36% calc(100% - var(--band)), var(--tier-star) 0 .8px, rgba(255, 248, 230, .3) 1.3px, transparent 2.2px),
+    radial-gradient(circle at var(--band) 62%, var(--tier-star) 0 .7px, transparent 1.8px);
+}
+html[data-edition="legendary"] .finish::after {
+  background:
+    radial-gradient(circle at 66% var(--band), var(--tier-star) 0 .7px, transparent 1.8px),
+    radial-gradient(circle at calc(100% - var(--band)) 74%, var(--tier-star) 0 .9px, rgba(255, 248, 230, .35) 1.4px, transparent 2.4px),
+    radial-gradient(circle at 80% calc(100% - var(--band)), var(--tier-star) 0 .7px, transparent 1.8px);
+  animation-delay: -1.6s;
+}
+@keyframes finish-twinkle { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+/* The name, in the same material as the frame. A text shadow would sit on the clipped gold, so it becomes a drop shadow. */
+html[data-edition] .nameplate {
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .28));
+}
+html[data-edition="rare"] .nameplate { background-image: var(--tier-thread), linear-gradient(100deg, #f6d98a, #fff1c2 40%, #e2b252 70%, #f6d98a); }
+html[data-edition="legendary"] .nameplate {
+  background-image:
+    radial-gradient(circle at 22% 30%, #fff 0 1px, transparent 2px),
+    radial-gradient(circle at 61% 64%, #fff 0 .8px, transparent 1.8px),
+    radial-gradient(circle at 84% 26%, #fff 0 1px, transparent 2px),
+    linear-gradient(100deg, var(--tier-gold-2), var(--tier-gold-3) 45%, var(--tier-gold-1) 80%, var(--tier-gold-2));
+}
+/* The naming reveal: the finish comes on with a flash, the name warms into its gold. */
+@media (prefers-reduced-motion: no-preference) {
+  html.is-edition-lit .finish { animation: finish-on 1.6s ease-out both; }
+  html.is-edition-lit .nameplate { animation: finish-name 1.2s ease-out both; }
+}
+@keyframes finish-on {
+  0% { opacity: 0; filter: brightness(2.2); }
+  35% { opacity: 1; filter: brightness(1.8); }
+  100% { opacity: 1; filter: none; }
+}
+@keyframes finish-name { from { opacity: .35; } }
+/* Tap sparkles: thread streaks for 금실, white-gold stars and one shooting star for 별밤. */
+html[data-edition="rare"] .sparkle {
+  width: 3px;
+  height: 18px;
+  border-radius: 2px;
+  clip-path: none;
+  background: linear-gradient(180deg, transparent, var(--tier-gold-3) 30%, var(--tier-gold-1) 70%, transparent);
+  animation-name: sparkle-thread;
+}
+@keyframes sparkle-thread {
+  0% { opacity: 0; transform: rotate(-24deg) scaleY(.2); }
+  30% { opacity: 1; transform: rotate(8deg) scaleY(1); }
+  100% { opacity: 0; transform: rotate(34deg) scaleY(.5) translate(var(--sx, 0), var(--sy, -24px)); }
+}
+html[data-edition="legendary"] .sparkle { background: var(--tier-star); filter: drop-shadow(0 0 3px rgba(246, 217, 138, .9)); }
+.sparkle.is-shoot {
+  width: 30px;
+  height: 2px;
+  border-radius: 2px;
+  clip-path: none;
+  background: linear-gradient(90deg, transparent, var(--tier-star));
+  animation: sparkle-shoot .8s ease-out both;
+}
+@keyframes sparkle-shoot {
+  0% { opacity: 0; transform: rotate(-32deg) translateX(-24px); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(-32deg) translateX(46px); }
+}
+
+/* 카드로 자랑하기 (it wears the close button's look, above) and the 포키 카드 sheet it opens */
+.sheet-head .st-share:active { transform: scale(.92); box-shadow: none; }
+.sheet-head .st-share svg { stroke-linejoin: round; }
+.share-stage {
+  display: grid;
+  place-items: center;
+  margin-top: 2px;
+}
+.share-canvas {
+  display: block;
+  width: auto;
+  height: min(56dvh, 440px);
+  aspect-ratio: 9 / 16;
+  border-radius: 14px;
+  background: rgba(8, 11, 19, .45);
+  box-shadow: 0 0 0 1px rgba(241, 214, 140, .28), 0 12px 28px rgba(0, 0, 0, .45);
+  transition: opacity .2s ease;
+}
+.sheet.is-drawing .share-canvas { opacity: .4; }
+.share-hint {
+  margin-top: 10px;
+  text-align: center;
+  font-size: .875rem;
+  font-weight: 700;
+  color: var(--gold-light);
+}
+.share-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 16px;
+}
+.share-actions button { flex: 1; margin-top: 0; }
+.share-actions button:disabled { opacity: .55; cursor: default; }
 
 /* A stat that grew, coins that landed: a short line floating up. */
 @media (prefers-reduced-motion: reduce) {
@@ -2389,11 +2699,18 @@ html.has-reveal body::after { visibility: hidden; }
   z-index: 4;
   width: 25cqmin;
   height: 25cqmin;
-  pointer-events: none;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: none;
+  box-shadow: none;
+  touch-action: manipulation;
   transform-origin: 0% 100%;
   animation: want-in .5s cubic-bezier(.2, 1.4, .4, 1) both, want-float 3.2s ease-in-out .5s infinite;
 }
-.want.is-gone { animation: want-out .3s ease-in both; }
+.want:active .want-cloud { transform: scale(.93); }
+.want.is-gone { pointer-events: none; animation: want-out .3s ease-in both; }
 .want-cloud {
   position: absolute;
   inset: 0;
@@ -2402,6 +2719,7 @@ html.has-reveal body::after { visibility: hidden; }
   border-radius: 50%;
   background: var(--paper);
   box-shadow: 0 4px 0 rgba(0, 0, 0, .18), 0 8px 18px rgba(20, 27, 43, .28);
+  transition: transform .12s ease;
 }
 .want-cloud svg { width: 64%; height: 64%; }
 .want i {
@@ -2900,12 +3218,15 @@ html.g-on .window { touch-action: none; }
   background: linear-gradient(180deg, var(--gold-light), var(--gold)); color: var(--navy); box-shadow: 0 3px 0 var(--gold-deep);
 }
 .g-start:disabled { opacity: .55; cursor: default; }
-.g-gifts {
+.g-gifts,
+.record-guide {
   display: flex; align-items: center; gap: 8px; width: 100%; min-height: 0; margin: 0; padding: 12px 4px 4px; border-radius: 0;
   border-top: 1px solid rgba(241, 214, 140, .18); background: none; box-shadow: none; font-family: inherit; font-size: .875rem; font-weight: 700;
   color: var(--muted, #a9b0c2); text-align: left;
 }
-.g-gifts:active { transform: none; box-shadow: none; }
+.g-gifts:active,
+.record-guide:active { transform: none; box-shadow: none; }
+.record-guide { margin-top: 10px; }
 .g-gifts b { color: var(--gold-light); }
 .g-gift-ic { position: relative; display: grid; }
 .g-gift-ic svg { width: 20px; height: 20px; fill: none; stroke: var(--gold-light); stroke-width: 1.8; }
@@ -3017,6 +3338,18 @@ html.f-layout .plate, html.f-layout .pet-stats { display: none; }
 html.f-layout .window { max-height: none; min-height: 300px; margin: 4px 0; }
 /* The basket row takes the footer's room, so a 655 px phone still fits the whole farm. */
 html.f-layout main > footer { display: none; }
+/* A farm visit wears the farm from its first paint, a field over the home, until app.js has the farm in; one that celebrates shows that on the home first.
+   The layout must stay html.f-layout's (the empty room is the basket row's), or the page jumps and the stage is sized wrong. */
+.has-app body[data-farm-visit]:not([data-celebrate]) main { padding-left: 20px; padding-right: 20px; }
+.has-app body[data-farm-visit]:not([data-celebrate]) :is(.plate, .pet-stats, main > footer) { display: none; }
+.has-app body[data-farm-visit]:not([data-celebrate]) .window { max-height: none; min-height: 300px; margin: 4px 0; touch-action: none; }
+.has-app:not(.f-layout) body[data-farm-visit]:not([data-celebrate]) main::after { content: ""; order: -2; min-height: 52px; margin-top: -2px; }
+.has-app body[data-farm-visit]:not([data-celebrate]) :is(.dock-btn:not([data-farm]), .topbar-end, .mascot-toggle) { opacity: .22; filter: saturate(.5); pointer-events: none; }
+.has-app body[data-farm-visit]:not([data-celebrate]) .sky { animation: none; background: linear-gradient(180deg, #bfe1f4, #f7f3e8 35%, #f4e8cc 35% 41%, #d6eab0 41%, #bfdc93); }
+.has-app[data-time="evening"] body[data-farm-visit]:not([data-celebrate]) .sky { background: linear-gradient(180deg, #f6a77d, #ffcf9e 22%, #ffe2bd 35%, #f4e8cc 35% 41%, #d6eab0 41%, #bfdc93); box-shadow: inset 0 0 0 100vmax rgba(138, 58, 30, .12); }
+.has-app[data-time="night"] body[data-farm-visit]:not([data-celebrate]) .sky { background: linear-gradient(180deg, #16204a, #36457e 35%, #f4e8cc 35% 41%, #d6eab0 41%, #bfdc93); box-shadow: inset 0 0 0 100vmax rgba(30, 42, 94, .42); }
+.has-app body[data-farm-visit]:not([data-celebrate]) .sky::after { display: none; }
+.has-app body[data-farm-visit]:not([data-celebrate]) :is(.sky > *, .pet, .want) { visibility: hidden; }
 
 .dock-btn.is-loading .dock-cap { animation: f-load .7s ease-in-out infinite alternate; }
 @keyframes f-load { to { transform: translateY(2px) scale(.94); } }
@@ -3679,4 +4012,159 @@ html[data-theme="najeon"] .talk-bar {
   .r-roster { gap: 4px; margin-bottom: 8px; }
   .r-roster img { height: 30px; }
   .r-game .r-card { top: calc(var(--r-top) + 52px); }
+}
+
+/* Guide: the coach's soft scrim with one spotlight, a ring hugging the target and a finger pointing at it */
+:root {
+  --coach-dim: rgba(8, 11, 19, 0.62);
+  --coach-ring: #f1d68c;
+  --coach-ring-2: rgba(214, 165, 70, 0.5);
+  --coach-glow: rgba(241, 214, 140, 0.45);
+  --coach-hand: #fffaf0;
+  --coach-ink: #4a2c20;
+  --coach-skip: rgba(20, 27, 43, 0.9);
+  --coach-skip-ink: #f8f0e3;
+  --coach-skip-line: rgba(241, 214, 140, 0.55);
+}
+.coach-hole,
+.coach-ring,
+.coach-finger,
+.coach-skip {
+  position: fixed;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity .25s ease-in, visibility 0s linear .25s;
+}
+html.has-coach :is(.coach-hole, .coach-ring, .coach-finger, .coach-skip) {
+  visibility: visible;
+  opacity: 1;
+  transition: opacity .25s ease-in;
+}
+.coach-hole,
+.coach-ring {
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  border-radius: var(--coach-r, 999px);
+}
+.coach-hole {
+  z-index: 130;
+  box-shadow: 0 0 0 200vmax var(--coach-dim);
+}
+.coach-ring {
+  z-index: 133;
+  border: 3px solid var(--coach-ring);
+  box-shadow: 0 0 0 3px var(--coach-ring-2), 0 0 22px 3px var(--coach-glow), inset 0 0 14px var(--coach-glow);
+}
+html.has-coach .coach-ring { animation: coach-ring-in .55s cubic-bezier(.3, 1.45, .5, 1) both, coach-breathe 1.8s ease-in-out .55s infinite; }
+html.has-coach .coach-ring.is-pulse { animation: coach-pulse .5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes coach-ring-in {
+  from { opacity: 0; transform: scale(1.25); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes coach-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+@keyframes coach-pulse {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.13); }
+  100% { transform: scale(1); }
+}
+.coach-finger {
+  left: 0;
+  top: 0;
+  z-index: 133;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.35));
+}
+.coach-hand {
+  --tip-x: 21px;
+  --tip-y: 3px;
+  position: absolute;
+  left: calc(-1 * var(--tip-x));
+  top: calc(-1 * var(--tip-y));
+  width: 52px;
+  height: 57px;
+  transform: rotate(-24deg);
+  transform-origin: var(--tip-x) var(--tip-y);
+}
+.coach-finger.is-down .coach-hand { transform: rotate(204deg); }
+.coach-hand svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  animation: coach-tap 1.15s cubic-bezier(.45, 0, .3, 1) infinite;
+}
+.coach-hand path {
+  fill: var(--coach-hand);
+  stroke: var(--coach-ink);
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@keyframes coach-tap {
+  0%, 100% { transform: translateY(14px); }
+  42% { transform: translateY(0); }
+  56% { transform: translateY(2px) scaleY(.97); }
+}
+.coach-skip {
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, calc(50vw - 208px));
+  z-index: 134;
+  width: auto;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--coach-skip);
+  color: var(--coach-skip-ink);
+  font-size: .8125rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: inset 0 0 0 1.5px var(--coach-skip-line), 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+/* The pet's line reads above the scrim; the dock's own want ring rests while the coach points. */
+html.has-coach body:not(.has-sheet) .dialog { z-index: 131; }
+html.has-coach .dock-btn.is-want .dock-cap::after { animation: none; opacity: 0; }
+/* A soft wait: only a quiet ring on the growing plot and its time left; nothing is dimmed or blocked. */
+html.coach-soft :is(.coach-hole, .coach-finger) { visibility: hidden; opacity: 0; }
+html.has-coach.coach-soft .coach-ring { opacity: .85; animation: coach-soft 2.4s ease-in-out infinite; }
+@keyframes coach-soft {
+  0%, 100% { opacity: .7; }
+  50% { opacity: 1; }
+}
+.coach-tag {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 133;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--coach-skip);
+  color: var(--coach-skip-ink);
+  font-size: .75rem;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1.5px var(--coach-skip-line), 0 3px 8px rgba(0, 0, 0, 0.3);
+  transform: translate(-50%, -100%);
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity .25s ease-in, visibility 0s linear .25s;
+}
+html.has-coach.coach-soft .coach-tag:not(:empty) { visibility: visible; opacity: 1; transition: opacity .25s ease-in; }
+@media (prefers-reduced-motion: reduce) {
+  html.has-coach .coach-ring,
+  .coach-hand svg { animation: none; }
+  .coach-hand svg { transform: translateY(5px); }
+  html.has-coach .coach-ring.is-pulse { animation: coach-flash .4s linear; }
+  html.has-coach.coach-soft .coach-ring { animation: none; }
+}
+@keyframes coach-flash {
+  50% { opacity: .35; }
 }

@@ -344,7 +344,8 @@ export async function createFarm(api) {
   let guideDone = false;
   let guideStep = 0;
   let guideTimer = 0;
-  try { guideDone = localStorage.getItem(guideKey) === "1"; } catch {}
+  // "1" once this hint ran, "tour" while the pet's guide teaches the pick instead.
+  try { guideDone = localStorage.getItem(guideKey) !== null; } catch {}
   const tweens = [];
   const parts = [];
   const tickers = new Set();
@@ -2004,6 +2005,15 @@ export async function createFarm(api) {
     });
   }
 
+  // A plot's tap box on screen, as plotAt reads it; a seedling needs less room above its bed.
+  function plotRect(p, reach = 0.95) {
+    if (!p) return null;
+    const box = win.getBoundingClientRect();
+    const floor = plots[0].cy + plots[0].w * 0.3;
+    const top = p.i >= 3 ? Math.max(p.cy - p.w * reach, floor) : p.cy - p.w * reach;
+    return { left: box.left + p.cx - p.w * 0.55, top: box.top + top, width: p.w * 1.1, height: p.cy + p.w * 0.3 - top };
+  }
+
   /* ---------- build, enter, leave ---------- */
   function changed() {
     const m = measure();
@@ -2165,6 +2175,20 @@ export async function createFarm(api) {
       return null;
     },
     wiggle,
+    // Where a ripe crop sits on screen, the 새싹 first, as plotAt reads a tap there; read only, for the guide's spotlight.
+    cropRect() {
+      if (!entered || showing) return null;
+      const ripe = plots.filter((p) => p.stage === 3 && p.plant.visible && !pending.has(p.i));
+      return plotRect(ripe.find((q) => q.data?.crop === "sprout") || ripe[0]);
+    },
+    // The growing crop that ripens next, the 새싹 first, with its time left; read only, for the guide's wait.
+    growRect() {
+      if (!entered || showing) return null;
+      const now = serverNow();
+      const growing = plots.filter((p) => p.stage > 0 && p.stage < 3 && p.data?.ripeAt && p.plant.visible && !pending.has(p.i));
+      const p = growing.find((q) => q.data.crop === "sprout") || growing.sort((a, b) => a.data.ripeAt - b.data.ripeAt)[0];
+      return p ? { ...plotRect(p, 0.6), ms: Math.max(0, p.data.ripeAt - now), words: timeWords(p.data, now).left } : null;
+    },
     // Redraws from the server's view, dropping anything half shown.
     redraw(view) {
       cut();

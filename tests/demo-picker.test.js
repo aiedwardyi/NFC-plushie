@@ -85,7 +85,7 @@ test("the admin chip's owner turns the pet into any of the 12 and every page fol
   assert.match(html, /<html lang="ko" data-mascot="tiger">/);
   assert.match(html, /<meta name="pet-kind" content="tiger">/);
   assert.match(html, /<img class="pet-frame is-show" data-frame="canon" src="\/mascot-tiger-512-v3\.png"/);
-  assert.match(statCard(html), /<b class="st-animal" data-stat-animal>호랑이<\/b>/);
+  assert.match(statCard(html), /<span data-stat-animal>호랑이<\/span>/);
   assert.match(html, /<img class="g-thumb-pet" src="\/mascot-tiger-512-v3\.png" alt="">/);
   assert.doesNotMatch(html, /mascot-horse-(?!512-v3\.png" width="(?:32|40)")/);
   const stranger = (await ctx.request(`/t?uid=${A}`)).html;
@@ -123,12 +123,12 @@ test("normal owners and strangers never get the picker or the tier row", async (
 test("the edition saved on the pet wins over RARE_UIDS and LEGENDARY_UIDS", async (t) => {
   const ctx = await setup(t, { legendaryUids: [A] });
   const jar = await meet(ctx, A, "Mochi");
-  assert.match(statCard(await home(ctx, jar)), /<span class="st-edition is-legendary">별밤 레전더리<\/span>/);
+  assert.match(statCard(await home(ctx, jar)), /<span class="st-edition"><span>별밤 레전더리<\/span><\/span>/);
   const classic = await post(ctx, "/demo/edition", jar, { uid: A, edition: "classic" });
   assert.equal(classic.status, 200);
   assert.deepEqual([classic.body.ok, classic.body.edition, classic.body.name, totals(classic.body.stats)], [true, "classic", "포근 클래식", baseOf("horse")]);
   assert.equal(ctx.row().edition, "classic");
-  assert.match(statCard(await home(ctx, jar)), /<span class="st-edition is-classic">포근 클래식<\/span>/);
+  assert.match(statCard(await home(ctx, jar)), /<span class="st-edition"><span>포근 클래식<\/span><\/span>/);
   const rare = await post(ctx, "/demo/edition", jar, { uid: A, edition: "rare" });
   assert.deepEqual([rare.body.edition, rare.body.name, totals(rare.body.stats)], ["rare", "금실 레어", baseOf("horse", 10)]);
   // Every reply that carries the sheet reads the saved edition too.
@@ -219,7 +219,7 @@ for (const kind of KINDS) {
     const jar = await meet(ctx, A, "Mochi");
     await post(ctx, "/demo/kind", jar, { uid: A, kind: kind.id });
     const card = statCard(await home(ctx, jar));
-    assert.match(card, new RegExp(`<b class="st-animal" data-stat-animal>${kind.name}</b>`));
+    assert.match(card, new RegExp(`<span data-stat-animal>${kind.name}</span>`));
     assert.deepEqual([...card.matchAll(/<b class="st-total">(\d+)<\/b>/g)].map((m) => Number(m[1])), baseOf(kind.id));
   });
 }

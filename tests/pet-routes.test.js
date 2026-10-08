@@ -553,7 +553,7 @@ test("the stat card shows a 포근 클래식 말 at 50/40/70/60, closed until as
   assert.match(home.html, /<div class="sheet" data-sheet="stats" role="dialog" aria-modal="true" aria-labelledby="sheet-stats-title" hidden>/);
   const card = statCardOf(home.html);
   assert.match(card, /<h2 id="sheet-stats-title">능력치<\/h2>/);
-  assert.match(card, /<b class="st-animal" data-stat-animal>말<\/b><span class="st-edition is-classic">포근 클래식<\/span>/);
+  assert.match(card, /<b class="st-name">Mochi<\/b><small class="st-kind"><span data-stat-animal>말<\/span> · Lv\. <span data-stat-level>1<\/span><\/small><\/p><span class="st-edition"><span>포근 클래식<\/span><\/span>/);
   assert.deepEqual(totalsOf(card), [50, 40, 70, 60]);
   assert.deepEqual([...card.matchAll(/<span class="st-label">([^<]+)<\/span>/g)].map((m) => m[1]), ["힘", "지능", "민첩", "매력"]);
   assert.deepEqual([...card.matchAll(/<small class="st-job">([^<]+)<\/small>/g)].map((m) => m[1]), ["기 모으기에서 더 높이", "텃밭 경험치 더 많이", "달리기에서 더 빨리", "버스 코인 더 많이"]);
@@ -573,7 +573,7 @@ test("a RARE 말 shows 금실 레어 at 60/50/80/70 with its training and a pend
   setA(ctx, "stats = ?", JSON.stringify({ v: 1, trained: { cha: 3 }, boost: { agi: 10 } }));
   const home = await ctx.request(`/t?uid=${A}&view=1`, { jar });
   const card = statCardOf(home.html);
-  assert.match(card, /<span class="st-edition is-rare">금실 레어<\/span>/);
+  assert.match(card, /<span class="st-edition"><span>금실 레어<\/span><\/span>/);
   assert.deepEqual(totalsOf(card), [60, 50, 90, 73]);
   assert.match(card, /data-stat="agi">[\s\S]*?<b class="st-total">90<\/b><span class="st-boost">\+10<\/span>/);
   assert.match(card, /data-base="60" data-plus="10" data-trained="3"/);
@@ -657,7 +657,7 @@ test("a stranger sees the stat card without the owner's buttons", async (t) => {
     const stranger = await ctx.request(`/t?uid=${A}`, { jar });
     assert.match(stranger.html, /이미 주인이 있어요/);
     const card = statCardOf(stranger.html);
-    assert.match(card, /<b class="st-animal" data-stat-animal>양<\/b><span class="st-edition is-legendary">별밤 레전더리<\/span>/);
+    assert.match(card, /<b class="st-name">Mochi<\/b><small class="st-kind"><span data-stat-animal>양<\/span><\/small><\/p><span class="st-edition"><span>별밤 레전더리<\/span><\/span>/);
     assert.deepEqual(totalsOf(card), [70, 80, 60, 90]);
     assert.match(stranger.html, /<button type="button" class="ghost stat-peek" data-open="stats" aria-haspopup="dialog">양 친구의 능력치<\/button>/);
     assert.doesNotMatch(stranger.html, /data-stat-farm|data-care|data-owner|data-farm|level-open|class="dock"/);

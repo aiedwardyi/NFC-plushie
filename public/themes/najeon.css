@@ -95,9 +95,9 @@ html[data-theme="najeon"] .level-badge {
   font-family: "Gowun Batang", serif;
   box-shadow: 0 2px 0 #000, 0 4px 10px rgba(0, 0, 0, 0.6);
 }
-html[data-theme="najeon"] .xp-bar { background: #050507; box-shadow: inset 0 0 0 1.5px var(--pearl-dim); }
-html[data-theme="najeon"] .xp-bar::after { background: linear-gradient(90deg, var(--pearl-dim) 0 4px, transparent 4px 8px, var(--pearl-dim) 8px); }
-html[data-theme="najeon"] .xp-fill { background: linear-gradient(90deg, #e9e7ef, #f2d9e5 35%, #d2eee9 65%, #ece9f2); }
+html[data-theme="najeon"] .xp-bar { background: rgba(233, 231, 239, 0.08); box-shadow: inset 0 0 0 1px rgba(233, 231, 239, 0.12); }
+html[data-theme="najeon"] .xp-bar::after { background: linear-gradient(90deg, rgba(233, 231, 239, 0.2) 0 4px, transparent 4px 8px, rgba(233, 231, 239, 0.2) 8px); }
+html[data-theme="najeon"] .xp-fill { background: linear-gradient(90deg, #e9e7ef, #f2d9e5 35%, #d2eee9 65%, #ece9f2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35); }
 
 /* Dialog: a lacquer letter box, vermilion seal for the name */
 html[data-theme="najeon"] .dialog,
@@ -152,7 +152,7 @@ html[data-theme="najeon"] .dock-label { color: #cfccd8; }
 html[data-theme="najeon"] footer { color: rgba(207, 204, 216, 0.5); }
 
 /* Buttons and fields */
-html[data-theme="najeon"] :where(main, .sheet, .demo-sheet) :where(button:not(.pet-hit, .dock-btn, .mascot-tog, .tile, .sheet-close, .copy, .demo-close, .theme-btn, .theme-card), .button) {
+html[data-theme="najeon"] :where(main, .sheet, .demo-sheet) :where(button:not(.pet-hit, .dock-btn, .mascot-tog, .tile, .sheet-close, .st-share, .copy, .demo-close, .theme-btn, .theme-card), .button) {
   background: linear-gradient(180deg, #d0393f, var(--vermilion) 60%, #8e1c22);
   color: #fff4ec;
   font-family: "Gowun Batang", serif;
@@ -305,7 +305,8 @@ html[data-theme="najeon"] {
 }
 html[data-theme="najeon"] .g-thumb-aura { background: radial-gradient(circle, rgba(225, 238, 255, .9) 0 22%, rgba(225, 238, 255, .3) 42%, transparent 66%); }
 html[data-theme="najeon"] .g-start { background: linear-gradient(135deg, #f4f7ff, #dff6ff 50%, #f6e8ff); color: #0c0c10; box-shadow: 0 3px 0 #8e8b99; }
-html[data-theme="najeon"] .g-gifts { background: none; color: var(--muted); font-family: inherit; box-shadow: none; }
+html[data-theme="najeon"] .g-gifts,
+html[data-theme="najeon"] .record-guide { background: none; color: var(--muted); font-family: inherit; box-shadow: none; }
 html[data-theme="najeon"] svg[data-icon] .i-a { fill: #eef3ff; stroke: #8d9bbd; }
 html[data-theme="najeon"] svg[data-icon] .i-b { stroke: #c9d8f5; }
 html[data-theme="najeon"] .g-fill, html[data-theme="najeon"] .g-timer i { background: linear-gradient(0deg, #c9d8f5, #f4f7ff 50%, #f6e8ff); }
@@ -313,15 +314,98 @@ html[data-theme="najeon"] .g-result { box-shadow: 0 0 0 1.5px #8d9bbd, 0 0 0 5px
 html[data-theme="najeon"] .g-badge { box-shadow: 0 0 0 1.5px #c9d8f5, 0 0 20px rgba(225, 238, 255, .6); }
 html[data-theme="najeon"] .g-result .g-again { background: linear-gradient(135deg, #f4f7ff, #dff6ff 50%, #f6e8ff) !important; }
 
-/* Stats, the basket row and the 씨앗 가게 on black lacquer: pearl text, real gold for the edition */
-html[data-theme="najeon"] .st-animal,
+/* Stats, the basket row and the 씨앗 가게 on black lacquer: pearl text, inlay strips, the sun's gold for the edition */
+html[data-theme="najeon"] {
+  --tier-gold-1: #c9a24a;
+  --tier-gold-2: #e2c27a;
+  --tier-gold-3: #f3e2a8;
+  --tier-night-1: #050507;
+  --tier-night-2: #141318;
+  --tier-star: #f4f2f8;
+}
+html[data-theme="najeon"] .st-name,
+html[data-theme="najeon"] .st-total,
 html[data-theme="najeon"] .shop-name b { font-family: "Gowun Batang", serif; }
-html[data-theme="najeon"] .st-row { border-radius: 4px; background: linear-gradient(110deg, color-mix(in srgb, var(--st-light) 10%, #0c0c10), #0c0c10); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--st-light) 40%, transparent); }
-html[data-theme="najeon"] .st-icon { border-radius: 4px; }
-html[data-theme="najeon"] .st-bar { box-shadow: inset 0 0 0 1px rgba(233, 231, 239, .2); }
-html[data-theme="najeon"] .st-bar .st-base { background: linear-gradient(100deg, var(--st), var(--st-light) 45%, #e6dff0 65%, var(--st-light)); }
-html[data-theme="najeon"] .st-bar .st-trained { background: #8fd6c0; }
-html[data-theme="najeon"] .st-edition.is-legendary { color: #f3e2a8; box-shadow: inset 0 0 0 1.5px #e2c27a, 0 0 14px rgba(226, 194, 122, 0.35); }
+html[data-theme="najeon"] .st-total { font-weight: 700; letter-spacing: 0; }
+html[data-theme="najeon"] .st-icon,
+html[data-theme="najeon"] .st-bar { border-radius: 4px; }
+html[data-theme="najeon"] .st-bar { background: #050507; box-shadow: inset 0 0 0 1px rgba(233, 231, 239, .18); }
+/* The base keeps its mother-of-pearl sheen, and the shine is a pearl pass, not white. */
+html[data-theme="najeon"] .st-fill {
+  background:
+    linear-gradient(100deg, transparent 30%, rgba(230, 223, 240, .55) 60%, transparent 85%) 0 0 / var(--base-w, 100%) 100% no-repeat,
+    linear-gradient(90deg, var(--stops, var(--st), var(--st-light)));
+}
+html[data-theme="najeon"] .st-fill::before { background: linear-gradient(100deg, transparent 32%, rgba(242, 217, 229, .6) 44%, rgba(210, 238, 233, .6) 50%, rgba(221, 211, 242, .6) 56%, transparent 68%); }
+html[data-theme="najeon"][data-edition="rare"] .st-edition { color: #0c0c10; background: linear-gradient(135deg, #f3e2a8, #e2c27a 55%, #c9a24a); box-shadow: 0 2px 8px rgba(201, 162, 74, .3); }
+html[data-theme="najeon"][data-edition="legendary"] .st-edition { background: linear-gradient(180deg, #141318, #050507); box-shadow: inset 0 0 0 1px #e2c27a; }
+html[data-theme="najeon"][data-edition="rare"] .st-sky { background: repeating-linear-gradient(115deg, rgba(243, 226, 168, .03) 0 1px, transparent 1px 3px), linear-gradient(180deg, rgba(201, 162, 74, .1), transparent); }
+/* Pearl specks on lacquer, no indigo. */
+html[data-theme="najeon"][data-edition="legendary"] .st-sky {
+  background:
+    radial-gradient(circle at 6% 12px, rgba(214, 239, 236, .8) 0 .8px, transparent 1.4px),
+    radial-gradient(circle at 33% 30px, rgba(242, 226, 236, .6) 0 .7px, transparent 1.2px),
+    radial-gradient(circle at 44% 64px, rgba(214, 239, 236, .5) 0 .6px, transparent 1.1px),
+    radial-gradient(circle at 58% 22px, rgba(244, 242, 248, .85) 0 .9px, transparent 1.5px),
+    radial-gradient(circle at 64% 100px, rgba(242, 226, 236, .55) 0 .7px, transparent 1.2px),
+    radial-gradient(circle at 77% 44px, rgba(214, 239, 236, .7) 0 .7px, transparent 1.2px),
+    radial-gradient(circle at 95% 8px, rgba(244, 242, 248, .6) 0 .6px, transparent 1.1px);
+}
+/* The card's buttons, and the 포키 카드 sheet's, wear the sun's gold: vermilion never sits by the edition's gold. */
+html[data-theme="najeon"] .st-snack,
+html[data-theme="najeon"] .share-actions button {
+  background: linear-gradient(180deg, #f3e2a8, #e2c27a 55%, #c9a24a);
+  color: #0c0c10;
+  box-shadow: 0 4px 0 #6e5a2a, 0 8px 18px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+html[data-theme="najeon"] .share-canvas { border-radius: 6px; box-shadow: 0 0 0 1.5px rgba(233, 231, 239, 0.4), 0 14px 28px rgba(0, 0, 0, 0.7); }
 html[data-theme="najeon"] .shop-row { box-shadow: inset 0 0 0 1.5px rgba(233, 231, 239, 0.2); }
 html[data-theme="najeon"] .stat-pop { color: #0c0c10; background: var(--pearl-sheen); box-shadow: 0 3px 0 #8e8b99, 0 8px 18px rgba(0, 0, 0, 0.5); }
 html.f-layout[data-theme="najeon"] .f-basket { box-shadow: inset 0 0 0 2px #e2c27a, 0 6px 14px rgba(0, 0, 0, 0.55); }
+
+/* The edition's finish on lacquer: a sun-gold inlay for 금실, pearl stars in the lacquer band for 별밤. Never vermilion by the gold. */
+html[data-theme="najeon"][data-edition] .window { outline-color: rgba(226, 194, 122, 0.8); }
+html[data-theme="najeon"][data-edition="rare"] .window {
+  box-shadow:
+    0 0 0 3px #c9a24a,
+    0 0 0 10px #060608,
+    0 0 0 11.5px rgba(226, 194, 122, 0.45),
+    0 24px 40px -10px rgba(0, 0, 0, 0.8);
+}
+html[data-theme="najeon"][data-edition="rare"] .finish {
+  inset: -3px;
+  padding: 3px;
+  border-radius: 27px;
+  background: var(--tier-thread), conic-gradient(from 210deg, #c9a24a, #f3e2a8 12%, #a8832f 30%, #e2c27a 50%, #a8832f 70%, #f3e2a8 85%, #c9a24a);
+}
+html[data-theme="najeon"][data-edition="legendary"] .window {
+  box-shadow:
+    0 0 0 1.5px #e2c27a,
+    0 0 0 10px #060608,
+    0 0 0 11.5px rgba(226, 194, 122, 0.55),
+    0 24px 40px -10px rgba(0, 0, 0, 0.8);
+}
+html[data-theme="najeon"][data-edition="legendary"] .finish { --band: 4.25px; inset: -10px; padding: 8.5px; border-radius: 34px; background: none; }
+html[data-theme="najeon"][data-edition="rare"] .nameplate { background-image: var(--tier-thread), linear-gradient(100deg, #f3e2a8, #e2c27a 40%, #c9a24a 70%, #f3e2a8); }
+html[data-theme="najeon"][data-edition="legendary"] .nameplate {
+  background-image:
+    radial-gradient(circle at 22% 30%, #f4f2f8 0 1px, transparent 2px),
+    radial-gradient(circle at 61% 64%, #f4f2f8 0 .8px, transparent 1.8px),
+    radial-gradient(circle at 84% 26%, #f4f2f8 0 1px, transparent 2px),
+    linear-gradient(100deg, #e2c27a, #f3e2a8 45%, #c9a24a 80%, #e2c27a);
+}
+
+/* Guide: a pearl ring with a gold hairline, never red */
+html[data-theme="najeon"] {
+  --coach-dim: rgba(0, 0, 0, 0.62);
+  --coach-ring: #f4f2f8;
+  --coach-ring-2: #e2c27a;
+  --coach-glow: rgba(214, 239, 236, 0.38);
+  --coach-hand: #f4f2f8;
+  --coach-ink: #8a6d2c;
+  --coach-skip: #0c0c10;
+  --coach-skip-ink: var(--pearl);
+  --coach-skip-line: #e2c27a;
+}
+html[data-theme="najeon"] .coach-ring { border-width: 2px; box-shadow: 0 0 0 1.5px #0c0c10, 0 0 0 4px var(--coach-ring-2), 0 0 20px 4px var(--coach-glow), inset 0 0 12px var(--coach-glow); }
+html[data-theme="najeon"] .coach-skip { font-family: "Gowun Batang", "Noto Serif KR", serif; font-weight: 700; }
