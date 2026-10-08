@@ -1197,6 +1197,8 @@ function runCelebrate() {
 
   if (kind === "named") {
     if (prefersReducedMotion()) {
+      // The lines show at once, so the edition they name goes on at once.
+      revealEdition();
       showStillCelebrate("named");
       enhanceRollingCounter({ duration: 0, goldPop: false });
       return;
@@ -1564,6 +1566,7 @@ function lineText(el) {
 function showLine(index) {
   lineIndex = index;
   dialogLines.forEach((el, i) => el.classList.toggle("is-current", i === index));
+  if (dialogLines[index]?.classList.contains("is-edition")) revealEdition();
 }
 
 function settleLine(index) {
@@ -1669,12 +1672,13 @@ function closeSheet() {
 document.querySelectorAll("[data-open]").forEach((button) => {
   button.addEventListener("click", () => openSheet(button.dataset.open, button));
 });
-document.querySelectorAll("[data-sheet]").forEach((sheet) => {
+function wireSheet(sheet) {
   sheet.addEventListener("click", (event) => {
     if (event.target === sheet) closeSheet();
   });
   sheet.querySelector("[data-sheet-close]")?.addEventListener("click", closeSheet);
-});
+}
+document.querySelectorAll("[data-sheet]").forEach(wireSheet);
 document.addEventListener("keydown", (event) => {
   if (!sheetOpen) return;
   if (event.key === "Escape") {
@@ -2141,6 +2145,14 @@ const care = (function careLoop() {
       win.appendChild(spark);
       window.setTimeout(() => spark.remove(), 900 + i * 45);
     }
+    // A 별밤 레전더리's touch also sends one small shooting star.
+    if (document.documentElement.dataset.edition !== "legendary") return;
+    const shoot = document.createElement("span");
+    shoot.className = "sparkle is-shoot";
+    shoot.style.left = `${x - 10}px`;
+    shoot.style.top = `${y - spread * 0.3}px`;
+    win.appendChild(shoot);
+    window.setTimeout(() => shoot.remove(), 900);
   }
 
   function cheer() {
@@ -2187,13 +2199,15 @@ const care = (function careLoop() {
       window.setTimeout(() => old.remove(), 320);
     }
     if (!id) return;
-    dock.querySelector(`[data-care="${id}"]`)?.classList.add("is-want");
-    wantEl = document.createElement("div");
+    const verb = dock.querySelector(`[data-care="${id}"]`);
+    verb?.classList.add("is-want");
+    wantEl = document.createElement("button");
+    wantEl.type = "button";
     wantEl.className = "want";
     wantEl.dataset.want = id;
-    wantEl.setAttribute("role", "img");
-    wantEl.setAttribute("aria-label", WANTS[id]);
+    wantEl.setAttribute("aria-label", `${WANTS[id]}, ${verb?.textContent.trim() || ""}`);
     wantEl.innerHTML = `<i></i><i></i><span class="want-cloud">${wantArt(id)}</span>`;
+    wantEl.addEventListener("click", () => press(id));
     win.appendChild(wantEl);
     // Before the page's first touch the sound is lost, so that touch plays it once if this bubble still shows.
     const shown = wantEl;
@@ -2988,6 +3002,8 @@ function paintLevel(r) {
     line.classList.add("is-growing");
   }
   document.querySelector(".level-open")?.setAttribute("aria-label", `능력치 보기, Lv. ${r.level}`);
+  const caption = document.querySelector("[data-stat-level]");
+  if (caption) caption.textContent = String(r.level);
   const unlock = document.querySelector("[data-level-next]");
   if (unlock) {
     let next = "";
@@ -3010,28 +3026,54 @@ function petStats() {
 
 const statBonus = (key) => Number(petStats()?.[key]?.bonus) || 0;
 
-// Each bar's base, edition and trained parts as shares of the card's full bar; `grow` starts them from empty.
-function fillBars(grow = false) {
+// One bar: its fill as a share of the card's bar, its stops as % of the fill (base, then training, then the edition's gold at the tip), and 8비트's 18 cells.
+function statBar({ base = 0, plus = 0, trained = 0 }, max = 120, cells = 18) {
+  const total = Math.max(1, base + plus + trained);
+  const g = (base / total) * 100;
+  const s = ((base + trained) / total) * 100;
+  // Each change of material blends over 8% of the fill, so no part ends in an edge.
+  const h = 4;
+  const stops = [["var(--st)", 0]];
+  if (plus > 0) {
+    // Stat and gold meet through the stat's own highlight: a glint, never a muddy band.
+    stops.push(["var(--st-light)", (trained > 0 ? g : s) - h]);
+    if (trained > 0 && s - g >= 2 * h) stops.push(["var(--st-hi)", g + h]);
+    stops.push(["var(--st-hi)", s], ["var(--tier-gold-2)", s + h], ["var(--tier-gold-1)", s + (100 - s) * 0.55], ["var(--tier-gold-3)", 100]);
+  } else if (trained > 0) {
+    stops.push(["var(--st-light)", g - h], ["var(--st-hi)", Math.min(100, g + h)], ["var(--st-hi)", 100]);
+  } else {
+    stops.push(["var(--st-light)", 100]);
+  }
+  const gold = plus > 0 ? Math.max(1, Math.round((plus / max) * cells)) : 0;
+  const grown = Math.round((trained / max) * cells);
+  const at = (v) => Math.round(Math.max(0, Math.min(100, v)) * 10) / 10;
+  return {
+    fill: Math.min(1, total / max),
+    base: at(g),
+    seam: at(s),
+    stops: stops.map(([color, p]) => `${color} ${at(p)}%`).join(", "),
+    cells: { base: Math.min(cells - gold - grown, Math.floor((base / max) * cells)), grown, gold },
+  };
+}
+
+function paintBar(bar, max) {
+  const b = statBar({ base: Number(bar.dataset.base) || 0, plus: Number(bar.dataset.plus) || 0, trained: Number(bar.dataset.trained) || 0 }, max);
+  const fill = bar.querySelector(".st-fill");
+  const n = b.cells.base + b.cells.grown + b.cells.gold;
+  fill.style.setProperty("--fill", String(b.fill));
+  fill.style.setProperty("--stops", b.stops);
+  fill.style.setProperty("--seam", `${b.seam}%`);
+  fill.style.setProperty("--base-w", `${b.base}%`);
+  fill.style.setProperty("--cells", String(n));
+  fill.style.setProperty("--px-g", `${(b.cells.base / n) * 100}%`);
+  fill.style.setProperty("--px-s", `${((b.cells.base + b.cells.grown) / n) * 100}%`);
+}
+
+function paintBars() {
   const list = document.querySelector(".st-list");
   if (!list) return;
   const max = Number(list.dataset.max) || 120;
-  list.querySelectorAll(".st-bar").forEach((bar) => {
-    const segmented = document.documentElement.dataset.theme === "8bit";
-    const total = ["base", "plus", "trained"].reduce((sum, part) => sum + (Number(bar.dataset[part]) || 0), 0);
-    for (const part of ["base", "plus", "trained"]) {
-      const el = bar.querySelector(`.st-${part}`);
-      if (!el) continue;
-      const value = segmented ? (part === "base" ? Math.round(Math.min(1, total / max) * 18) / 18 : 0) : (Number(bar.dataset[part]) || 0) / max;
-      const width = `${Math.max(0, Math.min(100, value * 100))}%`;
-      if (grow && !segmented && !prefersReducedMotion()) {
-        el.style.transition = "none";
-        el.style.width = "0%";
-        void el.offsetWidth;
-        el.style.transition = "";
-      }
-      el.style.width = width;
-    }
-  });
+  list.querySelectorAll(".st-bar").forEach((bar) => paintBar(bar, max));
 }
 
 // A reply's stat sheet repaints the card and the stats the games and popups read.
@@ -3051,8 +3093,90 @@ function paintStats(sheet) {
     const tag = row.querySelector(".st-boost");
     tag.textContent = `+${s.boost}`;
     tag.hidden = !s.boost;
+    const mix = row.querySelector(".st-mix");
+    mix.querySelector("b").textContent = String(s.base);
+    for (const [part, value] of [[".is-tier", s.plus], [".is-grow", s.trained]]) {
+      const el = mix.querySelector(part);
+      el.textContent = `+${value}`;
+      el.hidden = !value;
+    }
+    mix.hidden = !s.plus && !s.trained;
   }
-  fillBars();
+  paintBars();
+}
+
+// The admin's edition dresses the page at once: the finish, the pill and the bars; an unnamed pet waits for its naming.
+function showEdition(edition, name, stats) {
+  const root = document.documentElement;
+  if (!document.querySelector("[data-name-input]")) {
+    if (edition === "rare" || edition === "legendary") root.dataset.edition = edition;
+    else delete root.dataset.edition;
+    delete root.dataset.editionReveal;
+  }
+  const pill = document.querySelector(".st-edition > span");
+  if (pill && name) pill.textContent = name;
+  paintStats(stats);
+}
+
+const STAT_BUZZ = { classic: 10, rare: [10, 50, 14], legendary: [10, 50, 14, 70, 22] };
+
+// The naming page puts the edition on as the pet says which one it is.
+function revealEdition() {
+  const root = document.documentElement;
+  const edition = root.dataset.editionReveal;
+  if (!edition) return;
+  delete root.dataset.editionReveal;
+  root.dataset.edition = edition;
+  if (prefersReducedMotion()) return;
+  root.classList.add("is-edition-lit");
+  window.setTimeout(() => root.classList.remove("is-edition-lit"), 1800);
+  tryVibrate(STAT_BUZZ[edition]);
+}
+
+let statOpen = 0;
+
+// Every open replays the card: rows rise, one loop grows each bar and counts its total in step, then the tip settles and shines.
+function openStats() {
+  const sheet = document.querySelector('[data-sheet="stats"]');
+  if (!sheet?.classList.contains("is-open")) return;
+  const token = ++statOpen;
+  const root = document.documentElement;
+  const px = root.dataset.theme === "8bit";
+  const rows = Array.from(sheet.querySelectorAll(".st-row")).map((row) => ({
+    fill: row.querySelector(".st-fill"),
+    total: row.querySelector(".st-total"),
+    value: Number(petStats()?.[row.dataset.stat]?.total) || Number(row.querySelector(".st-total").textContent) || 0,
+    cells: Number(row.querySelector(".st-fill").style.getPropertyValue("--cells")) || 0,
+  }));
+  sheet.classList.remove("is-opening");
+  void sheet.offsetWidth;
+  sheet.classList.add("is-opening");
+  window.setTimeout(() => {
+    if (token === statOpen && sheet.classList.contains("is-open")) tryVibrate(px ? 10 : STAT_BUZZ[root.dataset.edition] || STAT_BUZZ.classic);
+  }, px ? 300 + 70 * (rows.length - 1) + 35 * 18 : 1270);
+  if (prefersReducedMotion()) {
+    for (const r of rows) {
+      r.fill.style.removeProperty("--grow");
+      r.total.textContent = String(r.value);
+    }
+    return;
+  }
+  const t0 = performance.now();
+  const ease = (t) => 1 - (1 - t) ** 3;
+  function tick(now) {
+    if (token !== statOpen) return;
+    let busy = false;
+    rows.forEach((r, i) => {
+      const t = Math.min(1, Math.max(0, (now - t0 - 300 - 70 * i) / (px ? 35 * Math.max(1, r.cells) : 720)));
+      // 8비트 lights one cell at a time and steps its total with it.
+      const e = px ? Math.floor(t * r.cells + 1e-6) / Math.max(1, r.cells) : ease(t);
+      r.fill.style.setProperty("--grow", String(e));
+      r.total.textContent = String(Math.round(e * r.value));
+      if (t < 1) busy = true;
+    });
+    if (busy) requestAnimationFrame(tick);
+  }
+  tick(t0);
 }
 
 // Short lines that float up over the window one at a time; a game on screen holds them until the pet is home.
@@ -3092,8 +3216,28 @@ function trainedPop(trained, delay = 0) {
   window.setTimeout(() => statPop(`${STAT_WORDS[trained.stat]} +1!`), delay);
 }
 
-fillBars();
-document.querySelectorAll('[data-open="stats"]').forEach((button) => button.addEventListener("click", () => fillBars(true)));
+paintBars();
+document.querySelectorAll('[data-open="stats"]').forEach((button) => button.addEventListener("click", openStats));
+
+// The 능력치 sheet closes first, so the card sheet hands focus back to what opened 능력치, not to this hidden button.
+const shareCard = document.querySelector("[data-share-card]");
+if (shareCard) {
+  let retry = 0;
+  shareCard.addEventListener("click", () => {
+    import(retry ? `/share-card.js?retry=${retry}` : "/share-card.js")
+      .catch((error) => {
+        retry += 1;
+        throw error;
+      })
+      .then((m) => {
+        if (!shareCard.closest(".sheet.is-open")) return;
+        const opener = sheetOpener;
+        closeSheet();
+        return m.showShareCard(document, { wire: wireSheet, open: () => openSheet("share", opener) });
+      })
+      .catch(() => {});
+  });
+}
 
 /* Tap combo: plushie taps in a row play a hello, the world's trick, then the secret move; the key counts them. */
 const combo = (function tapCombo() {
@@ -3725,6 +3869,16 @@ const combo = (function tapCombo() {
     nfcButton.addEventListener("click", () => listen());
   }
 
+  // A desk's plushie is F5: while a game or the farm takes taps, the key is a read of this plushie, not a reload.
+  if (TAP_SPOT === "desk") {
+    window.addEventListener("keydown", (event) => {
+      if (event.key !== "F5" || event.ctrlKey || event.shiftKey || event.altKey || event.metaKey || !sinkFn) return;
+      event.preventDefault();
+      // A held key repeats; only its first press is a tap.
+      if (!event.repeat) heard({ serialNumber: uid });
+    }, true);
+  }
+
   // Called once the opening is over: the page's own stage, then listening when NFC is already allowed.
   function start() {
     ready = true;
@@ -4225,6 +4379,8 @@ const farm = (function farmRoom() {
   let opening = false;
   let isOpen = false;
   let harvesting = false;
+  let tapped = 0;
+  let arriving = false;
   let buying = false;
   let acting = Promise.resolve();
   let cookieTimer = 0;
@@ -4523,6 +4679,7 @@ const farm = (function farmRoom() {
     acting = acting.then(() => post("harvest")).then(({ status, reply }) => {
       harvesting = false;
       if (reply) after(reply);
+      if (reply?.picked.length) tapped += 1;
       if (!isOpen || !ready) {
         if (reply) flush(reply);
         return;
@@ -4585,13 +4742,21 @@ const farm = (function farmRoom() {
     care.fx.say(FAILED);
   }
 
+  // The page wears the farm from its first paint (style.css, on data-farm-visit) until the farm is in or the visit gives up.
+  const uncover = () => { arriving = false; delete body.dataset.farmVisit; };
+
   function openVisit(r) {
     opening = true;
+    arriving = true;
+    if (r.picked.length) tapped += 1;
     preload();
     prepare().then((st) => {
       opening = false;
-      if (isOpen || careHold.asleep || st !== ready) return undefined;
-      return enter(st, r, "visit").then(() => {
+      if (isOpen || careHold.asleep || st !== ready) {
+        uncover();
+        return undefined;
+      }
+      return enter(st, r, "visit").finally(uncover).then(() => {
         if (!r.picked.length || !isOpen || st !== ready) return undefined;
         // A page opened by a plushie tap stays silent until it is touched, so the show waits for that touch.
         return st.promptTouch().then(() => {
@@ -4601,6 +4766,7 @@ const farm = (function farmRoom() {
         });
       }).catch((error) => broken(error, r));
     }, () => {
+      uncover();
       // The visit already harvested, so its XP and hearts show even without the farm.
       openFailed();
       flush(r);
@@ -4661,23 +4827,29 @@ const farm = (function farmRoom() {
     })();
   }
 
+  // Read before runCelebrate drops it: a celebrating visit has no cover, so it must not get one once the mark is gone.
+  const celebrating = body.hasAttribute("data-celebrate");
+
   function start() {
     if (body.dataset.farmNext) scheduleDot(Number(body.dataset.farmNext));
     const raw = body.dataset.farmVisit;
     if (!raw) return;
-    delete body.dataset.farmVisit;
+    if (celebrating) uncover();
     try {
       visit = JSON.parse(raw);
     } catch {
+      uncover();
       return;
     }
     prepare().catch(() => {});
-    whenCalm(() => {
+    const go = () => {
       if (!visit || isOpen || opening) return;
       const r = visit;
       visit = null;
       openVisit(r);
-    });
+    };
+    if (celebrating) whenCalm(go);
+    else go();
   }
 
   // A world picked while the farm is open rebuilds it once it closes.
@@ -4750,7 +4922,9 @@ const farm = (function farmRoom() {
     game = null;
     ready = null;
   });
-  return { start, restyle };
+  // The guide reads these: the open farm with nothing playing, where a ripe crop sits, a visit still on its way in, and a plushie harvest's picks.
+  const calm = () => Boolean(isOpen && ready && !ready.busy && !opening && !harvesting && !picking.size);
+  return { start, restyle, calm, cropRect: () => (isOpen && ready ? ready.cropRect() : null), growRect: () => (isOpen && ready ? ready.growRect() : null), coming: () => Boolean(visit) || arriving, tapped: () => tapped };
 })();
 
 /* Talk: a small mic at the speech line opens a slim bar; the pet answers in its own line. */
@@ -5755,12 +5929,7 @@ if (demoSheet && demoHold) {
       .then((reply) => {
         if (!reply?.ok) return;
         editions.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
-        paintStats(reply.stats);
-        const tag = document.querySelector(".st-edition");
-        if (tag) {
-          tag.className = `st-edition is-${reply.edition}`;
-          tag.textContent = reply.name;
-        }
+        showEdition(reply.edition, reply.name, reply.stats);
       })
       .catch(() => {});
   }));
@@ -5772,6 +5941,498 @@ if (demoSheet && demoHold) {
     }
   });
 }
+
+/* Coach: a soft scrim with one spotlight, a ring hugging the target and a finger pointing at it. The guide picks the target. */
+const coach = (function coachLayer() {
+  const root = document.documentElement;
+  const HAND = '<svg viewBox="0 0 80 88" aria-hidden="true"><path d="M25 43V13c0-10 13-10 13 0v23c3-8 13-5 13 2 5-6 13-2 13 5 8-3 13 2 11 11l-5 19c-2 8-9 11-21 11-13 0-21-4-27-12L8 53c-5-8 4-16 11-9l9 9"/></svg>';
+  const PX_HAND = [
+    "....kk..........",
+    "...kwwk.........",
+    "...kwwk.........",
+    "...kwwk.........",
+    "...kwwkkk.......",
+    "...kwwkwwkkk....",
+    "...kwwkwwkwwkk..",
+    "kk.kwwkwwkwwkwk.",
+    "kwkkwwwwwwwwwwk.",
+    "kwwkwwwwwwwwwwk.",
+    ".kwwwwwwwwwwwwk.",
+    "..kwwwwwwwwwwwk.",
+    "..kwwwwwwwwwwk..",
+    "...kwwwwwwwwwk..",
+    "....kwwwwwwwk...",
+    "....kkkkkkkkk...",
+  ];
+  const PAD = 8;
+  const MOVE_MS = 250;
+  const layer = (name, tag = "div") => {
+    const el = document.createElement(tag);
+    el.className = name;
+    if (tag === "div") el.setAttribute("aria-hidden", "true");
+    return el;
+  };
+  let hole = null;
+  let ring = null;
+  let finger = null;
+  let hand = null;
+  let tag = null;
+  let skip = null;
+  let onSkip = null;
+  let measure = null;
+  let label = null;
+  let box = null;
+  let from = null;
+  let started = 0;
+  let frame = 0;
+  let drawn = "";
+  let art = "";
+
+  function pixelHand() {
+    let rects = "";
+    PX_HAND.forEach((row, y) => [...row].forEach((ch, x) => {
+      if (ch !== ".") rects += `<rect class="px-${ch}" x="${x}" y="${y}" width="1.02" height="1.02"/>`;
+    }));
+    return `<svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
+  }
+
+  function dress() {
+    const px = root.dataset.theme === "8bit";
+    if (art === String(px)) return;
+    art = String(px);
+    hand.innerHTML = px ? pixelHand() : HAND;
+  }
+
+  // Follows the target every frame: a sheet sliding up or a resize moves the spotlight with it.
+  function place(now) {
+    frame = window.requestAnimationFrame(place);
+    const r = measure?.();
+    if (!r?.width) return;
+    let next = { x: r.left - PAD, y: r.top - PAD, w: r.width + PAD * 2, h: r.height + PAD * 2 };
+    const t = from && !prefersReducedMotion() ? Math.min(1, (now - started) / MOVE_MS) : 1;
+    if (t < 1) {
+      const k = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+      next = Object.fromEntries(Object.keys(next).map((key) => [key, from[key] + (next[key] - from[key]) * k]));
+    } else {
+      from = null;
+    }
+    box = next;
+    // The tip rests on the target's near edge, so the hand never covers what it points at; a big target takes it inside.
+    const down = r.top + r.height / 2 > window.innerHeight * 0.5;
+    const reach = r.height > 120 ? r.height * 0.38 : 7;
+    const tipX = r.left + r.width * 0.58;
+    const tipY = down ? r.top + reach : r.top + r.height - reach;
+    const text = label?.() || "";
+    const key = [box.x, box.y, box.w, box.h, tipX, tipY, down, text].map((v) => (typeof v === "number" ? v.toFixed(1) : v)).join();
+    if (key === drawn) return;
+    drawn = key;
+    const radius = `${Math.min(box.w, box.h) / 2}px`;
+    for (const el of [hole, ring]) {
+      el.style.left = `${box.x}px`;
+      el.style.top = `${box.y}px`;
+      el.style.width = `${box.w}px`;
+      el.style.height = `${box.h}px`;
+      el.style.setProperty("--coach-r", radius);
+    }
+    finger.style.left = `${tipX}px`;
+    finger.style.top = `${tipY}px`;
+    finger.classList.toggle("is-down", down);
+    tag.textContent = text;
+    tag.style.left = `${box.x + box.w / 2}px`;
+    tag.style.top = `${box.y - 6}px`;
+  }
+
+  // Built on the first step, so a page without a guide never carries it.
+  function build() {
+    hole = layer("coach-hole");
+    ring = layer("coach-ring");
+    finger = layer("coach-finger");
+    hand = layer("coach-hand", "span");
+    tag = layer("coach-tag");
+    skip = layer("coach-skip", "button");
+    skip.type = "button";
+    skip.textContent = "건너뛰기";
+    skip.addEventListener("click", () => onSkip?.());
+    ring.addEventListener("animationend", (event) => {
+      if (event.animationName === "coach-pulse" || event.animationName === "coach-flash") ring.classList.remove("is-pulse");
+    });
+    finger.append(hand);
+    document.body.append(hole, ring, finger, tag, skip);
+  }
+
+  // Soft: a quiet ring with no scrim or finger, for a wait; tag labels it.
+  function show(target, { soft = false, tag: words = null } = {}) {
+    if (!hole) build();
+    dress();
+    from = box && root.classList.contains("has-coach") ? box : null;
+    started = performance.now();
+    measure = target;
+    label = words;
+    drawn = "";
+    root.classList.toggle("coach-soft", soft);
+    if (!from) {
+      drawn = "";
+      ring.classList.remove("is-pulse");
+    }
+    root.classList.add("has-coach");
+    if (!frame) frame = window.requestAnimationFrame(place);
+  }
+
+  function hide() {
+    root.classList.remove("has-coach", "coach-soft");
+    window.cancelAnimationFrame(frame);
+    frame = 0;
+    measure = null;
+    box = null;
+  }
+
+  // A tap anywhere else: the ring bumps once, never dismissing the step.
+  function pulse() {
+    tryVibrate(10);
+    ring.classList.remove("is-pulse");
+    void ring.offsetWidth;
+    ring.classList.add("is-pulse");
+  }
+
+  return { show, hide, pulse, owns: (el) => Boolean(skip?.contains(el)), skipped: (fn) => { onSkip = fn; } };
+})();
+
+/* Guide: from the first home after naming, the pet walks its owner through one button at a time. */
+(function guideTour() {
+  const dock = document.querySelector(".dock[data-care-uid]");
+  const win = document.querySelector("[data-window]");
+  const met = document.body.dataset.met;
+  if (!care || !pet || !dock || !win || !met || !dialogBox) return;
+  // Read before the opening's celebration clears it.
+  const named = document.body.dataset.celebrate === "named";
+  const uid = dock.dataset.careUid;
+  const root = document.documentElement;
+  const mic = dialogBox.querySelector("[data-talk-mic]");
+  const talkBar = document.querySelector("[data-talk-bar]");
+  const arcadeSheet = document.querySelector('[data-sheet="arcade"]');
+  const TICK_MS = 100;
+  const CALM_MS = 700;
+  const TALK_IDLE_MS = 1500;
+  const LINE_BACK_MS = 1800;
+  const PLAY = { classic: "공놀이", "8bit": "공놀이", milk: "딸기공 놀이", najeon: "제기차기" };
+  const CARE_LINES = {
+    feed: () => (night() ? "자기 전에 밥 먹을래요! 밥을 눌러 줘요" : "배고파요! 밥을 눌러줘요"),
+    play: () => `${PLAY[root.dataset.theme] || PLAY.classic} 하고 싶어요! 아래 놀이를 눌러줘요`,
+    sleep: () => "졸려요! 잠을 눌러줘요",
+  };
+  let m = null;
+  let key = "";
+  let guide = null;
+  let shown = null;
+  let calm = 0;
+  let idle = 0;
+  let said = "";
+  let drift = 0;
+  let talked = 0;
+  let timer = 0;
+  let finished = 0;
+  let tapBase = 0;
+  // The farm's own first-time hint gives way to the farm tour; a skip before its first pick hands it back.
+  const FARM_HINT = `farm-guide:${uid}`;
+  let hint = false;
+
+  const verb = () => m.careVerb(dock.dataset.want);
+  // The pet wants 잠 only between 22 and 05 in Seoul.
+  const night = () => dock.dataset.want === "sleep";
+  // target: what the spotlight hugs and the only thing a touch reaches; done: the event on it that finishes the step.
+  const STEPS = {
+    care: {
+      target: () => dock.querySelector(`[data-care="${verb()}"]`),
+      // The want bubble counts when it does the verb's job; at night it would put the pet to bed instead.
+      also: () => win.querySelector(`.want[data-want="${verb()}"]:not(.is-gone)`),
+      line: () => CARE_LINES[verb()](),
+      done: "click",
+    },
+    pet: { target: () => pet.querySelector(".pet-hit"), line: () => "나를 톡톡 쓰다듬어 줄래요?", done: "pointerdown" },
+    talk: { target: () => mic, line: () => "마이크를 누르고 말을 걸어봐요. 대답하고 기억도 해요!", done: "click" },
+    // Finishes once the farm is open, however it opened.
+    farm: { target: () => dock.querySelector("[data-farm]"), line: () => "텃밭에서 간식을 길러요! 가볼래요?" },
+    arcade: { target: () => dock.querySelector('[data-open="arcade"]'), line: () => "오락실에서 같이 놀아요!", done: "click" },
+    race: {
+      target: () => arcadeSheet?.querySelector('[data-game="race"]'),
+      sheet: () => arcadeSheet,
+      // Closing the room by its × or its backdrop ends the step too, so nobody waits on a sheet they shut.
+      hits: (event) => {
+        const hit = event.target.closest?.('[data-game="race"], [data-sheet-close]');
+        return event.target === arcadeSheet || Boolean(hit && arcadeSheet.contains(hit));
+      },
+      done: "click",
+    },
+    sleep: { target: () => dock.querySelector('[data-care="sleep"]'), line: () => "이제 졸려요… 잠을 눌러 재워 줄래요?", done: "click" },
+    bye: { line: () => "언제든 인형을 폰에 톡 대면 내가 깨어나요!", asleep: true },
+    // The farm tour: crops are drawn on the stage, so the crop step lights the plot a tap there picks.
+    crop: {
+      rect: () => farm?.cropRect(),
+      hits: (event) => win.contains(event.target) && within(farm?.cropRect(), event),
+      line: () => "다 자란 채소를 톡 눌러서 따요",
+      done: "pointerdown",
+      farm: true,
+      // A plushie harvest already filled the basket, or nothing ripens soon.
+      skip: () => cropPhase() === "skip",
+    },
+    // Not a step of its own: the crop step's wait, a soft ring on the growing plot until it ripens.
+    grow: {
+      rect: () => farm?.growRect(),
+      line: () => "새싹이 쑥쑥 자라는 중! 다 자라면 알려 줄게요",
+      farm: true,
+      soft: true,
+      tag: () => {
+        const left = farm?.growRect();
+        if (!left) return "";
+        return left.ms < 60000 ? `${Math.max(1, Math.ceil(left.ms / 1000))}초 남았어요` : left.words;
+      },
+    },
+    send: {
+      target: () => document.querySelector(".f-basket .fb-act.is-all, .f-basket .fb-act.is-bus"),
+      line: () => "바구니에 모였어요! 버스로 보내면 코인을 받아요",
+      done: "click",
+      farm: true,
+      // The picks settle into the basket a moment after the last one.
+      after: 3000,
+      skip: () => Boolean(document.querySelector(".f-basket .fb-empty")),
+    },
+    shop: { target: () => document.querySelector(".f-basket .fb-coins"), line: () => "코인으로 새 씨앗을 사요", done: "click", farm: true },
+    "farm-bye": { line: () => "인형을 폰에 톡 대면 한 번에 다 거둬요!", farm: true, after: 2500 },
+    "farm-home": { target: () => dock.querySelector("[data-farm]"), line: () => "집으로 가서 오락실도 구경해요!", done: "click", farm: true, after: 2500 },
+  };
+
+  // A plushie harvest that picked since the tour began (a tap, a desk F5, a farm visit) is the pick, whatever is still ripe or growing.
+  const cropPhase = () => ((farm?.tapped() || 0) > tapBase ? "skip" : m.cropPhase({ ripe: Boolean(farm?.cropRect()), basket: Boolean(document.querySelector(".f-basket .fb-crop")), wait: farm?.growRect()?.ms ?? Infinity }));
+
+  const within = (r, event) => Boolean(r) && event.clientX >= r.left && event.clientX <= r.left + r.width && event.clientY >= r.top && event.clientY <= r.top + r.height;
+
+  // The spotlight's box this frame, or null while the target is gone.
+  function where(spec) {
+    if (spec.rect) return spec.rect() || null;
+    const el = spec.target?.();
+    return visible(el) ? el.getBoundingClientRect() : null;
+  }
+
+  function load() {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(key, JSON.stringify(guide));
+    } catch {
+      /* private mode: this page still runs it */
+    }
+  }
+
+  // A new meet clears the older meets' records for this pet.
+  function forget() {
+    try {
+      const prefix = m.guideKey(uid, "");
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const old = localStorage.key(i);
+        if (old?.startsWith(prefix) && old !== key) localStorage.removeItem(old);
+      }
+    } catch {
+      /* private mode */
+    }
+  }
+
+  // Anything the pet is busy with, or a sheet, panel or game on top, pauses the guide; a step may live in its own sheet.
+  // The open farm holds the pet, so farm steps wait for the farm's own shows instead; a naming's edition reveal and a farm visit on its way in pause both.
+  function blocked(spec) {
+    const field = Boolean(spec.farm);
+    return Boolean(waking || (careHold.asleep && !spec.asleep) || (!field && careHold.busy) || (field && !farm?.calm())
+      || root.classList.contains("f-on") !== field || (sheetOpen && sheetOpen !== spec.sheet?.()) || (demoSheet && !demoSheet.hidden)
+      || root.classList.contains("has-reveal") || root.classList.contains("g-on") || performance.now() - finished < (spec.after || 0)
+      || "editionReveal" in root.dataset || root.classList.contains("is-edition-lit") || farm?.coming()
+      || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump, .gift.is-glow, .combo-key, .talk-bar.is-open, .f-prompt"));
+  }
+
+  // The pet has said its piece: no typing bubble, no line mid-type, the last line of the opening reached.
+  function quiet() {
+    return !dialogBox.querySelector(".dialog-dots, .dialog-cursor:not(.is-done), .is-thinking")
+      && (!dialogBox.classList.contains("is-seq") || dialogBox.classList.contains("is-end"));
+  }
+
+  const visible = (el) => Boolean(el?.isConnected && !el.hidden && el.getClientRects().length);
+
+  function current() {
+    if (root.classList.contains("f-on")) {
+      const step = m.nextStep(guide, m.FARM_STEPS);
+      return step === "crop" && cropPhase() === "wait" ? "grow" : step;
+    }
+    const step = m.nextStep(guide, m.HOME_STEPS, { talk: Boolean(mic), night: night() });
+    // Back from a closed 오락실, the race step first points at the room again.
+    return step === "race" && sheetOpen !== arcadeSheet ? "arcade" : step;
+  }
+
+  // The talk step only shows the bar: once nobody speaks or types, the guide puts away the bar that step opened.
+  function settleTalk() {
+    if (!talked) return;
+    if (!talkBar?.classList.contains("is-open")) {
+      idle = 0;
+      if (talked > 1) talked = 0;
+      return;
+    }
+    talked = 2;
+    const input = talkBar.querySelector("[data-talk-input]");
+    const still = !mic?.classList.contains("is-listening") && !input?.value.trim() && document.activeElement !== input && quiet();
+    idle = still ? idle + TICK_MS : 0;
+    if (idle < TALK_IDLE_MS) return;
+    idle = 0;
+    talked = 0;
+    talkHook?.close();
+  }
+
+  function show(step) {
+    shown = step;
+    root.dataset.coach = step;
+    const spec = STEPS[step];
+    spec.target?.()?.scrollIntoView({ block: "nearest", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+    coach.show(() => where(spec), { soft: spec.soft, tag: spec.tag });
+    said = spec.line?.() || "";
+    if (said) care.fx.say(said);
+  }
+
+  // Another line took the speech box mid-step (the farm's own news, say): once it has been read, the step's line comes back.
+  function keepLine() {
+    const intro = dialogBox.querySelector(".intro");
+    const now = (intro?.querySelector(".visually-hidden") || intro)?.textContent.trim() || "";
+    drift = said && now !== said && quiet() ? drift + TICK_MS : 0;
+    if (drift < LINE_BACK_MS) return;
+    drift = 0;
+    care.fx.say(said);
+  }
+
+  function hide() {
+    shown = null;
+    said = "";
+    delete root.dataset.coach;
+    coach.hide();
+  }
+
+  function finish(step) {
+    guide = m.finishStep(guide, step);
+    finished = performance.now();
+    if (step === "talk") talked = 1;
+    save();
+    if (shown) hide();
+  }
+
+  function end() {
+    guide = m.skipGuide(guide);
+    save();
+    hide();
+    window.clearTimeout(timer);
+    if (!hint || guide.done.includes("crop")) return;
+    try {
+      localStorage.removeItem(FARM_HINT);
+    } catch {
+      /* private mode */
+    }
+  }
+
+  function tick() {
+    if (!m.nextStep(guide, m.HOME_STEPS, { talk: Boolean(mic), night: night() }) && !m.nextStep(guide, m.FARM_STEPS)) return;
+    timer = window.setTimeout(tick, TICK_MS);
+    if (root.classList.contains("f-on") && !guide.done.includes("farm")) finish("farm");
+    settleTalk();
+    const step = current();
+    const spec = step && STEPS[step];
+    const spot = (spec?.target || spec?.rect) && !spec.skip?.();
+    if (!spec || blocked(spec) || (spot && !where(spec))) {
+      calm = 0;
+      if (shown) hide();
+      return;
+    }
+    if (shown === step) {
+      // A plushie harvest can do the lit step's job while it shows.
+      if (spec.skip?.()) finish(step);
+      else keepLine();
+      return;
+    }
+    calm = quiet() ? calm + TICK_MS : 0;
+    if (calm < CALM_MS) return;
+    calm = 0;
+    if (spec.skip?.()) {
+      finish(step);
+      return;
+    }
+    if (spot) {
+      show(step);
+      return;
+    }
+    // A line with no spotlight closes the tour.
+    care.fx.say(spec.line());
+    finish(step);
+  }
+
+  // While a step shows, only its target (and 건너뛰기) takes a touch; anything else bumps the ring. A soft wait takes none.
+  function guard(event) {
+    if (!shown || !event.isTrusted || coach.owns(event.target) || event.target.closest?.("[data-demo-hold]")) return;
+    const spec = STEPS[shown];
+    if (spec.soft) return;
+    if (spec.hits ? spec.hits(event) : [spec.target(), spec.also?.()].some((el) => el?.contains(event.target))) {
+      if (event.type === spec.done) finish(shown);
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.type === "pointerdown") coach.pulse();
+  }
+
+  let begun = false;
+  function begin() {
+    if (m.nextStep(guide, m.FARM_STEPS) && !guide.done.includes("crop")) {
+      try {
+        hint = localStorage.getItem(FARM_HINT) !== "1";
+        localStorage.setItem(FARM_HINT, "1");
+      } catch {
+        /* private mode */
+      }
+    }
+    window.clearTimeout(timer);
+    if (!begun) {
+      begun = true;
+      for (const type of ["pointerdown", "pointerup", "click", "dblclick", "contextmenu"]) window.addEventListener(type, guard, true);
+      window.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || !shown) return;
+        event.preventDefault();
+        event.stopPropagation();
+        end();
+      }, true);
+      coach.skipped(end);
+    }
+    tick();
+  }
+
+  // 가이드 다시 보기 in 우리 기록: this meet's record starts over at step 1, the farm tour on the next farm open.
+  function replay() {
+    closeSheet();
+    hide();
+    guide = m.startGuide(null, { named: true });
+    tapBase = farm?.tapped() || 0;
+    save();
+    begin();
+  }
+
+  import("/guide-model.js").then((model) => {
+    m = model;
+    key = m.guideKey(uid, met);
+    document.querySelector("[data-guide-replay]")?.addEventListener("click", replay);
+    const saved = load();
+    guide = m.startGuide(saved, { named });
+    if (!guide || guide.skipped) return;
+    if (!saved) forget();
+    save();
+    begin();
+  }, () => {});
+})();
 
 if (document.body.hasAttribute("data-wake")) {
   if (!prefersReducedMotion()) window.addEventListener("load", () => loadSfx(cryName()), { once: true });

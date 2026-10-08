@@ -114,7 +114,7 @@ test("without the mascot cookie the page fills an old row's animal, never a save
   assert.equal(ctx.row().kind, "sheep");
   const again = await ctx.request(`/t?uid=${A}&view=1`, { jar });
   assert.match(again.html, /<meta name="pet-kind" content="sheep">/);
-  assert.match(again.html, /<b class="st-animal" data-stat-animal>양<\/b>/);
+  assert.match(again.html, /<span data-stat-animal>양<\/span>/);
   assert.equal((await kind(ctx, jar, { kind: "horse" })).body.kind, "horse");
   const kept = await kind(ctx, jar, { kind: "sheep", fill: true });
   assert.deepEqual([kept.body.kind, kept.body.name, totals(kept.body.stats)], ["horse", "말", [50, 40, 70, 60]]);
