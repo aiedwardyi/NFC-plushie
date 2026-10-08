@@ -133,6 +133,21 @@ test("a 복수전 on offer pairs with 다음에 할래요, no ticket gives the p
   assert.equal(wins.page.closed, 1);
 });
 
+test("a 복수전 is offered only on a loss whose challenger can still be raced", async () => {
+  const GONE = { card: { ...LOST.card, id: "Gone12_-xyz0", name: "Dodo" }, held: false, at: 2, gone: true };
+  const some = newsPage({ reply: { ok: true, news: [GONE, LOST], line: "자리 비운 사이에 2번 도전받았어요! 다 졌어요", tickets: 3, tapped: true } });
+  some.room.show();
+  await some.answer();
+  assert.match(some.box.innerHTML, /\[Dodo 졌어요 still\]\[Pippo 졌어요\]/);
+  some.page.click({ target: { closest: (s) => (s === "[data-news-go]" ? {} : null) } });
+  assert.deepEqual(some.page.rematch, ["Pippo"]);
+  const none = newsPage({ reply: { ok: true, news: [GONE, HELD], line: "자리 비운 사이에 2번 도전받았어요! 1번 이겼어요", tickets: 3, tapped: true } });
+  none.room.show();
+  await none.answer();
+  assert.doesNotMatch(none.box.innerHTML, /data-news-go|data-news-card|다 썼어요|톡 해 주세요/);
+  assert.match(none.box.innerHTML, /<div class="news-acts"><button type="button" class="copy" data-news-done>다음에 할래요<\/button><\/div>/);
+});
+
 test("an empty inbox shows nothing, and a page without the owner's dock has no news at all", async () => {
   const empty = newsPage({ reply: { ok: true, news: [], line: "", tickets: 0, tapped: false } });
   empty.room.show();

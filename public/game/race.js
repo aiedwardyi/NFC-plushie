@@ -38,7 +38,7 @@ function cropOf(img) {
 export async function createRace(api) {
   // A retry's query reaches the parts too: a failed module import stays failed for its URL.
   const v = new URL(import.meta.url).search;
-  const [{ RACE, eta, newRace, picker, raceTap, stepRace }, { WORLD_ART, canvas, sprites }, { DEFAULT_KIND, KINDS, kindOf }, { makeStage, loadImage: image }, { boardHtml, cardHtml, cityPicker, esc, sayHtml, ticketPips }, { cityName }] = await Promise.all([import(`./race-model.js${v}`), import(`./race-art.js${v}`), import(`../kinds.js${v}`), import(`./stage.js${v}`), import(`./city.js${v}`), import(`../cities.js${v}`)]);
+  const [{ RACE, eta, newRace, picker, raceTap, stepRace }, { WORLD_ART, canvas, sprites }, { DEFAULT_KIND, KINDS, kindOf }, { makeStage, loadImage: image }, { avenge, boardHtml, cardHtml, cityPicker, esc, owed, sayHtml, ticketPips, townRivals }, { cityName }] = await Promise.all([import(`./race-model.js${v}`), import(`./race-art.js${v}`), import(`../kinds.js${v}`), import(`./stage.js${v}`), import(`./city.js${v}`), import(`../cities.js${v}`)]);
   const PETS = Object.fromEntries(KINDS.map((k) => [k.id, k.name]));
   const rivalName = () => (bout ? bout.foe.name : PETS[match.rival]);
   const P = window.PIXI;
@@ -660,7 +660,7 @@ export async function createRace(api) {
   let town = null;
   let ranks = null;
   let foe = null;
-  let revenge = null;
+  let gone = false;
   let bout = null;
   let chosen = "";
   let asking = false;
@@ -776,8 +776,7 @@ export async function createRace(api) {
     bout = null;
     $(".r-foe").hidden = true;
     agi = Math.max(0, Number(api.bonus?.("agi")) || 0);
-    $(".r-pick").innerHTML = `<p class="r-eyebrow">${venue}</p><h2>달리기 시합</h2>
-      ${api.city ? `<div class="r-places" role="tablist" aria-label="상대"><button type="button" role="tab" data-pane="kinds">친구들</button><button type="button" role="tab" data-pane="city">우리 동네</button></div>` : ""}
+    $(".r-pick").innerHTML = `<p class="r-eyebrow">${venue}</p><div class="r-title"><h2>달리기 시합</h2>${api.city ? `<div class="r-places" role="tablist" aria-label="상대"><button type="button" role="tab" data-pane="kinds">친구들</button><button type="button" role="tab" data-pane="city">우리 동네</button></div>` : ""}</div>
       <ul class="r-roster">${Object.keys(PETS).filter((p) => p !== own).map((p) => `<li><button type="button" data-rival="${p}"><img src="${px ? faceUrl(p, "canon", true) : `/game/art/race/${p}.webp?v=${ART_V}`}" alt=""><b>${PETS[p]}</b><small>Lv.${state[p]?.level || 1}</small></button></li>`).join("")}</ul>
       ${api.city ? '<div class="r-town"></div>' : ""}
       <p class="r-versus"></p>
@@ -856,7 +855,10 @@ export async function createRace(api) {
       town = roster || { failed: true };
       ranks = board?.board || null;
       const rivals = rosterOf();
+      const picked = foe;
       foe = rivals.find((r) => r.id === foe?.id) || rivals[0] || null;
+      // The rival picked before is on no list now: it left, was reset or joined again as a new card.
+      gone = Boolean(picked && town.city && foe?.id !== picked.id);
       if (phase !== "pick") return;
       paintTown();
       if (pane === "city" && foe) lane(foe.kind);
@@ -865,7 +867,7 @@ export async function createRace(api) {
   }
 
   // A 복수전 rival leads the roster, even one that has moved to another city since.
-  const rosterOf = () => (town?.city ? [...(revenge ? [revenge] : []), ...(town.rivals || []).filter((r) => r.id !== revenge?.id)] : []);
+  const rosterOf = () => townRivals(town);
 
   function paintTown() {
     const box = $(".r-town");
@@ -875,14 +877,15 @@ export async function createRace(api) {
     else if (!town.city) {
       box.innerHTML = `${voice("우리 동네를 골라 주세요! 같은 동네 친구들이랑 달리기 시합을 해요")}
         ${cityPicker(chosen)}
-        <p class="c-fine">다른 친구들한테는 이름, 동물, 등급, 레벨만 보여요. 우리 기록에서 언제든 바꾸거나 나갈 수 있어요.</p>`;
+        <p class="c-fine">다른 친구들한테는 이름, 동물, 등급, 레벨, 동네, 승리 수만 보여요. 우리 기록에서 언제든 바꾸거나 나갈 수 있어요.</p>`;
     } else {
       const rivals = rosterOf();
       const left = town.tickets || 0;
-      const line = !rivals.length ? `아직 ${cityName(town.city)}에는 우리뿐이에요. 친구들이 오면 여기서 만나요!`
+      const line = gone && left ? "앗, 그 친구는 지금 동네에 없어요!"
+        : !rivals.length ? `아직 ${cityName(town.city)}에는 우리뿐이에요. 친구들이 오면 여기서 만나요!`
         : left ? "" : api.city.ask(town.tapped);
       box.innerHTML = `<p class="c-head"><b>${cityName(town.city)}</b>${ticketPips(left)}<span>오늘 티켓 ${left}장</span></p>
-        ${rivals.length ? `<div class="c-row" role="group" aria-label="${cityName(town.city)} 친구들">${rivals.map((r) => cardHtml(r, { attrs: ` data-foe="${esc(r.id)}"`, tag: r === revenge ? "복수전" : "", pressed: false })).join("")}</div>` : ""}
+        ${rivals.length ? `<div class="c-row" role="group" aria-label="${cityName(town.city)} 친구들">${rivals.map((r) => cardHtml(r, { attrs: ` data-foe="${esc(r.id)}"`, tag: owed(town, r) ? "복수전" : "", pressed: false })).join("")}</div>` : ""}
         ${ranks ? boardHtml(ranks) : ""}
         ${line ? voice(line) : ""}`;
     }
@@ -907,7 +910,7 @@ export async function createRace(api) {
       : !town ? "잠시만요…"
       : town.failed ? "다시 해 볼래요"
       : !joined ? (chosen ? `${cityName(chosen)}에서 달릴래요` : "동네를 골라 주세요")
-      : `${foe === revenge ? "복수전" : "도전하기"} · 티켓 1장`;
+      : `${owed(town, foe) ? "복수전" : "도전하기"} · 티켓 1장`;
   }
 
   function chooseFoe(id) {
@@ -1203,6 +1206,7 @@ export async function createRace(api) {
       saved = reply || false;
       if (reply?.race) state = reply.race;
       if (bout && reply && town) Object.assign(town, { tickets: reply.tickets, tapped: reply.tapped, wins: reply.wins });
+      if (bout && reply && won && owed(town, bout.foe)) town = avenge(town, bout.foe.id);
       if (phase === "result") fillCard();
     }, () => { if (g === gen) { saved = false; if (phase === "result") fillCard(); } });
     // Reduced motion keeps the photo and drops only its slow-mo and flash.
@@ -1850,7 +1854,7 @@ export async function createRace(api) {
     own = next;
     match = picker(rival, (k) => loadFaces([k]));
     kindPick = lead ? back : rival;
-    revenge = rematch;
+    gone = false;
     if (rematch) {
       pane = "city";
       foe = rematch;

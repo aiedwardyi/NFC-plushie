@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { CITIES, CITY_IDS, cityName } from "../public/cities.js";
 import { RACE, cityLevel, newRace, raceTap, rivalTime, stepRace } from "../public/game/race-model.js";
@@ -102,6 +103,11 @@ test("other owners see a clean name, else the animal's", () => {
   assert.equal(shownName(null, "unicorn"), "말");
 });
 
+test("the filter knows ㅄ, ㅆ발, ㅗ and a few more, and reads Cyrillic or Greek look-alikes as Latin", () => {
+  for (const name of ["ㅄ", "ㅆ발", "ㅅ발", "씹", "ㅗ", "fck", "phuck", "Hitler", "n a z i", "fu\u0441k", "FU\u0421K", "\u0455h\u0456t", "\u039D\u0391Z\u0399", "f\u03C5ck", "\u0430\u0455\u0455h\u043El\u0435"]) assert.equal(shownName(name, "dog"), "강아지", name);
+  for (const name of ["\u0422\u043E\u0448\u0430", "\u03A9mega", "보리"]) assert.equal(shownName(name, "dog"), name);
+});
+
 test("the pet tells its away races in plain numbers", () => {
   const held = { held: true };
   const lost = { held: false };
@@ -155,4 +161,24 @@ test("the strongest city rival is still beaten by fast taps alone", () => {
     stepRace(race, 1 / 240);
   }
   assert.ok(race.finish[0] < race.finish[1]);
+});
+
+test("the race leads with the 복수전 the server still owes and tags only those, whatever the news held", async () => {
+  const { avenge, owed, townRivals } = await import("../public/game/city.js");
+  const card = (id, name) => ({ id, name, kind: "dog", edition: "classic", level: 2, city: "seoul" });
+  const [pippo, coco, dodo] = [card("Pippo0000000", "Pippo"), card("Coco00000000", "Coco"), card("Dodo00000000", "Dodo")];
+  const town = { city: "seoul", revenge: [pippo], rivals: [coco, dodo] };
+  assert.deepEqual(townRivals(town).map((r) => r.name), ["Pippo", "Coco", "Dodo"]);
+  assert.deepEqual([pippo, coco, dodo, null].map((r) => owed(town, r)), [true, false, false, false]);
+  const won = avenge(town, pippo.id);
+  assert.deepEqual([townRivals(won).map((r) => r.name), owed(won, pippo), owed(town, pippo)], [["Pippo", "Coco", "Dodo"], false, true]);
+  const reloaded = { ...town, revenge: [], rivals: [coco, dodo, pippo] };
+  assert.deepEqual([townRivals(reloaded).map((r) => r.name), owed(reloaded, pippo)], [["Coco", "Dodo", "Pippo"], false]);
+  assert.deepEqual(townRivals({ city: "seoul", rivals: [coco] }).map((r) => r.name), ["Coco"]);
+  assert.deepEqual([townRivals({ city: null, revenge: [], rivals: [] }), townRivals(null)], [[], []]);
+});
+
+test("the 우리 동네 fine print names everything other owners see", () => {
+  const race = readFileSync(new URL("../public/game/race.js", import.meta.url), "utf8");
+  assert.match(race, /<p class="c-fine">다른 친구들한테는 이름, 동물, 등급, 레벨, 동네, 승리 수만 보여요\. 우리 기록에서 언제든 바꾸거나 나갈 수 있어요\.<\/p>/);
 });

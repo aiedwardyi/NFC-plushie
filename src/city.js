@@ -4,15 +4,15 @@ import { PET, seoulDayKey } from "./pet.js";
 
 const DAY = 24 * 60 * 60 * 1000;
 
-// tickets: what the day's first plushie tap gives; inbox: records kept per defender; boardMin: joined pets before a city ranks.
-export const CITY = { tickets: 3, inbox: 20, boardMin: 5, board: 3, roster: 30, matchMs: 10 * 60 * 1000 };
+// tickets: what the day's first plushie tap gives; inbox: records kept per defender; boardMin: joined pets before a city ranks; revengeMs: how long a loss is owed a 복수전.
+export const CITY = { tickets: 3, inbox: 20, boardMin: 5, board: 3, roster: 30, matchMs: 10 * 60 * 1000, revengeMs: 7 * DAY };
 
 export const cityPid = () => randomBytes(9).toString("base64url");
 export const matchId = () => randomBytes(12).toString("base64url");
 export const validPid = (id) => typeof id === "string" && /^[A-Za-z0-9_-]{12}$/.test(id);
 export const validMatch = (id) => typeof id === "string" && /^[A-Za-z0-9_-]{16}$/.test(id);
 
-// Picking a city: a move keeps the public id, a pet joining again gets a new one; this week's wins stay with the city that saw them.
+// Picking a city: a move keeps the public id and starts this week's wins over; a pet joining again gets a new id.
 export function joinCity(state, city, pid) {
   return state.city === city ? null : { city, cityPid: state.cityPid || pid, cityWeek: null, cityWins: null };
 }
@@ -26,7 +26,7 @@ export function ticketsLeft(state, now) {
   return state.cityDay === seoulDayKey(now) ? state.cityTickets : 0;
 }
 
-// The day's first rewarded tap fills the day's tickets; unused ones end with the Seoul day.
+// The day's first real plushie tap fills the day's tickets, XP or not; unused ones end with the Seoul day.
 export function dayTickets(now) {
   return { cityDay: seoulDayKey(now), cityTickets: CITY.tickets };
 }
@@ -59,19 +59,25 @@ export function matchRefusal(match, uid, now) {
 
 export const boardShown = (joined) => joined >= CITY.boardMin;
 
-// Folds look-alikes so 씨 발, f.u.c.k and ｆｕｃｋ all read the same; anything that isn't a letter goes.
+// Folds look-alikes so 씨 발, f.u.c.k, ｆｕｃｋ and a fuck spelled in Cyrillic all read the same; anything that isn't a letter goes.
 const LEET = { 0: "o", 1: "i", 3: "e", 4: "a", 5: "s", 7: "t", "@": "a", $: "s", "!": "i" };
-const fold = (text) => String(text).normalize("NFKC").toLowerCase().replace(/[013457@$!]/g, (c) => LEET[c]).replace(/[^\p{L}]/gu, "");
+// Cyrillic, then Greek letters that look Latin, small then capital: a Greek capital nu reads n where its small nu reads v.
+const LOOKS = Object.fromEntries([..."\u0430\u0432\u0441\u0435\u04BB\u0456\u0458\u043A\u043C\u043D\u043E\u0440\u0455\u0442\u0443\u0445\u0410\u0412\u0421\u0415\u04BA\u0406\u0408\u041A\u041C\u041D\u041E\u0420\u0405\u0422\u0423\u0425\u03B1\u03B5\u03B9\u03BA\u03BD\u03BF\u03C1\u03C4\u03C5\u03C7\u0391\u0395\u0399\u039A\u039D\u039F\u03A1\u03A4\u03A5\u03A7"].map((c, i) => [c, "abcehijkmhopstyxabcehijkmhopstyxaeikvoptuxaeiknoptyx"[i]]));
+const fold = (text) => String(text).normalize("NFKC").replace(/[\u0370-\u04FF]/g, (c) => LOOKS[c] || c).toLowerCase().replace(/[013457@$!]/g, (c) => LEET[c]).replace(/[^\p{L}]/gu, "");
 const BAD_WORDS = [
-  "시발", "씨발", "씨빨", "시빨", "씨팔", "시팔", "씨바", "ㅅㅂ", "ㅆㅂ", "병신", "븅신", "ㅂㅅ", "개새끼", "개새기", "개색기", "새끼", "좆", "존나", "ㅈㄴ",
+  "시발", "씨발", "씨빨", "시빨", "씨팔", "시팔", "씨바", "ㅅㅂ", "ㅆㅂ", "ㅆ발", "ㅅ발", "병신", "븅신", "ㅂㅅ", "ㅄ", "씹", "ㅗ", "개새끼", "개새기", "개색기", "새끼", "좆", "존나", "ㅈㄴ",
   "지랄", "ㅈㄹ", "미친놈", "미친년", "또라이", "꺼져", "닥쳐", "엿먹", "썅", "쌍년", "쌍놈", "걸레", "창녀", "니애미", "느금", "섹스", "야동", "보지", "자지",
-  "fuck", "fuk", "fvck", "shit", "bitch", "cunt", "dick", "pussy", "asshole", "bastard", "slut", "whore", "nigger", "nigga", "faggot", "retard", "porn", "penis", "vagina", "sex",
+  "fuck", "fuk", "fvck", "fck", "phuck", "shit", "bitch", "cunt", "dick", "pussy", "asshole", "bastard", "slut", "whore", "nigger", "nigga", "faggot", "retard", "porn", "penis", "vagina", "sex", "hitler", "nazi",
 ].map(fold);
+
+// Bidi controls draw a name in another order than it's stored, so a reversed bad word would read right on others' screens.
+export const noBidi = (text) => String(text).replace(/[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "");
 
 // The name other owners see: a bad word anywhere in it shows the animal's name instead.
 export function shownName(name, kind) {
-  const folded = fold(name || "");
-  return folded && !BAD_WORDS.some((word) => folded.includes(word)) ? String(name) : kindOf(kind).name;
+  const plain = noBidi(name || "");
+  const folded = fold(plain);
+  return folded && !BAD_WORDS.some((word) => folded.includes(word)) ? plain : kindOf(kind).name;
 }
 
 // What the pet says about the races run against it while its owner was away.

@@ -4042,9 +4042,10 @@ html[data-theme="najeon"] .talk-bar {
 .r-clock { width: max-content; margin: 10px 0 0; font-variant-numeric: tabular-nums; line-height: 1; text-shadow: 0 2px 6px rgba(0, 0, 0, .35); contain: layout paint; }
 .r-clock b { font-size: 30px; font-weight: 900; letter-spacing: -.02em; }
 .r-clock small { display: inline; margin: 0 0 0 2px; font-size: 14px; font-weight: 800; }
-.r-lv { position: absolute; right: 0; top: 34px; margin: 0; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; background: rgba(16, 18, 40, .4); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .3); }
+/* A 24-character name ends in an ellipsis: the label before the race clock, the tag before the screen's edge. */
+.r-lv { position: absolute; right: 0; top: 34px; max-width: calc(100% - 116px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; background: rgba(16, 18, 40, .4); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .3); }
 .r-tag {
-  position: absolute; z-index: 2; margin: 0; padding: 4px 10px; border-radius: 999px; white-space: nowrap; pointer-events: none;
+  position: absolute; z-index: 2; max-width: 70%; overflow: hidden; text-overflow: ellipsis; margin: 0; padding: 4px 10px; border-radius: 999px; white-space: nowrap; pointer-events: none;
   font-size: 12px; font-weight: 900; color: var(--g-accent-ink); background: var(--g-accent); box-shadow: 0 4px 12px rgba(0, 0, 0, .25); translate: -50% -100%;
 }
 .r-tag.is-rival { background: var(--g-card); color: var(--g-card-ink); }
@@ -4153,8 +4154,10 @@ html[data-theme="najeon"] .talk-bar {
 }
 
 /* 우리 동네: the race picker's other pane, rival cards as the plushie showroom, 우리 동네 소식 and its row in 우리 기록 */
-.r-places { display: flex; gap: 4px; margin: -4px 0 10px; padding: 3px; border-radius: 999px; background: rgba(var(--g-aura), .2); }
-.r-places button { flex: 1; min-height: 32px; margin: 0; padding: 0; border: 0; border-radius: 999px; font-size: 14px !important; font-weight: 800; background: none; color: inherit; box-shadow: none; opacity: .7; }
+/* The tabs share the title's row, so the sheet is no taller than without them and the pair keeps its place above it. */
+.r-title { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 0 10px; }
+.r-places { display: flex; gap: 2px; margin: 0; padding: 2px; border-radius: 999px; background: rgba(var(--g-aura), .2); }
+.r-places button { flex: none; width: auto; min-height: 28px; margin: 0; padding: 0 10px; border: 0; border-radius: 999px; font-size: 14px !important; font-weight: 800; background: none; color: inherit; box-shadow: none; opacity: .7; }
 .r-places [aria-selected="true"] { background: var(--g-accent); color: var(--g-accent-ink); opacity: 1; box-shadow: 0 2px 0 rgba(0, 0, 0, .15); }
 .r-town { min-height: 132px; }
 .c-wait { margin: 50px 0 0; font-size: 13px; font-weight: 700; opacity: .6; }

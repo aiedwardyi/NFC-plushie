@@ -36,5 +36,11 @@ export function boardHtml(best) {
   return `<div class="c-best"><b class="c-week">이번 주</b><ol aria-label="이번 주 우리 동네 순위">${rows}</ol></div>`;
 }
 
+// The town's rivals to pick from, the 복수전 the server still owes first; a news card alone never makes one.
+export const townRivals = (town) => (town?.city ? [...(town.revenge || []), ...(town.rivals || [])] : []);
+export const owed = (town, card) => Boolean(card && town?.revenge?.some((r) => r.id === card.id));
+// A won 복수전 is settled: its rival stays in town untagged, as the server's next roster will have it.
+export const avenge = (town, id) => ({ ...town, revenge: town.revenge.filter((r) => r.id !== id), rivals: [...town.revenge.filter((r) => r.id === id), ...(town.rivals || [])] });
+
 // The pet's own line, under its name like the home's dialog.
 export const sayHtml = (name, line) => `<p class="c-say"><b>${esc(name)}</b>${esc(line)}</p>`;

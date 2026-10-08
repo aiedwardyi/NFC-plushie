@@ -4531,7 +4531,7 @@ if (townRow && recoveryDock) {
 
   syncTown = (city) => {
     townRow.dataset.city = city || "";
-    const chip = picker.querySelector(`[data-city="${city}"]`);
+    const chip = city ? picker.querySelector(`[data-city="${city}"]`) : null;
     name.textContent = chip?.textContent || "아직 없어요";
     change.textContent = city ? "동네 바꾸기" : "동네 고르기";
     leave.hidden = !city;
@@ -4594,17 +4594,18 @@ const news = (function townNews() {
   let news = null;
   let foe = null;
 
-  // A 복수전 is on offer against a challenger who won, while a ticket is left; all wins get one cheer, no tickets the pet's line.
+  // A 복수전 is on offer against a challenger who won and can still be raced, while a ticket is left; all wins get one cheer, no tickets the pet's line.
   function fill(reply, { cardHtml, sayHtml }) {
     const lost = reply.news.filter((n) => !n.held);
-    const offer = lost.length > 0 && reply.tickets > 0;
-    foe = offer ? lost[0].card : null;
-    const cards = reply.news.map((n, i) => cardHtml(n.card, offer && !n.held ? { tag: "졌어요", attrs: ` data-news-card="${i}"`, pressed: n.card === foe } : { tag: n.held ? "이겼어요" : "졌어요", still: true }));
+    const open = lost.filter((n) => !n.gone);
+    const offer = open.length > 0 && reply.tickets > 0;
+    foe = offer ? open[0].card : null;
+    const cards = reply.news.map((n, i) => cardHtml(n.card, offer && !n.held && !n.gone ? { tag: "졌어요", attrs: ` data-news-card="${i}"`, pressed: n.card === foe } : { tag: n.held ? "이겼어요" : "졌어요", still: true }));
     const acts = !lost.length ? '<button type="button" class="copy is-go" data-news-done>잘했어요!</button>'
       : `${offer ? '<button type="button" class="copy is-go" data-news-go>복수전 · 티켓 1장</button>' : ""}<button type="button" class="copy" data-news-done>다음에 할래요</button>`;
     box.innerHTML = `${sayHtml(name, reply.line)}
       <div class="c-row news-row">${cards.join("")}</div>
-      ${lost.length && !offer ? sayHtml(name, ticketLine(reply.tapped)) : ""}
+      ${open.length && !offer ? sayHtml(name, ticketLine(reply.tapped)) : ""}
       <div class="news-acts">${acts}</div>`;
     box.addEventListener("click", (event) => {
       const card = event.target.closest("[data-news-card]");

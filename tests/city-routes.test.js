@@ -117,7 +117,7 @@ test("leaving takes the pet off its city, and a pet that joins again is a new ca
   assert.equal((await city(ctx, "/city/leave", jar, { uid: "bad" })).status, 400);
   assert.equal((await city(ctx, "/city/leave", other, { uid: A })).status, 403);
   assert.equal((await city(ctx, "/city/leave", {}, { uid: A })).status, 403);
-  assert.deepEqual((await city(ctx, "/city/leave", jar, { uid: A })).body, { ok: true });
+  assert.deepEqual((await city(ctx, "/city/leave", jar, { uid: A })).body, { ok: true, city: null });
   assert.deepEqual([ctx.row().city, ctx.row().city_pid], [null, null]);
   assert.deepEqual((await city(ctx, "/city/roster", other, { uid: B })).body.rivals, []);
   const mine = (await city(ctx, "/city/roster", jar, { uid: A })).body;
@@ -155,7 +155,7 @@ test("the roster shows the city's other joined pets by their public cards, close
   assert.deepEqual([none.ok, none.city, none.rivals, none.tickets, none.tapped], [true, null, [], 0, false]);
 });
 
-test("the day's first rewarded plushie tap gives 3 tickets; a view reload or a later tap gives none", async (t) => {
+test("the day's first plushie tap gives 3 tickets; a view reload or a later tap gives none", async (t) => {
   const ctx = await setup(t);
   const jar = await meet(ctx, A);
   const other = await meet(ctx, B, "Pippo");
@@ -177,6 +177,69 @@ test("the day's first rewarded plushie tap gives 3 tickets; a view reload or a l
   assert.deepEqual([(await town()).tickets, (await town()).tapped], [0, false]);
   await tap(ctx, jar, A);
   assert.deepEqual([(await town()).tickets, (await town()).tapped], [3, true]);
+});
+
+test("a row from before tickets gets 3 on its next real tap, once; a stale replay or a view reload gives none", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A);
+  const other = await meet(ctx, B, "Pippo");
+  await joinAs(ctx, other, B);
+  const town = async () => { const r = await took(ctx, "/city/roster", jar, { uid: A }); return [r.tickets, r.tapped]; };
+  await ctx.request(`/t?uid=${A}x000005`, { jar });
+  ctx.db.prepare("UPDATE plushies SET city_day = NULL, city_tickets = NULL WHERE uid = ?").run(A);
+  await ctx.request(`/t?uid=${A}x000005`, { jar });
+  await ctx.request(`/t?uid=${A}x000005&view=1`, { jar });
+  assert.deepEqual(await town(), [0, false]);
+  ctx.advance(31 * MIN);
+  await ctx.request(`/t?uid=${A}x000006`, { jar });
+  assert.deepEqual([...(await town()), ctx.row().reward_day_count], [3, true, 2]);
+  await joinAs(ctx, jar, A);
+  await race(ctx, jar, A, B);
+  await race(ctx, jar, A, B);
+  ctx.advance(31 * MIN);
+  await ctx.request(`/t?uid=${A}x000007`, { jar });
+  assert.deepEqual([...(await town()), ctx.row().reward_day_count], [1, true, 3]);
+});
+
+test("the open page's tap fills the day's tickets like /t", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A);
+  await tap(ctx, jar, A);
+  ctx.db.prepare("UPDATE plushies SET city_day = NULL, city_tickets = NULL WHERE uid = ?").run(A);
+  ctx.advance(31 * MIN);
+  const res = await took(ctx, "/combo", jar, { uid: A, start: true });
+  assert.deepEqual([res.combo, res.rewarded], [1, true]);
+  assert.deepEqual([ctx.row().city_day, ctx.row().city_tickets], ["2026-05-01", 3]);
+});
+
+test("a cooldown tap just after midnight, or a tap chain running past it, gives the new day's tickets", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A);
+  ctx.advance(13 * 60 * MIN + 40 * MIN);
+  await tap(ctx, jar, A);
+  const night = ctx.now();
+  ctx.advance(20 * MIN + 30 * 1000);
+  await tap(ctx, jar, A);
+  assert.deepEqual([ctx.row().last_rewarded_at, ctx.row().city_day, ctx.row().city_tickets], [night, "2026-05-02", 3]);
+  const late = await setup(t);
+  const owner = await meet(late, A);
+  late.advance(14 * 60 * MIN - 5 * 1000);
+  await tap(late, owner, A);
+  late.advance(10 * 1000);
+  assert.equal((await took(late, "/combo", owner, { uid: A })).combo, 2);
+  assert.deepEqual([late.row().city_day, late.row().city_tickets], ["2026-05-02", 3]);
+});
+
+test("after care-reset a real tap the same day gives 3 tickets again", async (t) => {
+  const ctx = await setup(t, { demoUids: [A] });
+  const jar = await meet(ctx, A);
+  await tap(ctx, jar, A);
+  await ctx.request("/demo/care-reset", { jar, body: { uid: A } });
+  await tap(ctx, jar, A);
+  assert.deepEqual([ctx.row().city_day, ctx.row().city_tickets], [null, null]);
+  ctx.advance(MIN);
+  await tap(ctx, jar, A);
+  assert.deepEqual([ctx.row().city_day, ctx.row().city_tickets], ["2026-05-01", 3]);
 });
 
 test("a challenge spends a ticket and issues a match with the rival running on its own numbers", async (t) => {
@@ -268,7 +331,7 @@ test("the defender hears of its away races once, newest first, and keeps its new
   await result(ctx, jar, A, await matchOf(ctx, jar, A, B), false);
   assert.equal((await city(ctx, "/city/inbox", jar, { uid: B })).status, 403);
   const news = (await city(ctx, "/city/inbox", other, { uid: B })).body;
-  assert.deepEqual(news.news, [{ card, held: true, at: T0 + MIN }, { card, held: false, at: T0 }]);
+  assert.deepEqual(news.news, [{ card, held: true, at: T0 + MIN, gone: false }, { card, held: false, at: T0, gone: false }]);
   assert.equal(news.line, "자리 비운 사이에 2번 도전받았어요! 1번 이겼어요");
   assert.deepEqual((await city(ctx, "/city/inbox", other, { uid: B })).body.news, []);
   ctx.db.prepare("UPDATE plushies SET city_tickets = 30 WHERE uid = ?").run(A);
@@ -280,6 +343,84 @@ test("the defender hears of its away races once, newest first, and keeps its new
   assert.equal(kept.length, 20);
   assert.equal(kept.at(-1).done_at, T0 + 4 * MIN);
   assert.equal((await city(ctx, "/city/inbox", other, { uid: B })).body.news.length, 20);
+});
+
+test("a 복수전 is against a challenger that beat the pet in the last 7 days until the pet beats it in a race of its own, on the card it still holds", async (t) => {
+  const G = "04ABABABABABAB";
+  const ctx = await setup(t, { demoUids: [G] });
+  const jars = { [A]: await meet(ctx, A) };
+  for (const [uid, name] of [[B, "Pippo"], [C, "Coco"], [D, "Dodo"], [E, "Evi"], [F, "Fifi"], [G, "Gigi"]]) jars[uid] = await meet(ctx, uid, name);
+  for (const uid of [A, B, C, D, E, F, G]) {
+    await tap(ctx, jars[uid], uid);
+    await joinAs(ctx, jars[uid], uid);
+  }
+  for (const uid of [F, B, C, D, G, E]) {
+    ctx.advance(MIN);
+    await result(ctx, jars[uid], uid, await matchOf(ctx, jars[uid], uid, A), uid !== C);
+  }
+  ctx.db.prepare("UPDATE city_matches SET done_at = done_at - 8 * 24 * 60 * 60 * 1000 WHERE challenger = ?").run(F);
+  await city(ctx, "/city/leave", jars[D], { uid: D });
+  await ctx.request("/demo/care-reset", { jar: jars[G], body: { uid: G } });
+  await joinAs(ctx, jars[E], E, "busan");
+  const town = () => took(ctx, "/city/roster", jars[A], { uid: A });
+  let mine = await town();
+  assert.deepEqual(mine.revenge.map((r) => [r.name, r.city, r.id]), [["Evi", "busan", pidOf(ctx, E)], ["Pippo", "seoul", pidOf(ctx, B)]]);
+  assert.deepEqual(Object.keys(mine.revenge[0]).sort(), ["city", "edition", "id", "kind", "level", "name"]);
+  assert.deepEqual(mine.rivals.map((r) => r.name).sort(), ["Coco", "Fifi"]);
+  // A pet that joins again is a new card, so the old loss stays behind.
+  await joinAs(ctx, jars[D], D);
+  mine = await town();
+  assert.deepEqual([mine.revenge.map((r) => r.name), mine.rivals.map((r) => r.name).sort()], [["Evi", "Pippo"], ["Coco", "Dodo", "Fifi"]]);
+  ctx.advance(MIN);
+  await result(ctx, jars[A], A, await matchOf(ctx, jars[A], A, B), false);
+  assert.deepEqual((await town()).revenge.map((r) => r.name), ["Evi", "Pippo"]);
+  ctx.advance(MIN);
+  await result(ctx, jars[A], A, await matchOf(ctx, jars[A], A, B), true);
+  mine = await town();
+  assert.deepEqual([mine.revenge.map((r) => r.name), mine.rivals.map((r) => r.name).sort()], [["Evi"], ["Coco", "Dodo", "Fifi", "Pippo"]]);
+  // A defense held by the pet's bot leaves it owed; a race it runs and wins settles it.
+  ctx.advance(MIN);
+  await result(ctx, jars[E], E, await matchOf(ctx, jars[E], E, A), false);
+  assert.deepEqual((await town()).revenge.map((r) => r.name), ["Evi"]);
+  ctx.advance(MIN);
+  await result(ctx, jars[A], A, await matchOf(ctx, jars[A], A, E), true);
+  assert.deepEqual((await town()).revenge, []);
+  const away = (await took(ctx, "/city/roster", jars[D], { uid: D })).revenge;
+  assert.deepEqual(away, []);
+});
+
+test("the news marks each card whose challenger can't be raced any more", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A);
+  const pets = { [B]: await meet(ctx, B, "Pippo"), [C]: await meet(ctx, C, "Coco"), [D]: await meet(ctx, D, "Dodo") };
+  await joinAs(ctx, jar, A);
+  for (const uid of [B, C, D]) {
+    await tap(ctx, pets[uid], uid);
+    await joinAs(ctx, pets[uid], uid);
+    await result(ctx, pets[uid], uid, await matchOf(ctx, pets[uid], uid, A), uid !== D);
+    ctx.advance(MIN);
+  }
+  await joinAs(ctx, pets[B], B, "busan");
+  await city(ctx, "/city/leave", pets[C], { uid: C });
+  await city(ctx, "/city/leave", pets[D], { uid: D });
+  const news = (await took(ctx, "/city/inbox", jar, { uid: A })).news;
+  assert.deepEqual(news.map((n) => [n.card.name, n.held, n.gone]), [["Dodo", true, true], ["Coco", false, true], ["Pippo", false, false]]);
+});
+
+test("a name loses its bidi controls on the way in, and other owners never get one", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "\u202Ekcuf");
+  const other = await meet(ctx, B, "Pippo");
+  await joinAs(ctx, jar, A);
+  await joinAs(ctx, other, B);
+  const bidi = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/;
+  assert.equal(ctx.row().pet_name, "kcuf");
+  assert.doesNotMatch((await took(ctx, "/city/roster", other, { uid: B })).rivals[0].name, bidi);
+  ctx.db.prepare("UPDATE plushies SET pet_name = ? WHERE uid = ?").run("\u2067Mo\u200Fchi\u061C\u2069", A);
+  assert.equal((await took(ctx, "/city/roster", other, { uid: B })).rivals[0].name, "Mochi");
+  const only = await ctx.request("/name", { jar, body: { uid: A, name: " \u202E\u200F\u2066 " } });
+  assert.equal(only.status, 400);
+  assert.match(only.html, /이름은 1글자에서 24글자 사이로 지어주세요/);
 });
 
 test("a city ranks this week's wins only once it has 5 joined pets", async (t) => {
