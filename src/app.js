@@ -13,6 +13,7 @@ import { ARCADE, applyPlay, applyRace, raceState, xpPlaysLeft } from "./arcade.j
 import { FARM, addGiftSeeds, buySeed, farmDot, farmView, feedCrop, giftSeeds, harvestFarm, nextRipeAt, openFarm, parseFarm, pickPlot, ripenFarm, sendCrops } from "./farm.js";
 import { KIND_CSS, awayLine, devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
 import { mountTalk, purgeTalk, takeQuestion } from "./chat.js";
+import { mountDiag } from "./diag.js";
 import { EDITIONS, STAT_KEYS, editionOf, parseStats, setBoost, statSheet, train, useBoost } from "./stats.js";
 
 const cookieAge = 400 * 24 * 60 * 60 * 1000;
@@ -89,7 +90,7 @@ function petState(row, t) {
   };
 }
 
-export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now, rng = Math.random, demoUids = parseDemoUids(process.env.DEMO_UIDS), openUids = parseDemoUids(process.env.OPEN_UIDS), guestUids = parseDemoUids(process.env.GUEST_UIDS), rareUids = parseDemoUids(process.env.RARE_UIDS), legendaryUids = parseDemoUids(process.env.LEGENDARY_UIDS), talk = null }) {
+export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now, rng = Math.random, demoUids = parseDemoUids(process.env.DEMO_UIDS), openUids = parseDemoUids(process.env.OPEN_UIDS), guestUids = parseDemoUids(process.env.GUEST_UIDS), rareUids = parseDemoUids(process.env.RARE_UIDS), legendaryUids = parseDemoUids(process.env.LEGENDARY_UIDS), talk = null, diagKey = process.env.DIAG_KEY || "" }) {
   // Open pets let any browser in, but a new 안심 코드 still goes only to the browser holding the owner token.
   const owns = binding.canRename;
   const anyone = [...new Set([...openUids, ...guestUids])];
@@ -120,6 +121,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     req.theme = themeOf(req.cookies?.theme).id;
     next();
   });
+  // Ahead of the 4 KB parsers: a beacon batch is bigger, and it is answered 204 whatever it holds.
+  mountDiag(app, { db, key: diagKey, now });
   app.use(express.urlencoded({ extended: false, limit: "4kb" }));
   app.use(express.json({ limit: "4kb" }));
   app.use(express.static(fileURLToPath(new URL("../public", import.meta.url)), {
