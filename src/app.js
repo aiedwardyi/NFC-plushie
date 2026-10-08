@@ -148,7 +148,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     const from = `mascot-${DEFAULT_KIND}`;
     res.send = (body) => {
       if (typeof body === "string" && body.includes(from) && !body.includes('name="pet-kind"')) {
-        // Keep toggle and picker icons as they are; only rewrite pet frames outside them.
+        // Keep the admin picker's icons as they are; only rewrite pet frames outside it.
         const parts = body.split(/(<aside class="mascot-toggle"[\s\S]*?<\/aside>)/);
         body = parts
           .map((part) =>
@@ -382,6 +382,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     const serial = parsed.serial;
     const counter = parsed.counter;
     const demo = demoUids.includes(serial) ? serial : "";
+    // No browser ever holds a guest pet's token or code, so dropping it from GUEST_UIDS locks everyone out.
+    const guest = guestUids.includes(serial);
     const theme = req.theme;
     const result = db.transaction(() => {
       const row = getRow(serial);
@@ -390,8 +392,6 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const today = seoulDayKey(t);
       const stamp = new Date(t).toISOString();
       if (state === "NEW") {
-        // No browser ever holds a guest pet's token or code, so dropping it from GUEST_UIDS locks everyone out.
-        const guest = guestUids.includes(serial);
         const existing = req.cookies.owner_token;
         const token = !guest && typeof existing === "string" && existing ? existing : ownerToken();
         const code = recoveryCode();
@@ -426,7 +426,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           const skipped = getRow(serial);
           const asleep = view && Boolean(skipped.pet_name) && skipped.slept_at !== null;
           const pet = petView(skipped, petState(skipped, t), { rewarded: false }, t, { morning, asleep, view });
-          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found), theme, talk: talks(serial), card: cardOf(skipped, req) }) };
+          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found), theme, talk: talks(serial), guest, card: cardOf(skipped, req) }) };
         }
         if (!afterTap.pet_name) {
           raiseMirror();
@@ -466,7 +466,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         }
         // A follow-up waits for a visit with nothing to celebrate.
         const ask = talks(serial) && !visual && !morning && !visit && !away && combo <= 1 ? takeQuestion(db, serial, today) : "";
-        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo, visit, away, farmRow: visit ? getRow(serial) : fresh }), demo, found: parseFound(fresh.gift_found), theme, talk: talks(serial), ask, card: cardOf(getRow(serial), req) }) };
+        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo, visit, away, farmRow: visit ? getRow(serial) : fresh }), demo, found: parseFound(fresh.gift_found), theme, talk: talks(serial), ask, guest, card: cardOf(getRow(serial), req) }) };
       }
       if (state === "STRANGER") return { html: strangerPage(row, "", { demo, theme, card: cardOf(row, req) }) };
       throw new Error("Invalid binding result");
@@ -706,6 +706,21 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     }
     const demo = demoUids.includes(uid) ? uid : "";
     res.status(result.status).send(result.row ? strangerPage(result.row, result.message, { demo, theme: req.theme, card: cardOf(result.row, req) }) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>", { theme: req.theme }));
+  });
+
+  app.post("/recovery", (req, res) => {
+    const { uid } = req.body || {};
+    if (!validUid(uid)) return res.status(400).json({ ok: false });
+    const reply = db.transaction(() => {
+      const row = getRow(uid);
+      // A guest pet never gets a code, so dropping it from GUEST_UIDS still locks everyone out.
+      if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row.pet_name || guestUids.includes(uid)) return null;
+      const code = recoveryCode();
+      db.prepare("UPDATE plushies SET recovery_code_hash = ? WHERE uid = ?").run(hash(code), uid);
+      return { ok: true, code };
+    })();
+    if (!reply) return res.status(403).json({ ok: false });
+    res.json(reply);
   });
 
   if (demoUids.length) {

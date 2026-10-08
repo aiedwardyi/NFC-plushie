@@ -1,4 +1,4 @@
-/* Dad demo: the 말/양 corner toggle and the admin panel's 12 animals. Persist localStorage+cookie. binding.js untouched. */
+/* Dad demo: this browser's 말 or 양 from ?mascot=, and the admin panel's 12 animals. Persist localStorage+cookie. binding.js untouched. */
 (function mascotDemoToggle() {
   const KEY = "pokkey-mascot";
   const MAX_AGE = String(400 * 24 * 60 * 60);
@@ -24,14 +24,14 @@
   }
 
   function persist(kind) {
-    // A kind off the switch lives on the pet only, so this phone keeps its own 말 or 양.
+    // Only 말 or 양 is this phone's own; any other kind lives on the pet.
     if (KINDS.includes(kind)) {
       try { localStorage.setItem(KEY, kind); } catch (_) { /* ignore */ }
       try {
         document.cookie = "mascot=" + kind + ";path=/;max-age=" + MAX_AGE + ";samesite=lax";
       } catch (_) { /* ignore */ }
     }
-    // Drop sticky ?mascot= so it can't fight the toggle on the next read/navigation.
+    // Drop the one-time ?mascot= from the address; the choice now lives in localStorage and the cookie.
     try {
       const url = new URL(window.location.href);
       if (url.searchParams.has("mascot")) {
@@ -74,21 +74,21 @@
     window.setTimeout(() => pet.classList.remove("is-press"), 700);
   }
 
-  // The owner's own page also saves the animal on the server; anyone else's toggle stays in this browser.
-  function saveKind(next, fill = false) {
+  // Only the owner's own page saves the animal on the server; anyone else's stays in this browser.
+  function fillKind(next) {
     const dock = document.querySelector(".dock[data-care-uid]");
-    if (!dock || !document.querySelector("[data-mascot-toggle][data-owner]")) return;
+    if (!dock) return;
     fetch("/kind", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid: dock.dataset.careUid, kind: next, fill }),
+      body: JSON.stringify({ uid: dock.dataset.careUid, kind: next, fill: true }),
       credentials: "same-origin",
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((reply) => {
         if (!reply?.ok) return;
         // A fill keeps an animal another page saved meanwhile, so show that one.
-        if (fill && kind === next && reply.kind !== next) {
+        if (kind === next && reply.kind !== next) {
           kind = reply.kind;
           applyArt(kind);
         }
@@ -130,15 +130,12 @@
   if (KINDS.includes(choice)) persist(choice);
   applyArt(kind);
   // The server can't see localStorage, so the owner's page fills an unsaved pet's animal.
-  if (!document.querySelector('meta[name="pet-kind"]')) saveKind(kind, true);
+  if (!document.querySelector('meta[name="pet-kind"]')) fillKind(kind);
 
   let skipClick = false;
 
   function swapTo(btn) {
     const next = btn.getAttribute("data-mascot");
-    const picker = Boolean(btn.closest("[data-demo-switch]"));
-    if (!picker && !KINDS.includes(next)) return;
-    if (!picker) persist(next);
     if (next === kind) {
       bouncePet();
       return;
@@ -147,8 +144,7 @@
     kind = next;
     applyArt(kind); // swap FIRST so the squash is of the new pet
     bouncePet(); // same tick — one continuous motion
-    if (picker) saveDemoKind(kind, was);
-    else saveKind(kind);
+    saveDemoKind(kind, was);
   }
 
   function onPointerDown(event) {
@@ -473,6 +469,95 @@ copyButton?.addEventListener("click", async () => {
   }
 });
 
+/* 우리 기록's 안심 코드: a new code when the owner asks, shown only until the sheet closes and never kept by the browser. */
+const recovery = document.querySelector("[data-recovery]");
+const recoveryDock = document.querySelector(".dock[data-care-uid]");
+if (recovery && recoveryDock) {
+  const sheet = recovery.closest("[data-sheet]");
+  const [idle, confirming, shown, fail, ask, go, cancel, code, copy, share] = ["idle", "confirm", "shown", "fail", "ask", "go", "cancel", "code", "copy", "share"]
+    .map((name) => recovery.querySelector(`[data-recovery-${name}]`));
+  const copyLabel = copy.querySelector("span");
+  let copied = 0;
+
+  function step(state) {
+    idle.hidden = state !== "idle";
+    confirming.hidden = state !== "confirm";
+    shown.hidden = state !== "shown";
+  }
+
+  function forget() {
+    window.clearTimeout(copied);
+    code.textContent = "";
+    copy.classList.remove("is-done");
+    copyLabel.textContent = "복사";
+    fail.hidden = true;
+    step("idle");
+  }
+
+  ask.addEventListener("click", () => {
+    fail.hidden = true;
+    step("confirm");
+    go.focus();
+  });
+  cancel.addEventListener("click", () => {
+    step("idle");
+    ask.focus();
+  });
+  go.addEventListener("click", () => {
+    if (recovery.getAttribute("aria-busy") === "true") return;
+    recovery.setAttribute("aria-busy", "true");
+    go.disabled = true;
+    cancel.disabled = true;
+    fetch("/recovery", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: recoveryDock.dataset.careUid }),
+      credentials: "same-origin",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .catch(() => null)
+      .then((reply) => {
+        recovery.removeAttribute("aria-busy");
+        go.disabled = false;
+        cancel.disabled = false;
+        if (!reply?.ok || typeof reply.code !== "string") {
+          step("idle");
+          fail.hidden = false;
+          ask.focus();
+          return;
+        }
+        code.textContent = reply.code;
+        step("shown");
+        code.focus();
+      });
+  });
+  copy.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(code.textContent);
+    } catch (_) {
+      const range = document.createRange();
+      range.selectNodeContents(code);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      return;
+    }
+    copy.classList.add("is-done");
+    copyLabel.textContent = "복사했어요";
+    window.clearTimeout(copied);
+    copied = window.setTimeout(() => {
+      copy.classList.remove("is-done");
+      copyLabel.textContent = "복사";
+    }, 2000);
+  });
+  share.hidden = typeof navigator.share !== "function";
+  share.addEventListener("click", () => {
+    navigator.share({ text: code.textContent }).catch(() => {});
+  });
+  new MutationObserver(() => {
+    if (sheet.hidden) forget();
+  }).observe(sheet, { attributes: true, attributeFilter: ["hidden"] });
+}
 
 const CELEBRATE_COLORS = ["#d6a546", "#f1d68c", "#e8806b", "#f8f0e3", "#f4ded5", "#fff9f0"];
 const FRAME_MS = 1000 / 60;
@@ -1570,7 +1655,8 @@ function openSheet(id, opener) {
 
 function closeSheet() {
   const sheet = sheetOpen;
-  if (!sheet) return;
+  // A sheet waiting on the server stays up, so the reply lands where the owner can see it.
+  if (!sheet || sheet.querySelector('[aria-busy="true"]')) return;
   sheetOpen = null;
   sheet.classList.remove("is-open");
   document.body.classList.remove("has-sheet");
@@ -1596,7 +1682,7 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key !== "Tab") return;
-  const items = Array.from(sheetOpen.querySelectorAll("button, [href], input"));
+  const items = Array.from(sheetOpen.querySelectorAll("button, [href], input")).filter((el) => !el.disabled && el.getClientRects().length);
   if (!items.length) return;
   const first = items[0];
   const last = items[items.length - 1];
@@ -2879,11 +2965,6 @@ function recordRow(label) {
 // Level, XP bar and record sheet as a reload would draw them, with the bar's grow pulse.
 function paintLevel(r) {
   const left = r.xpSpan - r.xpInto;
-  const pin = document.querySelector(".level-pin");
-  if (pin) {
-    pin.textContent = `Lv. ${r.level}`;
-    pin.setAttribute("aria-label", `우리 기록, Lv. ${r.level}`);
-  }
   const badge = document.querySelector(".level-badge");
   if (badge) {
     badge.textContent = String(r.level);

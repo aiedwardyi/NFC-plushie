@@ -27,7 +27,7 @@
     var h = new Date().getHours();
     document.documentElement.setAttribute("data-time", h >= 5 && h < 11 ? "morning" : h >= 11 && h < 18 ? "day" : h >= 18 && h < 22 ? "evening" : "night");
     var KEY = "pokkey-mascot";
-    // The switch's kinds are listed on this script's own tag.
+    // The kinds a browser can keep as its own are listed on this script's own tag.
     var kinds = ((document.currentScript && document.currentScript.getAttribute("data-mascots")) || "").split(" ");
     var base = document.documentElement.getAttribute("data-mascot");
     var kind = base;
@@ -58,15 +58,9 @@
           imgs[i].setAttribute("src", src.split("mascot-" + base).join("mascot-" + kind));
         }
       }
-      var btns = document.querySelectorAll(".mascot-tog");
-      for (var j = 0; j < btns.length; j++) {
-        var on = btns[j].getAttribute("data-mascot") === kind;
-        btns[j].classList.toggle("is-active", on);
-        btns[j].setAttribute("aria-pressed", on ? "true" : "false");
-      }
     };
     swap();
-    // The pet and its toggle come after this script, so swap them as the parser adds them, before the first paint.
+    // The pet comes after this script, so swap its frames as the parser adds them, before the first paint.
     var parsing = new MutationObserver(swap);
     parsing.observe(document.documentElement, { childList: true, subtree: true });
     document.addEventListener("DOMContentLoaded", function () { parsing.disconnect(); });

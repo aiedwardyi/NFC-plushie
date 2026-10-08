@@ -137,7 +137,7 @@ test("an invalid theme cookie means classic everywhere", async (t) => {
 
 test("owner home has the 꾸미기 button and sheet with the current world pressed", async (t) => {
   const { home } = await named(t, "8bit");
-  assert.match(home.html, /<span class="topbar-end"><button type="button" class="theme-btn" data-open="theme" aria-haspopup="dialog" aria-label="꾸미기">[\s\S]*?<\/button><button type="button" class="level-pin" data-open="record" aria-haspopup="dialog" aria-label="우리 기록, Lv\. 1">Lv\. 1<\/button><\/span>/);
+  assert.match(home.html, /<span class="topbar-end"><button type="button" class="theme-btn" data-open="theme" aria-haspopup="dialog" aria-label="꾸미기">[\s\S]*?<\/button><button type="button" class="level-pin" data-open="record" aria-haspopup="dialog" aria-label="우리 기록, 함께한 지 1일"><svg [^>]*>[\s\S]*?<\/svg>1일<\/button><\/span>/);
   assert.match(home.html, /<div class="sheet" data-sheet="theme" role="dialog" aria-modal="true" aria-labelledby="sheet-theme-title" hidden>/);
   assert.match(home.html, /<h2 id="sheet-theme-title">꾸미기<\/h2>/);
   assert.match(home.html, /<p class="theme-lede">어떤 세상에서 놀까요\?<\/p>/);

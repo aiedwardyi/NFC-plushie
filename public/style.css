@@ -115,11 +115,12 @@ main::before {
 p { line-height: 1.6; margin: 0; }
 h1, h2 { margin: 0; }
 
-/* Top bar: wordmark, demo switch, enamel level pin */
+/* Top bar: wordmark, then 꾸미기 and the enamel days pin */
 .topbar {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr auto;
   align-items: center;
+  column-gap: 8px;
   min-height: 52px;
 }
 .wordmark {
@@ -132,16 +133,21 @@ h1, h2 { margin: 0; }
 .level-pin {
   position: relative;
   justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   width: auto;
-  min-height: 0;
+  height: 40px;
+  min-height: 40px;
   margin: 0;
   border: 0;
-  padding: 5px 12px;
+  padding: 0 14px 0 12px;
   border-radius: 999px;
   background: linear-gradient(180deg, #27324d, var(--navy2) 70%);
   color: var(--gold-light);
-  font-size: .8125rem;
+  font-size: .875rem;
   font-weight: 800;
+  line-height: 1;
   letter-spacing: .02em;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -152,11 +158,18 @@ h1, h2 { margin: 0; }
     inset 0 -2px 0 rgba(0, 0, 0, 0.3),
     0 4px 8px rgba(0, 0, 0, 0.4);
 }
+.level-pin svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: var(--coral);
+  filter: drop-shadow(0 1px 0 #b4503d);
+}
 .level-pin::after {
   content: "";
   position: absolute;
-  top: 3px;
-  left: 8px;
+  top: 5px;
+  left: 13px;
   width: 9px;
   height: 3px;
   border-radius: 999px;
@@ -195,11 +208,10 @@ h1, h2 { margin: 0; }
 }
 html:not(.has-app) .theme-btn { display: none; }
 @media (max-width: 380px) {
-  .is-home .topbar { grid-template-columns: auto 1fr auto; column-gap: 8px; }
-  .is-home .mascot-toggle { justify-self: center; }
   .topbar-end { gap: 6px; }
   .topbar .theme-btn { width: 36px; height: 36px; min-height: 36px; }
   .topbar .theme-btn .swatch { width: 20px; height: 20px; }
+  .topbar .level-pin { height: 36px; min-height: 36px; padding: 0 12px 0 10px; }
 }
 
 /* Nameplate */
@@ -1115,11 +1127,34 @@ a { color: var(--gold-light); }
   stroke-width: 1.8;
   stroke-linejoin: round;
 }
-.copy.is-done {
+.copy.is-done,
+.copy.is-go {
   background: var(--gold);
   color: var(--navy);
   box-shadow: none;
 }
+
+/* 우리 기록: the same key card hands out a new code */
+.sheet .recovery { margin-top: 16px; }
+.sheet .recovery p { text-wrap: balance; }
+.recovery-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.recovery-acts .copy {
+  flex: 1 1 0;
+  min-width: max-content;
+  justify-content: center;
+}
+.recovery-acts svg { stroke-linecap: round; }
+.recovery-acts .copy:disabled { opacity: .55; cursor: default; }
+.recovery .recovery-fail { margin-top: 8px; color: var(--coral); font-weight: 700; }
+.recovery-ask { margin-top: 10px; }
+.recovery .recovery-ask > p { color: var(--cream); font-weight: 700; }
+.recovery-new .code { margin-top: 12px; }
+.recovery-new .recovery-acts { margin-top: 10px; }
 
 /* Naming focus: the stage tightens so the name lands in view */
 .is-meet .window { transition: height .35s var(--ease-out), box-shadow .9s ease; }
@@ -2838,8 +2873,7 @@ html.has-reveal body::after { visibility: hidden; }
 }
 html.g-on .pet-stats,
 html.g-on .dock,
-html.g-on .topbar-end,
-html.g-on .mascot-toggle { opacity: .22; filter: saturate(.5); pointer-events: none; transition: opacity .4s ease, filter .4s ease; }
+html.g-on .topbar-end { opacity: .22; filter: saturate(.5); pointer-events: none; transition: opacity .4s ease, filter .4s ease; }
 html.g-on .window { touch-action: none; }
 
 .g-today { display: flex; align-items: center; gap: 6px; margin: -4px 0 14px; font-size: .8125rem; font-weight: 700; color: var(--gold-light); }
@@ -2976,8 +3010,7 @@ svg[data-icon="beyond"] .i-b { stroke: #f6d8a8; }
 
 /* 텃밭: the farm takes the window; the dock dims but its last button reads 집으로 */
 html.f-on .dock-btn:not([data-farm]),
-html.f-on .topbar-end,
-html.f-on .mascot-toggle { opacity: .22; filter: saturate(.5); pointer-events: none; transition: opacity .4s ease, filter .4s ease; }
+html.f-on .topbar-end { opacity: .22; filter: saturate(.5); pointer-events: none; transition: opacity .4s ease, filter .4s ease; }
 html.f-on .window { touch-action: none; }
 html.f-layout main { padding-left: 20px; padding-right: 20px; }
 html.f-layout .plate, html.f-layout .pet-stats { display: none; }

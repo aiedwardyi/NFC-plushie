@@ -113,7 +113,7 @@ test("rewarded owner home carries the dock, both sheets and the found gift", asy
   assert.equal(count(home.html, /data-tile="/g), GIFT_COUNT);
   assert.match(home.html, /class="tile is-common is-new" data-tile="c01" data-tier="common" data-line="오늘도 와줘서 고마워요!"/);
   assert.match(home.html, /선물 1\/30/);
-  assert.match(home.html, /<button type="button" class="level-pin" data-open="record" aria-haspopup="dialog" aria-label="우리 기록, Lv\. 1">Lv\. 1<\/button>/);
+  assert.match(home.html, /<button type="button" class="level-pin" data-open="record" aria-haspopup="dialog" aria-label="우리 기록, 함께한 지 1일"><svg [^>]*>[\s\S]*?<\/svg>1일<\/button>/);
   assert.match(home.html, /함께한 지 1일/);
   assert.match(home.html, /<dt>다음 레벨까지<\/dt><dd>\d+ XP<\/dd>/);
   assert.match(home.html, /class="xp-fill" data-xp="\d+"/);
@@ -138,7 +138,7 @@ test("post-naming page is the full home with read-only stats and the first tap o
   assert.match(skip.html, /<p class="count" data-tap-count="1">/);
   assert.match(skip.html, /<dt>토닥인 횟수<\/dt><dd>1번<\/dd>/);
   assert.match(skip.html, /<section class="pet-stats"[\s\S]*class="hearts"[\s\S]*class="xp-fill" data-xp="\d+"/);
-  assert.match(skip.html, /<button type="button" class="level-pin" data-open="record"[^>]*>Lv\. 1<\/button>/);
+  assert.match(skip.html, /<button type="button" class="level-pin" data-open="record"[^>]*><svg [^>]*>[\s\S]*?<\/svg>1일<\/button>/);
   assert.match(skip.html, /<dt>레벨<\/dt><dd>Lv\. 1<\/dd>/);
   assert.match(skip.html, /<dt>다음 레벨까지<\/dt><dd>\d+ XP<\/dd>/);
   assert.match(skip.html, /<dt>기분<\/dt>/);
@@ -193,10 +193,10 @@ test("the dock runs the arcade, the three care verbs, then the farm", async (t) 
   assert.match(preview.html, /<button type="button" class="dock-btn is-side" data-farm>/);
 });
 
-test("the level pin opens 우리 기록 and the dock keeps no record button", async (t) => {
+test("the days pin opens 우리 기록 and the dock keeps no record button", async (t) => {
   const { request, jar } = await named(t);
   const home = await request(`/t?uid=${A}`, { jar });
-  assert.match(home.html, /<span class="topbar-end"><button type="button" class="theme-btn"[^>]*>[\s\S]*?<\/button><button type="button" class="level-pin" data-open="record" aria-haspopup="dialog" aria-label="우리 기록, Lv\. 1">Lv\. 1<\/button><\/span>/);
+  assert.match(home.html, /<span class="topbar-end"><button type="button" class="theme-btn"[^>]*>[\s\S]*?<\/button><button type="button" class="level-pin" data-open="record" aria-haspopup="dialog" aria-label="우리 기록, 함께한 지 1일"><svg [^>]*>[\s\S]*?<\/svg>1일<\/button><\/span>/);
   assert.match(home.html, /<div class="sheet" data-sheet="record" role="dialog"/);
   assert.doesNotMatch(home.html.match(/<nav class="dock"[\s\S]*?<\/nav>/)[0], /data-open="record"|우리 기록/);
 });
