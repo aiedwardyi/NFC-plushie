@@ -260,10 +260,32 @@ function dockHtml({ gift = false, want = "", meals = 0, plays = 0, uid = "", com
     </nav>`;
 }
 
-function themeSheet(current) {
+// The editions in order: a worn look never ranks above the plushie's own.
+const RANK = { classic: 0, rare: 1, legendary: 2 };
+const LOOK_LEDES = {
+  classic: "포근 클래식 친구예요. 금실 레어와 별밤 레전더리 인형은 이렇게 빛나요.",
+  rare: "금실 레어 친구예요. 어떤 창틀로 보여줄까요?",
+  legendary: "별밤 레전더리 친구예요. 어떤 창틀로 보여줄까요?",
+};
+
+// 창틀과 이름: every frame up to the plushie's edition; the ones above stay a full-color showcase, locked, the plushie its key.
+function lookTiles({ own, shown, name }) {
+  const tiles = Object.keys(RANK).map((id) => {
+    const title = EDITIONS[id].name;
+    const locked = RANK[id] > RANK[own];
+    const note = `${title} 인형이 열쇠예요`;
+    return `<li><button type="button" class="theme-card look-card${locked ? " is-locked" : ""}" data-look="${id}" aria-pressed="${id === shown}"${locked ? ' aria-disabled="true"' : ""} aria-label="${title} 창틀${locked ? `, ${note}` : ""}"><span class="look-mini" aria-hidden="true"><b class="look-name">${escapeHtml(name)}</b><i class="look-frame"></i></span><span class="look-title">${title}</span>${locked ? `<small class="look-note">${note}</small>` : ""}</button></li>`;
+  }).join("");
+  return `
+      <h3 class="theme-sub">창틀과 이름</h3>
+      <p class="theme-lede" data-look-lede>${LOOK_LEDES[own]}</p>
+      <ul class="theme-grid look-grid" data-look-grid>${tiles}</ul>`;
+}
+
+function themeSheet(current, wear = null) {
   const cards = THEMES.map((t) => `<li><button type="button" class="theme-card" data-pick="${t.id}" data-color="${t.color}" aria-pressed="${t.id === current ? "true" : "false"}"><span class="theme-thumb" aria-hidden="true"></span><span class="theme-name">${t.name}</span></button></li>`).join("");
   return sheetHtml("theme", "꾸미기", `<p class="theme-lede">어떤 세상에서 놀까요?</p>
-      <ul class="theme-grid">${cards}</ul>`);
+      <ul class="theme-grid">${cards}</ul>${wear ? lookTiles(wear) : ""}`);
 }
 
 function sheetHtml(id, title, body, action = "") {
@@ -394,7 +416,7 @@ function farmAttrs(farm) {
   return ` data-farm-dot="${farm.dot ? 1 : 0}" data-farm-now="${farm.now}"${next}${visit}`;
 }
 
-export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = DEFAULT_KIND, wake = false, morning = false, asleep = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, days = null, meet = false, theme = "classic", farm = null, owner = false, card = null, edition = "classic", met = "", diag = false } = {}) {
+export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = DEFAULT_KIND, wake = false, morning = false, asleep = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, days = null, meet = false, theme = "classic", farm = null, owner = false, card = null, edition = "classic", look: wear = "", met = "", diag = false } = {}) {
   const look = themeOf(theme);
   const title = escapeHtml(row?.pet_name || "새 친구");
   const timeEl = timeLine ? `<p class="time-line" data-time-line></p>` : "";
@@ -416,11 +438,15 @@ export function page(row, content, { waving = false, away = false, lonely = fals
     : "";
   const bodyClass = dock ? "is-home" : meet ? "is-meet" : away ? "is-stranger" : "";
   // A 금실 레어 or 별밤 레전더리 dresses the page from its naming on; that naming page puts it on in front of the owner.
-  const finish = (edition === "rare" || edition === "legendary") && !unnamed
-    ? (celebrate === "named" ? ` data-edition-reveal="${edition}"` : ` data-edition="${edition}"`)
-    : "";
+  // data-edition is the plushie's own; data-look is the frame it wears, the owner's pick capped at that edition.
+  const own = Object.hasOwn(RANK, edition) ? edition : "classic";
+  const shown = wear && RANK[wear] < RANK[own] ? wear : own;
+  const reveal = celebrate === "named";
+  const attrs = unnamed ? "" : reveal
+    ? (own !== "classic" ? ` data-edition-reveal="${own}"` : "")
+    : `${own !== "classic" ? ` data-edition="${own}"` : ""}${shown !== "classic" ? ` data-look="${shown}"` : ""}`;
   return `<!doctype html>
-<html lang="ko" data-mascot="${kind}"${themed ? ` data-theme="${look.id}"` : ""}${finish}>
+<html lang="ko" data-mascot="${kind}"${themed ? ` data-theme="${look.id}"` : ""}${attrs}>
 <head>
   <meta charset="utf-8">${row?.kind ? `\n  <meta name="pet-kind" content="${kind}">` : ""}
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -449,8 +475,8 @@ export function page(row, content, { waving = false, away = false, lonely = fals
       ${countHtml}
     </section>
     <div class="window${away ? " is-away" : ""}" data-window>
-      ${SKY}${finish || demo ? `
-      <span class="finish" aria-hidden="true"></span>` : ""}
+      ${own !== "classic" || demo ? `<span class="finish" aria-hidden="true"></span>
+      ` : ""}${SKY}
       ${petMarkup({ waving, away, lonely, mascot: kind, faces: Boolean(row), stats: card ? statsData(card.sheet) : "" })}
     </div>
     ${dialogBox}
@@ -459,7 +485,7 @@ export function page(row, content, { waving = false, away = false, lonely = fals
     ${dock}
     <footer${demo ? " data-demo-hold" : ""}>토닥이면 깨어나는 작은 친구</footer>
   </main>
-  ${sheets}${card ? statCard(card, owner, row?.pet_name, level) : ""}${dock ? themeSheet(look.id) : ""}
+  ${sheets}${card ? statCard(card, owner, row?.pet_name, level) : ""}${dock ? themeSheet(look.id, reveal ? null : { own, shown, name: row?.pet_name || "" }) : ""}
   ${demo ? demoPanel(demo, row, kind, edition) : ""}
 </body>
 </html>`;
@@ -522,7 +548,7 @@ function homeExtras(row, pet, found, mascot, talk, keyed) {
   };
 }
 
-export function petPage(row, code = null, { celebrate = "", pet = null, mascot = DEFAULT_KIND, demo = "", found = [], theme = "classic", talk = false, ask = "", guest = false, keyed = true, card = null } = {}) {
+export function petPage(row, code = null, { celebrate = "", pet = null, mascot = DEFAULT_KIND, demo = "", found = [], theme = "classic", look = "", talk = false, ask = "", guest = false, keyed = true, card = null } = {}) {
   mascot = row.kind || mascot;
   const firstMeet = celebrate === "claim" || celebrate === "named";
   let greeting = row.pet_name
@@ -562,7 +588,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
     `${recovery}${prompt}`,
     {
       waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet, mascot, wake: Boolean(code), morning: Boolean(pet?.morning), asleep: Boolean(pet?.asleep), demo,
-      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, days: pet ? pet.days : null, meet: !row.pet_name, theme, farm: row.pet_name ? pet?.farm : null, owner: Boolean(row.pet_name), card: row.pet_name ? card : null, edition: card?.edition, met: row.pet_name ? row.created_at : "", diag: true, ...extras,
+      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, days: pet ? pet.days : null, meet: !row.pet_name, theme, farm: row.pet_name ? pet?.farm : null, owner: Boolean(row.pet_name), card: row.pet_name ? card : null, edition: card?.edition, look, met: row.pet_name ? row.created_at : "", diag: true, ...extras,
     },
   );
 }

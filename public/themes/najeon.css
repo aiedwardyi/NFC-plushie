@@ -24,7 +24,7 @@ html[data-theme="najeon"] main::before {
   background:
     radial-gradient(circle, rgba(214, 239, 236, 0.35) 0 1px, transparent 1.5px) 3px 11px / 47px 53px,
     radial-gradient(circle, rgba(242, 226, 236, 0.3) 0 1px, transparent 1.5px) 21px 29px / 61px 43px,
-    radial-gradient(90% 55% at 50% 36%, rgba(233, 231, 239, 0.06), transparent 70%),
+    radial-gradient(90% 55% at 50% 36%, var(--glow), transparent 70%),
     linear-gradient(180deg, #0f0e13 0%, #08080b 60%, #0f0e13 100%);
 }
 
@@ -193,6 +193,13 @@ html[data-theme="najeon"] .topbar .theme-btn { background: #0c0c10; box-shadow: 
 html[data-theme="najeon"] .theme-grid .theme-card { border-radius: 12px; box-shadow: 0 0 0 1px rgba(233, 231, 239, 0.3); }
 html[data-theme="najeon"] .theme-grid .theme-card[aria-pressed="true"] { box-shadow: 0 0 0 1.5px var(--pearl), 0 0 0 4px #0c0c10, 0 0 0 5px rgba(233, 231, 239, 0.4); }
 html[data-theme="najeon"] .theme-name { font-family: "Gowun Batang", serif; font-weight: 700; }
+/* The minis are lacquer screens with the pearl name, as the home's. */
+html[data-theme="najeon"] .look-frame { box-shadow: 0 0 0 1px var(--pearl), 0 0 0 4px #060608; outline: 1px dotted rgba(233, 231, 239, .6); outline-offset: 2px; }
+html[data-theme="najeon"] .look-card[data-look="rare"] .look-frame { outline-color: rgba(226, 194, 122, .85); }
+html[data-theme="najeon"] .look-frame::after { background: linear-gradient(180deg, #17161c, #0c0c10 74%); }
+html[data-theme="najeon"] .look-name { font-family: "Gowun Batang", "Noto Serif KR", serif; font-weight: 700; }
+html[data-theme="najeon"] .look-card[data-look="classic"] .look-name { background: var(--pearl-sheen); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; }
+html[data-theme="najeon"] .look-title { font-family: "Gowun Batang", serif; }
 
 /* The reveal stays classic */
 html[data-theme="najeon"] body > .reveal {
@@ -363,36 +370,120 @@ html[data-theme="najeon"] .shop-row { box-shadow: inset 0 0 0 1.5px rgba(233, 23
 html[data-theme="najeon"] .stat-pop { color: #0c0c10; background: var(--pearl-sheen); box-shadow: 0 3px 0 #8e8b99, 0 8px 18px rgba(0, 0, 0, 0.5); }
 html.f-layout[data-theme="najeon"] .f-basket { box-shadow: inset 0 0 0 2px #e2c27a, 0 6px 14px rgba(0, 0, 0, 0.55); }
 
-/* The edition's finish on lacquer: a sun-gold inlay for 금실, pearl stars in the lacquer band for 별밤. Never vermilion by the gold. */
-html[data-theme="najeon"][data-edition] .window { outline-color: rgba(226, 194, 122, 0.8); }
-html[data-theme="najeon"][data-edition="rare"] .window {
-  box-shadow:
-    0 0 0 3px #c9a24a,
-    0 0 0 10px #060608,
-    0 0 0 11.5px rgba(226, 194, 122, 0.45),
-    0 24px 40px -10px rgba(0, 0, 0, 0.8);
+/* The edition's finish on lacquer: an inlay set into the lacquer band, gold leaf for 금실, mother-of-pearl for 별밤, with a lacquer seam on each side for the recess. Never vermilion by the gold. */
+html[data-theme="najeon"] { --win-r: 24px; }
+html[data-theme="najeon"][data-look] .window::after { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .6), inset 0 10px 24px rgba(0, 0, 0, .4), 0 0 0 var(--edge-w) var(--edge); }
+/* Lacquer doesn't glow: the seams are the finish's only outline. */
+html[data-theme="najeon"][data-look] .finish { --halo: 0 0 0 transparent; }
+html[data-theme="najeon"][data-look="rare"],
+html[data-theme="najeon"] .look-card[data-look="rare"] { --edge: #060608; --edge-w: 1px; }
+html[data-theme="najeon"][data-look="rare"] { --glow: rgba(201, 162, 74, .12); }
+html[data-theme="najeon"][data-look="rare"] .window { box-shadow: 0 0 0 10px #060608, 0 0 0 11.5px #c9a24a, 0 24px 40px -10px rgba(0, 0, 0, .8); }
+/* The beads ride the 8-10px lacquer seam. The finish paints over the window's own outline, so they are the finish's: its edge is that ring. */
+html[data-theme="najeon"][data-look="rare"] .finish { outline: 2px dotted rgba(226, 194, 122, .85); }
+/* Four pearl five-dot flowers, and a pearl glint on the top-right one. */
+html[data-theme="najeon"][data-look="rare"] .finish {
+  --band-w: 7px;
+  --d: 11.8px;
+  --deco:
+    radial-gradient(circle at calc(var(--d) + 8px) calc(var(--d) + 8px), #f4f2f8 0 1.4px, transparent 1.9px),
+    radial-gradient(circle at calc(var(--d) + 8px) calc(var(--d) + 5px), #d6efec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(var(--d) + 8px) calc(var(--d) + 11px), #d6efec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(var(--d) + 5px) calc(var(--d) + 8px), #f2e2ec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(var(--d) + 11px) calc(var(--d) + 8px), #f2e2ec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(100% - var(--d) - 8px) calc(var(--d) + 8px), #f4f2f8 0 1.4px, transparent 1.9px),
+    radial-gradient(circle at calc(100% - var(--d) - 8px) calc(var(--d) + 5px), #d6efec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(100% - var(--d) - 8px) calc(var(--d) + 11px), #d6efec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(100% - var(--d) - 11px) calc(var(--d) + 8px), #f2e2ec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(100% - var(--d) - 5px) calc(var(--d) + 8px), #f2e2ec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(var(--d) + 8px) calc(100% - var(--d) - 8px), #f4f2f8 0 1.4px, transparent 1.9px),
+    radial-gradient(circle at calc(var(--d) + 8px) calc(100% - var(--d) - 11px), #d6efec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(var(--d) + 8px) calc(100% - var(--d) - 5px), #d6efec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(var(--d) + 5px) calc(100% - var(--d) - 8px), #f2e2ec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(var(--d) + 11px) calc(100% - var(--d) - 8px), #f2e2ec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(100% - var(--d) - 8px) calc(100% - var(--d) - 8px), #f4f2f8 0 1.4px, transparent 1.9px),
+    radial-gradient(circle at calc(100% - var(--d) - 8px) calc(100% - var(--d) - 11px), #d6efec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(100% - var(--d) - 8px) calc(100% - var(--d) - 5px), #d6efec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(100% - var(--d) - 11px) calc(100% - var(--d) - 8px), #f2e2ec 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at calc(100% - var(--d) - 5px) calc(100% - var(--d) - 8px), #f2e2ec 0 1.2px, transparent 1.7px);
+  --glint:
+    radial-gradient(circle, #f4f2f8 0 1.6px, rgba(244, 242, 248, .5) 2.6px, transparent 3.6px),
+    linear-gradient(90deg, transparent, #f4f2f8 40% 60%, transparent) 50% 50% / 20px 1.2px no-repeat,
+    linear-gradient(180deg, transparent, #f4f2f8 40% 60%, transparent) 50% 50% / 1.2px 20px no-repeat;
 }
-html[data-theme="najeon"][data-edition="rare"] .finish {
-  inset: -3px;
-  padding: 3px;
-  border-radius: 27px;
-  background: var(--tier-thread), conic-gradient(from 210deg, #c9a24a, #f3e2a8 12%, #a8832f 30%, #e2c27a 50%, #a8832f 70%, #f3e2a8 85%, #c9a24a);
+html[data-theme="najeon"][data-look="rare"] .finish,
+html[data-theme="najeon"] .look-card[data-look="rare"] .look-frame {
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 245, 214, .5) 0 1px, transparent 1px 2px, rgba(90, 62, 12, .5) 2px 2.6px, transparent 2.6px 4px),
+    conic-gradient(from 210deg, #c9a24a, #f3e2a8 12%, #a8832f 30%, #e2c27a 50%, #a8832f 70%, #f3e2a8 85%, #c9a24a);
 }
-html[data-theme="najeon"][data-edition="legendary"] .window {
-  box-shadow:
-    0 0 0 1.5px #e2c27a,
-    0 0 0 10px #060608,
-    0 0 0 11.5px rgba(226, 194, 122, 0.55),
-    0 24px 40px -10px rgba(0, 0, 0, 0.8);
+html[data-theme="najeon"][data-look="legendary"],
+html[data-theme="najeon"] .look-card[data-look="legendary"] { --edge: #e2c27a; --edge-w: 1.5px; }
+html[data-theme="najeon"][data-look="legendary"] { --glow: rgba(214, 239, 236, .08); }
+html[data-theme="najeon"][data-look="legendary"] .window {
+  outline: 2px dotted rgba(233, 231, 239, .8);
+  outline-offset: 11.5px;
+  box-shadow: 0 0 0 15px #060608, 0 0 0 16.5px #e2c27a, 0 24px 40px -10px rgba(0, 0, 0, .8);
 }
-html[data-theme="najeon"][data-edition="legendary"] .finish { --band: 4.25px; inset: -10px; padding: 8.5px; border-radius: 34px; background: none; }
-html[data-theme="najeon"][data-edition="rare"] .nameplate { background-image: var(--tier-thread), linear-gradient(100deg, #f3e2a8, #e2c27a 40%, #c9a24a 70%, #f3e2a8); }
-html[data-theme="najeon"][data-edition="legendary"] .nameplate {
+/* Four gold five-dot flowers. */
+html[data-theme="najeon"][data-look="legendary"] .finish {
+  --band-w: 8.5px;
+  --band: 4.25px;
+  --d: 13px;
+  --deco:
+    radial-gradient(circle at calc(var(--d) + 8px) calc(var(--d) + 8px), #f3e2a8 0 1.8px, transparent 2.3px),
+    radial-gradient(circle at calc(var(--d) + 8px) calc(var(--d) + 3.8px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(var(--d) + 8px) calc(var(--d) + 12.2px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(var(--d) + 3.8px) calc(var(--d) + 8px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(var(--d) + 12.2px) calc(var(--d) + 8px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(100% - var(--d) - 8px) calc(var(--d) + 8px), #f3e2a8 0 1.8px, transparent 2.3px),
+    radial-gradient(circle at calc(100% - var(--d) - 8px) calc(var(--d) + 3.8px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(100% - var(--d) - 8px) calc(var(--d) + 12.2px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(100% - var(--d) - 12.2px) calc(var(--d) + 8px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(100% - var(--d) - 3.8px) calc(var(--d) + 8px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(var(--d) + 8px) calc(100% - var(--d) - 8px), #f3e2a8 0 1.8px, transparent 2.3px),
+    radial-gradient(circle at calc(var(--d) + 8px) calc(100% - var(--d) - 12.2px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(var(--d) + 8px) calc(100% - var(--d) - 3.8px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(var(--d) + 3.8px) calc(100% - var(--d) - 8px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(var(--d) + 12.2px) calc(100% - var(--d) - 8px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(100% - var(--d) - 8px) calc(100% - var(--d) - 8px), #f3e2a8 0 1.8px, transparent 2.3px),
+    radial-gradient(circle at calc(100% - var(--d) - 8px) calc(100% - var(--d) - 12.2px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(100% - var(--d) - 8px) calc(100% - var(--d) - 3.8px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(100% - var(--d) - 12.2px) calc(100% - var(--d) - 8px), #e2c27a 0 1.6px, transparent 2.1px),
+    radial-gradient(circle at calc(100% - var(--d) - 3.8px) calc(100% - var(--d) - 8px), #e2c27a 0 1.6px, transparent 2.1px);
+}
+/* Pearl flecks and three gold dots on the band's center line, over the pearl itself. */
+html[data-theme="najeon"][data-look="legendary"] .finish,
+html[data-theme="najeon"] .look-card[data-look="legendary"] .look-frame {
+  background:
+    radial-gradient(circle at 12% var(--band), #fff 0 1px, transparent 1.6px),
+    radial-gradient(circle at 24% var(--band), #e2c27a 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 36% var(--band), #d6efec 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 58% var(--band), #f2e2ec 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 74% var(--band), #fff 0 1px, transparent 1.6px),
+    radial-gradient(circle at 90% var(--band), #d6efec 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 8% calc(100% - var(--band)), #f2e2ec 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 30% calc(100% - var(--band)), #fff 0 1px, transparent 1.6px),
+    radial-gradient(circle at 52% calc(100% - var(--band)), #e2c27a 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 68% calc(100% - var(--band)), #d6efec 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 86% calc(100% - var(--band)), #f2e2ec 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at var(--band) 34%, #fff 0 1px, transparent 1.6px),
+    radial-gradient(circle at var(--band) 70%, #f2e2ec 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at calc(100% - var(--band)) 22%, #d6efec 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at calc(100% - var(--band)) 56%, #e2c27a 0 1.2px, transparent 1.8px),
+    var(--pearl-sheen);
+}
+/* The world's own pearl name resets the background, so the sheen's resting place comes back. */
+html[data-theme="najeon"][data-look] .nameplate { background-position: 62% 0; }
+html[data-theme="najeon"][data-look="rare"] .nameplate,
+html[data-theme="najeon"] .look-card[data-look="rare"] .look-name { background-image: var(--tier-thread), linear-gradient(100deg, #a8832f 0%, #e2c27a 30%, #f8ecc4 48%, #e2c27a 66%, #a8832f 100%); }
+/* Pearl and the sun's gold, moving. */
+html[data-theme="najeon"][data-look="legendary"] .nameplate,
+html[data-theme="najeon"] .look-card[data-look="legendary"] .look-name {
   background-image:
-    radial-gradient(circle at 22% 30%, #f4f2f8 0 1px, transparent 2px),
-    radial-gradient(circle at 61% 64%, #f4f2f8 0 .8px, transparent 1.8px),
-    radial-gradient(circle at 84% 26%, #f4f2f8 0 1px, transparent 2px),
-    linear-gradient(100deg, #e2c27a, #f3e2a8 45%, #c9a24a 80%, #e2c27a);
+    linear-gradient(105deg, transparent 44%, rgba(255, 255, 255, .9) 50%, transparent 56%),
+    linear-gradient(100deg, #e2c27a 0%, #f4f2f8 22%, #d6efec 40%, #f2e2ec 58%, #f3e2a8 76%, #c9a24a 100%);
+  background-size: 300% 100%, auto;
 }
 
 /* Guide: a pearl ring with a gold hairline, never red */

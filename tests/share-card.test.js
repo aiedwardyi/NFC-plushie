@@ -119,9 +119,9 @@ test("a quick tap mid count-up still prints the pet's real totals", () => {
 });
 
 test("딸기우유 별밤 레전더리 wears the app's twilight: its ring inside the pink plush, gold stars, a twilight-to-gold name and no dark outline", () => {
-  const ring = cssStops(milk.match(/\[data-edition="legendary"\] \.finish \{[^}]*background: (linear-gradient\([^;]+\));/)[1]);
-  const name = cssStops(milk.match(/\[data-edition="legendary"\] \.nameplate \{[^}]*(linear-gradient\(180deg[^;]+\));/)[1]);
-  const star = milk.match(/\[data-edition="legendary"\] \.finish \{[^}]*--tier-star: (#[0-9a-f]{6});/i)[1].toLowerCase();
+  const ring = cssStops(milk.match(/\[data-look="legendary"\] \.finish,[^{]*\{[^}]*?(linear-gradient\(180deg[^;]+\));/)[1]);
+  const name = cssStops(milk.match(/\[data-look="legendary"\] \.nameplate,[^{]*\{[^}]*(linear-gradient\(180deg[^;]+\));/)[1]);
+  const star = milk.match(/\[data-look="legendary"\] \.finish,[^{]*\{[^}]*--star: (#[0-9a-f]{6});/i)[1].toLowerCase();
   const card = painted("milk", "legendary");
   const has = (stops) => card.gradients.some((g) => JSON.stringify(g) === JSON.stringify(stops));
   assert.ok(has(ring), `ring ${JSON.stringify(ring)}`);

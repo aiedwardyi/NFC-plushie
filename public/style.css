@@ -1612,86 +1612,155 @@ html[data-edition="legendary"] .st-fill::after {
 @keyframes st-twinkle { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 
 /* The edition's finish beyond the card: the window frame, the nameplate and the tap sparkles. 포근 클래식 keeps the gold-light ring. */
+/* The finish sits under the sky, which covers its middle, so only its band shows around the glass and its pseudos may reach past it. */
 .finish { display: none; }
-html[data-edition] .finish {
+html[data-look] .finish {
   position: absolute;
-  inset: -4px;
-  z-index: 2;
+  inset: calc(-1 * (var(--edge-w) + var(--band-w)));
+  z-index: 0;
   display: block;
-  padding: 4px;
-  border-radius: 36px;
+  border-radius: calc(var(--win-r, 32px) + var(--edge-w) + var(--band-w));
   pointer-events: none;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
+  box-shadow: 0 0 0 var(--edge-w) var(--edge), var(--halo, 0 0 0 transparent);
 }
-html[data-edition="rare"] .window {
-  box-shadow:
-    0 0 0 4px #c99436,
-    0 0 0 8px var(--navy2),
-    0 0 0 9px rgba(226, 178, 82, .3),
-    0 22px 40px -10px rgba(0, 0, 0, .6),
-    0 0 90px -12px var(--glow);
+/* The inner hairline sits on the glass, above the band, with the glass's own insets kept. */
+html[data-look] .window::after {
+  box-shadow: inset 0 10px 22px rgba(20, 27, 43, .28), inset 0 -8px 18px rgba(20, 27, 43, .14), 0 0 0 var(--edge-w) var(--edge);
 }
-html[data-edition="rare"] .finish {
+html[data-look] .finish::before,
+html[data-look] .finish::after { content: ""; position: absolute; pointer-events: none; }
+html[data-look] .finish::before { inset: -8px; background: var(--deco); }
+html[data-look="rare"] .finish::after {
+  top: calc(var(--d) - 10px);
+  right: calc(var(--d) - 10px);
+  width: 20px;
+  height: 20px;
+  background: var(--glint);
+  opacity: 0;
+}
+/* 금실 레어: a twisted gold thread between two deep gold hairlines, a gold stud on each corner, one glint. */
+html[data-look="rare"],
+.look-card[data-look="rare"] { --edge: #7a5a1c; --edge-w: 1.5px; }
+html[data-look="rare"] .finish {
+  --band-w: 10px;
+  --d: 16.3px;
+  --halo: 0 0 48px -8px rgba(226, 178, 82, .45);
+  --stud: radial-gradient(circle, #fff6d8 0 1.2px, #e2b252 1.3px 3.4px, #6e5119 3.5px 4.6px, transparent 5px);
+  --deco:
+    var(--stud) calc(var(--d) + 3px) calc(var(--d) + 3px) / 10px 10px no-repeat,
+    var(--stud) calc(100% - var(--d) - 3px) calc(var(--d) + 3px) / 10px 10px no-repeat,
+    var(--stud) calc(var(--d) + 3px) calc(100% - var(--d) - 3px) / 10px 10px no-repeat,
+    var(--stud) calc(100% - var(--d) - 3px) calc(100% - var(--d) - 3px) / 10px 10px no-repeat;
+  --glint:
+    radial-gradient(circle, #fff8e6 0 1.6px, rgba(255, 248, 230, .5) 2.6px, transparent 3.6px),
+    linear-gradient(90deg, transparent, #fff8e6 40% 60%, transparent) 50% 50% / 20px 1.2px no-repeat,
+    linear-gradient(180deg, transparent, #fff8e6 40% 60%, transparent) 50% 50% / 1.2px 20px no-repeat;
+}
+/* The diagonal repeat reads as rope at phone size. */
+html[data-look="rare"] .finish,
+.look-card[data-look="rare"] .look-frame {
   background:
-    var(--tier-thread),
+    repeating-linear-gradient(45deg, rgba(255, 246, 216, .55) 0 1.5px, transparent 1.5px 3.5px, rgba(110, 80, 20, .45) 3.5px 4.5px, transparent 4.5px 7px),
     conic-gradient(from 210deg, #e2b252, #fff1c2 10%, #c99436 28%, #f6d98a 46%, #b8862e 64%, #fff1c2 80%, #e2b252);
 }
-html[data-edition="legendary"] .window {
-  box-shadow:
-    0 0 0 1.5px #e2c27a,
-    0 0 0 8px var(--tier-night-1),
-    0 0 0 9.5px rgba(226, 194, 122, .7),
-    0 22px 40px -10px rgba(0, 0, 0, .6),
-    0 0 90px -12px rgba(120, 110, 220, .25);
+/* 별밤 레전더리: a violet night lighter than the page, stars on its center line, a four-point star on each corner. */
+html[data-look="legendary"],
+.look-card[data-look="legendary"] { --edge: #e2c27a; --edge-w: 1.5px; }
+html[data-look="legendary"] .finish {
+  --band-w: 12px;
+  --band: 6px;
+  --d: 17.6px;
+  --halo: 0 0 48px -8px rgba(120, 110, 220, .55);
+  --spark-tl:
+    radial-gradient(circle, var(--star) 0 1.6px, rgba(255, 248, 230, .5) 2.6px, transparent 3.6px) var(--d) var(--d) / 16px 16px no-repeat,
+    linear-gradient(90deg, transparent, var(--star) 40% 60%, transparent) var(--d) calc(var(--d) + 7.4px) / 16px 1.2px no-repeat,
+    linear-gradient(180deg, transparent, var(--star) 40% 60%, transparent) calc(var(--d) + 7.4px) var(--d) / 1.2px 16px no-repeat;
+  --spark-tr:
+    radial-gradient(circle, var(--star) 0 1.6px, rgba(255, 248, 230, .5) 2.6px, transparent 3.6px) calc(100% - var(--d)) var(--d) / 16px 16px no-repeat,
+    linear-gradient(90deg, transparent, var(--star) 40% 60%, transparent) calc(100% - var(--d)) calc(var(--d) + 7.4px) / 16px 1.2px no-repeat,
+    linear-gradient(180deg, transparent, var(--star) 40% 60%, transparent) calc(100% - var(--d) - 7.4px) var(--d) / 1.2px 16px no-repeat;
+  --spark-bl:
+    radial-gradient(circle, var(--star) 0 1.6px, rgba(255, 248, 230, .5) 2.6px, transparent 3.6px) var(--d) calc(100% - var(--d)) / 16px 16px no-repeat,
+    linear-gradient(90deg, transparent, var(--star) 40% 60%, transparent) var(--d) calc(100% - var(--d) - 7.4px) / 16px 1.2px no-repeat,
+    linear-gradient(180deg, transparent, var(--star) 40% 60%, transparent) calc(var(--d) + 7.4px) calc(100% - var(--d)) / 1.2px 16px no-repeat;
+  --spark-br:
+    radial-gradient(circle, var(--star) 0 1.6px, rgba(255, 248, 230, .5) 2.6px, transparent 3.6px) calc(100% - var(--d)) calc(100% - var(--d)) / 16px 16px no-repeat,
+    linear-gradient(90deg, transparent, var(--star) 40% 60%, transparent) calc(100% - var(--d)) calc(100% - var(--d) - 7.4px) / 16px 1.2px no-repeat,
+    linear-gradient(180deg, transparent, var(--star) 40% 60%, transparent) calc(100% - var(--d) - 7.4px) calc(100% - var(--d)) / 1.2px 16px no-repeat;
+  --deco: var(--spark-tl), var(--spark-tr), var(--spark-bl), var(--spark-br);
 }
-/* The night band between two gold hairlines, with seven stars that twinkle in two sets. */
-html[data-edition="legendary"] .finish {
-  inset: -8px;
-  --band: 3.25px;
-  padding: 6.5px;
-  border-radius: 40px;
-  background: radial-gradient(140% 120% at 30% 0%, var(--tier-night-2), var(--tier-night-1) 70%);
-}
-html[data-edition="legendary"] .finish::before,
-html[data-edition="legendary"] .finish::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  animation: finish-twinkle 3.2s ease-in-out infinite;
-}
-html[data-edition="legendary"] .finish::before {
+/* Fourteen stars on the band's center line; --band is half the band. */
+html[data-look="legendary"] .finish,
+.look-card[data-look="legendary"] .look-frame {
+  --star: #fff8e6;
   background:
-    radial-gradient(circle at 18% var(--band), var(--tier-star) 0 .9px, rgba(255, 248, 230, .35) 1.4px, transparent 2.4px),
-    radial-gradient(circle at calc(100% - var(--band)) 30%, var(--tier-star) 0 .8px, rgba(255, 248, 230, .3) 1.3px, transparent 2.2px),
-    radial-gradient(circle at 36% calc(100% - var(--band)), var(--tier-star) 0 .8px, rgba(255, 248, 230, .3) 1.3px, transparent 2.2px),
-    radial-gradient(circle at var(--band) 62%, var(--tier-star) 0 .7px, transparent 1.8px);
+    radial-gradient(circle at 14% var(--band), var(--star) 0 1.4px, rgba(255, 248, 230, .45) 2.4px, transparent 3.6px),
+    radial-gradient(circle at 31% var(--band), var(--star) 0 1px, transparent 2.2px),
+    radial-gradient(circle at 52% var(--band), #f6d98a 0 1.4px, rgba(246, 217, 138, .4) 2.4px, transparent 3.6px),
+    radial-gradient(circle at 70% var(--band), var(--star) 0 1px, transparent 2.2px),
+    radial-gradient(circle at 88% var(--band), var(--star) 0 1.4px, rgba(255, 248, 230, .45) 2.4px, transparent 3.6px),
+    radial-gradient(circle at 10% calc(100% - var(--band)), var(--star) 0 1px, transparent 2.2px),
+    radial-gradient(circle at 27% calc(100% - var(--band)), var(--star) 0 1.4px, rgba(255, 248, 230, .45) 2.4px, transparent 3.6px),
+    radial-gradient(circle at 46% calc(100% - var(--band)), #f6d98a 0 1px, transparent 2.2px),
+    radial-gradient(circle at 64% calc(100% - var(--band)), var(--star) 0 1.4px, rgba(255, 248, 230, .45) 2.4px, transparent 3.6px),
+    radial-gradient(circle at 83% calc(100% - var(--band)), var(--star) 0 1px, transparent 2.2px),
+    radial-gradient(circle at var(--band) 40%, var(--star) 0 1.2px, transparent 2.6px),
+    radial-gradient(circle at var(--band) 72%, var(--star) 0 1px, transparent 2.2px),
+    radial-gradient(circle at calc(100% - var(--band)) 28%, var(--star) 0 1.2px, transparent 2.6px),
+    radial-gradient(circle at calc(100% - var(--band)) 60%, var(--star) 0 1px, transparent 2.2px),
+    linear-gradient(180deg, #4a3cb0 0%, #2d2a7e 45%, #1f1d62 100%);
 }
-html[data-edition="legendary"] .finish::after {
-  background:
-    radial-gradient(circle at 66% var(--band), var(--tier-star) 0 .7px, transparent 1.8px),
-    radial-gradient(circle at calc(100% - var(--band)) 74%, var(--tier-star) 0 .9px, rgba(255, 248, 230, .35) 1.4px, transparent 2.4px),
-    radial-gradient(circle at 80% calc(100% - var(--band)), var(--tier-star) 0 .7px, transparent 1.8px);
-  animation-delay: -1.6s;
-}
-@keyframes finish-twinkle { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
-/* The name, in the same material as the frame. A text shadow would sit on the clipped gold, so it becomes a drop shadow. */
-html[data-edition] .nameplate {
+/* The page glows in the frame's light, after the time of day's. */
+html[data-look="rare"] { --glow: rgba(226, 178, 82, .26); }
+html[data-look="legendary"] { --glow: rgba(120, 110, 220, .30); }
+/* The name, in the same material as the frame. A text shadow would sit on the clipped gold, so it becomes a drop shadow; the sheen layer rests near the name's start. */
+/* Its box hugs the letters, so the gradient's ends, the dots and the sheen land on the name. */
+html[data-look] .nameplate,
+.look-card:not([data-look="classic"]) .look-name {
+  width: fit-content;
+  margin-inline: auto;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   text-shadow: none;
   filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .28));
+  background-position: 62% 0;
 }
-html[data-edition="rare"] .nameplate { background-image: var(--tier-thread), linear-gradient(100deg, #f6d98a, #fff1c2 40%, #e2b252 70%, #f6d98a); }
-html[data-edition="legendary"] .nameplate {
+html[data-look="rare"] .nameplate,
+.look-card[data-look="rare"] .look-name { background-image: var(--tier-thread), linear-gradient(100deg, #b8862e 0%, #f6d98a 30%, #fff6d8 48%, #e2b252 68%, #a8782a 100%); }
+html[data-look="legendary"] .nameplate,
+.look-card[data-look="legendary"] .look-name {
   background-image:
+    linear-gradient(105deg, transparent 44%, rgba(255, 255, 255, .9) 50%, transparent 56%),
     radial-gradient(circle at 22% 30%, #fff 0 1px, transparent 2px),
     radial-gradient(circle at 61% 64%, #fff 0 .8px, transparent 1.8px),
     radial-gradient(circle at 84% 26%, #fff 0 1px, transparent 2px),
-    linear-gradient(100deg, var(--tier-gold-2), var(--tier-gold-3) 45%, var(--tier-gold-1) 80%, var(--tier-gold-2));
+    linear-gradient(180deg, #fff8e6 0%, #f6d98a 50%, #c9b8ff 100%);
+  background-size: 300% 100%, auto, auto, auto, auto;
 }
+/* The one loop a frame adds to the home: the 금실 stud's glint, the sheen across the 별밤 name. */
+@keyframes glint {
+  0%, 84% { opacity: 0; transform: scale(.4) rotate(0deg); }
+  90% { opacity: 1; transform: scale(1) rotate(20deg); }
+  100% { opacity: 0; transform: scale(.5) rotate(40deg); }
+}
+/* The sheen layer is 300% wide: 100% -> 0% walks its highlight left to right, then it rests. */
+@keyframes name-sheen { 0% { background-position: 100% 0; } 18%, 100% { background-position: 0% 0; } }
+@keyframes look-on { from { opacity: 0; } }
+@keyframes look-shake { 20%, 60% { transform: translateX(-3px); } 40%, 80% { transform: translateX(3px); } }
+@media (prefers-reduced-motion: no-preference) {
+  html[data-look="rare"] .finish::after { animation: glint 6s ease-in-out infinite; }
+  html[data-look="legendary"] .nameplate { animation: name-sheen 6s linear infinite; }
+  html.is-look-on .finish,
+  html.is-look-on .nameplate { animation: look-on .5s ease-out both; }
+  .look-card.is-shake { animation: look-shake .35s ease-in-out; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-look="rare"] .finish::after { opacity: .6; }
+}
+/* Other sheets pause the home's one loop; the 꾸미기 sheet keeps it, the frame is what the picker is for. */
+body.has-sheet:not(:has([data-sheet="theme"].is-open)) .nameplate,
+body.has-sheet:not(:has([data-sheet="theme"].is-open)) .finish::after { animation-play-state: paused; }
 /* The naming reveal: the finish comes on with a flash, the name warms into its gold. */
 @media (prefers-reduced-motion: no-preference) {
   html.is-edition-lit .finish { animation: finish-on 1.6s ease-out both; }
@@ -1704,7 +1773,7 @@ html[data-edition="legendary"] .nameplate {
 }
 @keyframes finish-name { from { opacity: .35; } }
 /* Tap sparkles: thread streaks for 금실, white-gold stars and one shooting star for 별밤. */
-html[data-edition="rare"] .sparkle {
+html[data-look="rare"] .sparkle {
   width: 3px;
   height: 18px;
   border-radius: 2px;
@@ -1717,7 +1786,7 @@ html[data-edition="rare"] .sparkle {
   30% { opacity: 1; transform: rotate(8deg) scaleY(1); }
   100% { opacity: 0; transform: rotate(34deg) scaleY(.5) translate(var(--sx, 0), var(--sy, -24px)); }
 }
-html[data-edition="legendary"] .sparkle { background: var(--tier-star); filter: drop-shadow(0 0 3px rgba(246, 217, 138, .9)); }
+html[data-look="legendary"] .sparkle { background: var(--tier-star); filter: drop-shadow(0 0 3px rgba(246, 217, 138, .9)); }
 .sparkle.is-shoot {
   width: 30px;
   height: 2px;
@@ -1887,6 +1956,73 @@ html[data-edition="legendary"] .sparkle { background: var(--tier-star); filter: 
   border: solid var(--navy);
   border-width: 0 3px 3px 0;
   transform: rotate(45deg);
+}
+/* 창틀과 이름: each tile is the home's frame and name in miniature, in the current world, from the same rules. */
+/* Set tight enough that a 포근 클래식 owner's two locked notes still end above the fold at 655px. */
+.theme-sub {
+  margin: 10px 0 2px;
+  font-size: .8125rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+  color: var(--gold-light);
+}
+.theme-sub + .theme-lede { margin-bottom: 10px; }
+.look-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.theme-grid .look-card {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 6px;
+  background: var(--navy2);
+  text-align: center;
+}
+.look-mini { display: grid; justify-items: center; gap: 4px; }
+.look-name {
+  max-width: 84px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--cream);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, .28);
+}
+/* The classic mini is the base ring; a tier's band is the frame's background, its sky the ::after. */
+.look-frame {
+  position: relative;
+  width: 86px;
+  height: 50px;
+  border-radius: 12px;
+  box-shadow: 0 0 0 1.5px var(--gold-light), 0 0 0 4px var(--navy2);
+}
+.look-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom) 74%);
+}
+.look-card[data-look="rare"] .look-frame { --band: 2.5px; box-shadow: 0 0 0 1px var(--edge); }
+.look-card[data-look="rare"] .look-frame::after { inset: 5px; border-radius: 7px; box-shadow: 0 0 0 1px var(--edge); }
+.look-card[data-look="legendary"] .look-frame { --band: 3px; box-shadow: 0 0 0 1px var(--edge); }
+.look-card[data-look="legendary"] .look-frame::after { inset: 6px; border-radius: 6px; box-shadow: 0 0 0 1px var(--edge); }
+.look-title { font-size: 12px; font-weight: 800; color: var(--cream); }
+.look-note { font-size: 11px; line-height: 1.3; color: var(--muted); }
+/* Locked tiles keep their full preview. The lock is the window's own keyhole: the plushie is the key. */
+.look-card.is-locked::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 40%, var(--navy) 0 2.4px, transparent 2.9px) no-repeat,
+    linear-gradient(var(--navy), var(--navy)) 50% 70% / 2.2px 6px no-repeat,
+    linear-gradient(180deg, var(--gold-light), var(--gold) 65%, var(--gold-deep));
+  box-shadow: 0 0 0 1.5px var(--navy2), 0 2px 4px rgba(0, 0, 0, .45);
 }
 
 /* World switch: the new world grows out of the pet, the pet converts last */

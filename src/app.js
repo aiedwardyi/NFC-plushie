@@ -119,6 +119,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   app.use(cookieParser());
   app.use((req, res, next) => {
     req.theme = themeOf(req.cookies?.theme).id;
+    req.look = ["classic", "rare"].includes(req.cookies?.look) ? req.cookies.look : "";
     next();
   });
   // Ahead of the 4 KB parsers: a beacon batch is bigger, and it is answered 204 whatever it holds.
@@ -432,7 +433,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           const skipped = getRow(serial);
           const asleep = view && Boolean(skipped.pet_name) && skipped.slept_at !== null;
           const pet = petView(skipped, petState(skipped, t), { rewarded: false }, t, { morning, asleep, view });
-          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found), theme, talk: talks(serial), guest, keyed, card: cardOf(skipped, req) }) };
+          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found), theme, look: req.look, talk: talks(serial), guest, keyed, card: cardOf(skipped, req) }) };
         }
         if (!afterTap.pet_name) {
           raiseMirror();
@@ -472,7 +473,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         }
         // A follow-up waits for a visit with nothing to celebrate.
         const ask = talks(serial) && !visual && !morning && !visit && !away && combo <= 1 ? takeQuestion(db, serial, today) : "";
-        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo, visit, away, farmRow: visit ? getRow(serial) : fresh }), demo, found: parseFound(fresh.gift_found), theme, talk: talks(serial), ask, guest, keyed, card: cardOf(getRow(serial), req) }) };
+        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo, visit, away, farmRow: visit ? getRow(serial) : fresh }), demo, found: parseFound(fresh.gift_found), theme, look: req.look, talk: talks(serial), ask, guest, keyed, card: cardOf(getRow(serial), req) }) };
       }
       if (state === "STRANGER") return { html: strangerPage(row, "", { demo, theme, card: cardOf(row, req) }) };
       throw new Error("Invalid binding result");

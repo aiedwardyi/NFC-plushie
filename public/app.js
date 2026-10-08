@@ -1699,6 +1699,8 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+// The 꾸미기 sheet's 창틀과 이름 tiles; the sheet fills it in, and the edition calls it whenever it changes.
+let syncLooks = () => {};
 const themeSheet = document.querySelector('[data-sheet="theme"]');
 if (themeSheet) {
   const root = document.documentElement;
@@ -1898,6 +1900,62 @@ if (themeSheet) {
     const card = event.target.closest("[data-pick]");
     if (card) pick(card);
   });
+
+  // 창틀과 이름: any frame up to the plushie's edition, stored like the world; the ones above only say which plushie is their key.
+  const lookGrid = themeSheet.querySelector("[data-look-grid]");
+  if (lookGrid) {
+    const RANK = { classic: 0, rare: 1, legendary: 2 };
+    const LOOK_LINES = { classic: "포근하게 돌아왔어요!", rare: "금실이 반짝반짝해요!", legendary: "별밤처럼 빛나요!" };
+    const LOCK_LINES = { rare: "금실 레어 인형이 열쇠예요!", legendary: "별밤 레전더리 인형이 열쇠예요!" };
+    const LEDES = {
+      classic: "포근 클래식 친구예요. 금실 레어와 별밤 레전더리 인형은 이렇게 빛나요.",
+      rare: "금실 레어 친구예요. 어떤 창틀로 보여줄까요?",
+      legendary: "별밤 레전더리 친구예요. 어떤 창틀로 보여줄까요?",
+    };
+    const looks = Array.from(themeSheet.querySelectorAll("[data-look]"));
+    const plush = () => root.dataset.edition || "classic";
+    const worn = () => root.dataset.look || "classic";
+
+    syncLooks = () => {
+      for (const el of looks) {
+        const locked = RANK[el.dataset.look] > RANK[plush()];
+        el.classList.toggle("is-locked", locked);
+        el.setAttribute("aria-disabled", String(locked));
+        el.setAttribute("aria-pressed", String(el.dataset.look === worn()));
+      }
+      themeSheet.querySelector("[data-look-lede]").textContent = LEDES[plush()];
+    };
+
+    function pickLook(card) {
+      const id = card.dataset.look;
+      const still = prefersReducedMotion();
+      if (RANK[id] > RANK[plush()]) {
+        card.classList.remove("is-shake");
+        void card.offsetWidth;
+        card.classList.add("is-shake");
+        speak(LOCK_LINES[id], still);
+        return;
+      }
+      if (id === worn()) return;
+      // The plushie's own edition needs no cookie, so the cookie only ever holds a lower frame.
+      document.cookie = id === plush()
+        ? "look=;path=/;max-age=0;samesite=lax"
+        : `look=${id};path=/;max-age=${400 * 24 * 60 * 60};samesite=lax`;
+      if (id === "classic") delete root.dataset.look;
+      else root.dataset.look = id;
+      root.classList.add("is-look-on");
+      window.setTimeout(() => root.classList.remove("is-look-on"), 600);
+      playSfx(`care-${root.dataset.theme === "8bit" ? "chip" : "soft"}-press`);
+      tryVibrate(18);
+      speak(LOOK_LINES[id], still);
+      syncLooks();
+    }
+
+    lookGrid.addEventListener("click", (event) => {
+      const card = event.target.closest("[data-look]");
+      if (card) pickLook(card);
+    });
+  }
 }
 
 /* Care: 밥 · 놀이 · 잠 with a want bubble, lights out, and the wake on the next plushie tap. */
@@ -2145,8 +2203,8 @@ const care = (function careLoop() {
       win.appendChild(spark);
       window.setTimeout(() => spark.remove(), 900 + i * 45);
     }
-    // A 별밤 레전더리's touch also sends one small shooting star.
-    if (document.documentElement.dataset.edition !== "legendary") return;
+    // A touch in the 별밤 레전더리 frame also sends one small shooting star.
+    if (document.documentElement.dataset.look !== "legendary") return;
     const shoot = document.createElement("span");
     shoot.className = "sparkle is-shoot";
     shoot.style.left = `${x - 10}px`;
@@ -3111,9 +3169,15 @@ function paintStats(sheet) {
 function showEdition(edition, name, stats) {
   const root = document.documentElement;
   if (!document.querySelector("[data-name-input]")) {
-    if (edition === "rare" || edition === "legendary") root.dataset.edition = edition;
-    else delete root.dataset.edition;
+    if (edition === "rare" || edition === "legendary") {
+      root.dataset.edition = edition;
+      root.dataset.look = edition;
+    } else {
+      delete root.dataset.edition;
+      delete root.dataset.look;
+    }
     delete root.dataset.editionReveal;
+    syncLooks();
   }
   const pill = document.querySelector(".st-edition > span");
   if (pill && name) pill.textContent = name;
@@ -3129,6 +3193,8 @@ function revealEdition() {
   if (!edition) return;
   delete root.dataset.editionReveal;
   root.dataset.edition = edition;
+  root.dataset.look = edition;
+  syncLooks();
   if (prefersReducedMotion()) return;
   root.classList.add("is-edition-lit");
   window.setTimeout(() => root.classList.remove("is-edition-lit"), 1800);
