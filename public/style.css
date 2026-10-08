@@ -1421,6 +1421,62 @@ button.tile:active { transform: translateY(2px); }
 .st-snack { margin-top: 18px; }
 .stat-peek { margin-top: 0; }
 
+/* 카드로 자랑하기 and the 포키 카드 sheet it opens */
+.sheet-head .st-share {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  margin: 0 0 0 auto;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+.sheet-head .st-share:active { transform: scale(.92); box-shadow: none; }
+.sheet-head .st-share svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.share-stage {
+  display: grid;
+  place-items: center;
+  margin-top: 2px;
+}
+.share-canvas {
+  display: block;
+  width: auto;
+  height: min(56dvh, 440px);
+  aspect-ratio: 9 / 16;
+  border-radius: 14px;
+  background: rgba(8, 11, 19, .45);
+  box-shadow: 0 0 0 1px rgba(241, 214, 140, .28), 0 12px 28px rgba(0, 0, 0, .45);
+  transition: opacity .2s ease;
+}
+.sheet.is-drawing .share-canvas { opacity: .4; }
+.share-hint {
+  margin-top: 10px;
+  text-align: center;
+  font-size: .875rem;
+  font-weight: 700;
+  color: var(--gold-light);
+}
+.share-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 16px;
+}
+.share-actions button { flex: 1; margin-top: 0; }
+.share-actions button:disabled { opacity: .55; cursor: default; }
+
 /* A stat that grew, coins that landed: a short line floating up. */
 @media (prefers-reduced-motion: reduce) {
   .st-bar i { transition: none; }

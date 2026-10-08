@@ -65,6 +65,7 @@ const ICONS = {
   mic: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5"/></svg>`,
   send: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19.5V5M6 10.5 12 4.5l6 6"/></svg>`,
   lock: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
+  share: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14.5V3.8M7.9 7.9 12 3.8l4.1 4.1"/><path d="M8.6 10.8H7.3a2.6 2.6 0 0 0-2.6 2.6v4.3a2.6 2.6 0 0 0 2.6 2.6h9.4a2.6 2.6 0 0 0 2.6-2.6v-4.3a2.6 2.6 0 0 0-2.6-2.6h-1.3"/></svg>`,
 };
 
 const TOGGLE = KINDS.filter((k) => k.toggle);
@@ -225,7 +226,7 @@ function statCard({ kind, edition, sheet }, owner) {
   const name = Object.hasOwn(EDITIONS, edition) ? edition : "classic";
   return sheetHtml("stats", "능력치", `<p class="st-who"><b class="st-animal" data-stat-animal>${animalName(kind)}</b><span class="st-edition is-${name}">${EDITIONS[name].name}</span></p>
       <ul class="st-list" data-max="${STAT_BAR_MAX}">${rows}</ul>${owner ? `
-      <button type="button" class="st-snack" data-stat-farm>텃밭에서 간식 주기</button>` : ""}`);
+      <button type="button" class="st-snack" data-stat-farm>텃밭에서 간식 주기</button>` : ""}`, owner ? `<button type="button" class="st-share" data-share-card aria-label="카드로 자랑하기">${ICONS.share}</button>` : "");
 }
 
 function petStats(pet) {
@@ -255,12 +256,12 @@ function themeSheet(current) {
       <ul class="theme-grid">${cards}</ul>`);
 }
 
-function sheetHtml(id, title, body) {
+function sheetHtml(id, title, body, action = "") {
   return `<div class="sheet" data-sheet="${id}" role="dialog" aria-modal="true" aria-labelledby="sheet-${id}-title" hidden>
     <section class="sheet-card">
       <header class="sheet-head">
         <h2 id="sheet-${id}-title">${title}</h2>
-        <button type="button" class="sheet-close" data-sheet-close aria-label="닫기">${ICONS.close}</button>
+        ${action}<button type="button" class="sheet-close" data-sheet-close aria-label="닫기">${ICONS.close}</button>
       </header>
       ${body}
     </section>

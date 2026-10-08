@@ -639,6 +639,9 @@ html[data-theme="8bit"] .st-bar {
 html[data-theme="8bit"] .st-bar .st-plus,
 html[data-theme="8bit"] .st-bar .st-trained { background: var(--st-light); box-shadow: none; }
 html[data-theme="8bit"] .st-boost { color: var(--ink); background: var(--gold-light); box-shadow: none; }
+html[data-theme="8bit"] .sheet-head .st-share { color: var(--cream); }
+html[data-theme="8bit"] .sheet-head .st-share svg { stroke-linecap: square; stroke-linejoin: miter; }
+html[data-theme="8bit"] .share-canvas { border-radius: 0; box-shadow: -4px 0 0 0 var(--cream), 4px 0 0 0 var(--cream), 0 -4px 0 0 var(--cream), 0 4px 0 0 var(--cream), 8px 10px 0 0 rgba(0, 0, 0, 0.35); }
 html[data-theme="8bit"] .stat-pop {
   border-radius: 0;
   color: var(--ink);

@@ -1583,12 +1583,13 @@ function closeSheet() {
 document.querySelectorAll("[data-open]").forEach((button) => {
   button.addEventListener("click", () => openSheet(button.dataset.open, button));
 });
-document.querySelectorAll("[data-sheet]").forEach((sheet) => {
+function wireSheet(sheet) {
   sheet.addEventListener("click", (event) => {
     if (event.target === sheet) closeSheet();
   });
   sheet.querySelector("[data-sheet-close]")?.addEventListener("click", closeSheet);
-});
+}
+document.querySelectorAll("[data-sheet]").forEach(wireSheet);
 document.addEventListener("keydown", (event) => {
   if (!sheetOpen) return;
   if (event.key === "Escape") {
@@ -3013,6 +3014,26 @@ function trainedPop(trained, delay = 0) {
 
 fillBars();
 document.querySelectorAll('[data-open="stats"]').forEach((button) => button.addEventListener("click", () => fillBars(true)));
+
+// The 능력치 sheet closes first, so the card sheet hands focus back to what opened 능력치, not to this hidden button.
+const shareCard = document.querySelector("[data-share-card]");
+if (shareCard) {
+  let retry = 0;
+  shareCard.addEventListener("click", () => {
+    import(retry ? `/share-card.js?retry=${retry}` : "/share-card.js")
+      .catch((error) => {
+        retry += 1;
+        throw error;
+      })
+      .then((m) => {
+        if (!shareCard.closest(".sheet.is-open")) return;
+        const opener = sheetOpener;
+        closeSheet();
+        return m.showShareCard(document, { wire: wireSheet, open: () => openSheet("share", opener) });
+      })
+      .catch(() => {});
+  });
+}
 
 /* Tap combo: plushie taps in a row play a hello, the world's trick, then the secret move; the key counts them. */
 const combo = (function tapCombo() {
