@@ -394,7 +394,7 @@ function farmAttrs(farm) {
   return ` data-farm-dot="${farm.dot ? 1 : 0}" data-farm-now="${farm.now}"${next}${visit}`;
 }
 
-export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = DEFAULT_KIND, wake = false, morning = false, asleep = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, days = null, meet = false, theme = "classic", farm = null, owner = false, card = null, edition = "classic", met = "" } = {}) {
+export function page(row, content, { waving = false, away = false, lonely = false, timeLine = false, celebrate = "", countHtml = "", pet = null, mascot = DEFAULT_KIND, wake = false, morning = false, asleep = false, demo = "", dialog = "", speaker = "", stats = "", dock = "", sheets = "", level = null, days = null, meet = false, theme = "classic", farm = null, owner = false, card = null, edition = "classic", met = "", diag = false } = {}) {
   const look = themeOf(theme);
   const title = escapeHtml(row?.pet_name || "새 친구");
   const timeEl = timeLine ? `<p class="time-line" data-time-line></p>` : "";
@@ -433,7 +433,8 @@ export function page(row, content, { waving = false, away = false, lonely = fals
   <link rel="stylesheet" href="/kinds.css">
   <link rel="stylesheet" href="/mascot-toggle.css">${themed ? `
   <link rel="stylesheet" href="/themes/${look.id}.css">` : ""}
-  <script src="/mascot-boot.js" data-mascots="${TOGGLE.map((k) => k.id).join(" ")}" data-reveals="${KINDS.filter((k) => k.reveal).map((k) => k.id).join(" ")}"></script>
+  <script src="/mascot-boot.js" data-mascots="${TOGGLE.map((k) => k.id).join(" ")}" data-reveals="${KINDS.filter((k) => k.reveal).map((k) => k.id).join(" ")}"></script>${diag ? `
+  <script type="module" src="/diag.js"></script>` : ""}
   <script src="/app.js" defer></script>
 </head>
 <body${bodyClass ? ` class="${bodyClass}"` : ""}${farmAttrs(farm)}${met ? ` data-met="${escapeHtml(met)}"` : ""}${celebrateAttr}${wake ? " data-wake" : ""}${morning ? " data-morning" : ""}${asleep ? " data-asleep" : ""}>
@@ -561,7 +562,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
     `${recovery}${prompt}`,
     {
       waving: Boolean(code), lonely: Boolean(pet?.lonely), timeLine: true, celebrate: kind, countHtml, pet, mascot, wake: Boolean(code), morning: Boolean(pet?.morning), asleep: Boolean(pet?.asleep), demo,
-      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, days: pet ? pet.days : null, meet: !row.pet_name, theme, farm: row.pet_name ? pet?.farm : null, owner: Boolean(row.pet_name), card: row.pet_name ? card : null, edition: card?.edition, met: row.pet_name ? row.created_at : "", ...extras,
+      dialog, speaker: row.pet_name || "", stats, level: pet ? pet.level : null, days: pet ? pet.days : null, meet: !row.pet_name, theme, farm: row.pet_name ? pet?.farm : null, owner: Boolean(row.pet_name), card: row.pet_name ? card : null, edition: card?.edition, met: row.pet_name ? row.created_at : "", diag: true, ...extras,
     },
   );
 }
