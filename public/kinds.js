@@ -1,5 +1,5 @@
 // The 12 POKKEY plushies in zodiac order: the one list the server, the pages and the games read.
-// rival: its 달리기 시합 opponent; toggle: on the everyday 말/양 switch; reveal: has its own opening video.
+// rival: its 달리기 시합 opponent; toggle: a browser can keep it as its own (?mascot=); reveal: has its own opening video.
 export const KINDS = [
   { id: "rat", name: "쥐", rival: "ox", reveal: true },
   { id: "ox", name: "소", rival: "rat", reveal: true },

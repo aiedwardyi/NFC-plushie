@@ -50,6 +50,7 @@ html[data-theme="najeon"] .level-pin {
   box-shadow: 0 0 0 1.5px var(--pearl), 0 0 0 3.5px var(--lacquer), 0 0 0 4.5px rgba(233, 231, 239, 0.3), 0 4px 8px rgba(0, 0, 0, 0.5);
 }
 html[data-theme="najeon"] .level-pin::after { background: rgba(255, 255, 255, 0.18); }
+html[data-theme="najeon"] .level-pin svg { fill: #c8323c; filter: drop-shadow(0 1px 0 #5e1014); }
 
 /* Window: inlay screen in a lacquer frame with a bead border */
 html[data-theme="najeon"] .window {
@@ -230,6 +231,8 @@ html[data-theme="najeon"] .theme-say {
 html[data-theme="najeon"] .wake-call::before,
 html[data-theme="najeon"] .theme-say::after { background: var(--pearl); }
 html[data-theme="najeon"] .copy { color: var(--pearl); box-shadow: inset 0 0 0 1.5px var(--pearl-dim); }
+html[data-theme="najeon"] .copy.is-done,
+html[data-theme="najeon"] .copy.is-go { background: var(--pearl-sheen); color: #0c0c10; box-shadow: none; }
 html[data-theme="najeon"] .nameplate.is-placeholder { opacity: .45; }
 html[data-theme="najeon"] .dialog .is-soft { color: rgba(233, 231, 239, 0.66); }
 html[data-theme="najeon"] .dialog .is-lonely-line { color: #c9c2e0; }

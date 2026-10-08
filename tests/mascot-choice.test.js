@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 
-function page({ saved = null, preference = "horse", lapsed = false, query = "", picker = false, owner = false, kept = null } = {}) {
+function page({ saved = null, preference = "horse", lapsed = false, query = "", owner = false, kept = null } = {}) {
   let stored = preference;
   let cookie = preference && !lapsed ? `mascot=${preference}` : "";
   let art = saved || "horse";
@@ -14,7 +14,6 @@ function page({ saved = null, preference = "horse", lapsed = false, query = "", 
     getAttribute: () => kind,
     setAttribute() {},
     classList: { toggle() {} },
-    closest: () => picker ? {} : null,
     addEventListener: (event, fn) => { if (event === "click") clicks.set(kind, () => fn({ currentTarget: buttons.find((b) => b.getAttribute() === kind) })); },
   }));
   const document = {
@@ -23,8 +22,7 @@ function page({ saved = null, preference = "horse", lapsed = false, query = "", 
     documentElement: { getAttribute: () => art, setAttribute: (_, value) => { art = value; } },
     querySelector: (selector) => selector === "script[data-mascots]" ? { dataset: { mascots: "horse sheep" } }
       : selector === 'meta[name="pet-kind"]' && saved ? { content: saved }
-      : selector === ".dock[data-care-uid]" && owner ? { dataset: { careUid: "04AAAAAAAAAAA1" } }
-      : selector === "[data-mascot-toggle][data-owner]" && owner ? {} : null,
+      : selector === ".dock[data-care-uid]" && owner ? { dataset: { careUid: "04AAAAAAAAAAA1" } } : null,
     querySelectorAll: (selector) => selector === ".mascot-tog" ? buttons : [],
   };
   const source = readFileSync(new URL("../public/app.js", import.meta.url), "utf8").split(/\r?\nconst toggle =/)[0];
@@ -114,16 +112,8 @@ test("an explicit mascot query persists the choice while saved pet art still win
   assert.doesNotMatch(p.url(), /mascot=/);
 });
 
-test("the everyday toggle persists a choice even when that pet is already shown", () => {
-  const p = page({ saved: "sheep" });
-  p.click("sheep");
-  assert.deepEqual(p.choice(), { cookie: "mascot=sheep", stored: "sheep", art: "sheep" });
-  p.click("horse");
-  assert.deepEqual(p.choice(), { cookie: "mascot=horse", stored: "horse", art: "horse" });
-});
-
 test("the admin animal picker keeps the browser's choice after saving", async () => {
-  const p = page({ saved: "horse", picker: true });
+  const p = page({ saved: "horse" });
   p.click("sheep");
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(p.choice(), { cookie: "mascot=horse", stored: "horse", art: "sheep" });
