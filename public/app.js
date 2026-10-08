@@ -3950,6 +3950,23 @@ function loadPixi() {
   return VENDOR.reduce((done, src) => done.then(() => vendorScript(src)), Promise.resolve());
 }
 
+// How long 시작 or 텃밭 waits for its scene to be ready to show; past that it comes back with a retry line.
+const START_MS = 10000;
+
+// A wait that gives up after `ms`: nothing a room waits on before its scene shows may hold the page.
+function within(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("timed out")), ms);
+    promise.then((value) => {
+      window.clearTimeout(timer);
+      resolve(value);
+    }, (error) => {
+      window.clearTimeout(timer);
+      reject(error);
+    });
+  });
+}
+
 function petBusy() {
   return Boolean(careHold.busy || waking || document.documentElement.classList.contains("has-reveal")
     || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump"));
@@ -4139,6 +4156,7 @@ const arcade = (function arcadeRoom() {
     ready.tap("screen");
   }
 
+  // The game is on screen in the same task the home is taken: its open() settled before this runs.
   async function run(g, mode) {
     closeSheet();
     combo.end();
@@ -4148,7 +4166,15 @@ const arcade = (function arcadeRoom() {
     document.addEventListener("pointerdown", onScreen, true);
     let out = "again";
     try {
-      while (out === "again") out = await g.play(mode, Number(dock.dataset.giBest) || 0);
+      out = await g.play(mode, Number(dock.dataset.giBest) || 0);
+      // A round again keeps its stage; a window that changed size meanwhile gets a new one first, within the same bound.
+      while (out === "again") {
+        await within(g.open(), START_MS);
+        out = await g.play(mode, Number(dock.dataset.giBest) || 0);
+      }
+    } catch {
+      g.exit();
+      out = "aborted";
     } finally {
       combo.sink(null);
       document.removeEventListener("pointerdown", onScreen, true);
@@ -4160,7 +4186,8 @@ const arcade = (function arcadeRoom() {
     else if (out === "aborted") care.fx.say(FAILED);
   }
 
-  // A tap is held until the engine is up and the NFC reader has had its moment; closing the sheet first drops it.
+  // A tap is held while the engine, the art and the stage get ready and the NFC reader has its moment; the home is
+  // taken only once the game can show. Closing the sheet first drops the tap, and a wait past START_MS gives 시작 back.
   function begin() {
     if (playing || held || careHold.asleep || petBusy()) return;
     const tap = {};
@@ -4173,20 +4200,29 @@ const arcade = (function arcadeRoom() {
     const listening = "NDEFReader" in window ? combo.listen() : null;
     const reader = listening && Promise.race([listening, new Promise((resolve) => window.setTimeout(() => resolve(null), NFC_WAIT_MS))]);
     // After a failed load, this tap tries again.
-    Promise.all([prepare(), reader]).then(([g, nfc]) => {
-      if (held !== tap) return;
-      held = null;
-      paintStart();
-      // While it waited, the sheet may have closed, the page hidden, the stage been rebuilt or a combo begun.
-      if (sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) return;
+    const opened = prepare().then((g) => (held === tap ? g.open().then(() => g) : g));
+    Promise.all([within(opened, START_MS), reader]).then(([g, nfc]) => {
+      const mine = held === tap;
+      if (mine) {
+        held = null;
+        paintStart();
+      }
+      // While it waited, the sheet may have closed, the page hidden, the stage been rebuilt or a combo begun: a stage
+      // made for nothing goes, unless a newer tap waits on it.
+      if (!mine || sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) {
+        if (!held && !playing) g.exit();
+        return;
+      }
       playing = true;
       run(g, nfc ? "nfc" : "screen");
     }, () => {
-      if (held !== tap) return;
-      held = null;
-      start.textContent = "시작";
-      start.disabled = false;
-      blurb.textContent = FAILED;
+      if (held === tap) {
+        held = null;
+        start.textContent = "시작";
+        start.disabled = false;
+        blurb.textContent = FAILED;
+      }
+      if (!held && !playing) ready?.exit();
     });
   }
 
@@ -4278,6 +4314,7 @@ const racing = (function raceRoom() {
     start.textContent = held ? "준비 중…" : "시작";
     blurb.textContent = careHold.asleep ? "쿨쿨 자는 중이에요" : label;
   }
+  // The race is on screen in the same task the home is taken: its open() settled before this runs.
   async function run(g, mode) {
     playing = true;
     closeSheet();
@@ -4286,7 +4323,7 @@ const racing = (function raceRoom() {
     root.classList.add("g-on", "r-on");
     combo.sink(() => g.tap("nfc"));
     let out = "quit";
-    try { out = await g.play(mode, state, root.dataset.mascot, raced); }
+    try { out = await g.play(mode); }
     finally {
       combo.sink(null);
       combo.end();
@@ -4298,6 +4335,7 @@ const racing = (function raceRoom() {
     if (out === "quit") care.fx.say("재밌었어요! 또 달려요!");
     else if (out === "aborted") care.fx.say(FAILED);
   }
+  // As in 기 모으기: the home is taken only once the race can show, and a wait past START_MS gives 시작 back.
   function begin() {
     if (held || playing || careHold.asleep || petBusy()) return;
     const tap = {};
@@ -4307,17 +4345,25 @@ const racing = (function raceRoom() {
     tryVibrate(12);
     const listening = "NDEFReader" in window ? combo.listen() : null;
     const reader = listening && Promise.race([listening, new Promise((done) => setTimeout(() => done(null), NFC_WAIT_MS))]);
-    Promise.all([prepare(), reader]).then(([g, nfc]) => {
-      if (held !== tap) return;
-      held = null;
-      paint();
-      if (sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) return;
+    const opened = prepare().then((g) => (held === tap ? g.open(state, root.dataset.mascot, raced).then(() => g) : g));
+    Promise.all([within(opened, START_MS), reader]).then(([g, nfc]) => {
+      const mine = held === tap;
+      if (mine) {
+        held = null;
+        paint();
+      }
+      if (!mine || sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) {
+        if (!held && !playing) g.exit();
+        return;
+      }
       run(g, nfc ? "nfc" : "screen");
     }, () => {
-      if (held !== tap) return;
-      held = null;
-      paint();
-      blurb.textContent = "지금은 열 수 없어요. 다시 눌러 주세요";
+      if (held === tap) {
+        held = null;
+        paint();
+        blurb.textContent = "지금은 열 수 없어요. 다시 눌러 주세요";
+      }
+      if (!held && !playing) ready?.exit();
     });
   }
   function restyle() {
@@ -4713,7 +4759,7 @@ const farm = (function farmRoom() {
     win.addEventListener("pointermove", onMove);
     win.addEventListener("pointerup", onUp);
     win.addEventListener("pointercancel", onUp);
-    return st.enter(reply, how);
+    return st.play(reply, how);
   }
 
   // The home is back at once; the farm's slide-out is decoration over it and never holds the page.
@@ -4734,7 +4780,7 @@ const farm = (function farmRoom() {
     playSfx(`care-${kit()}-press`);
     buzz(10);
     try {
-      ready?.leave();
+      ready?.exit();
     } finally {
       if (stale) restyle();
       paintDot();
@@ -4755,10 +4801,12 @@ const farm = (function farmRoom() {
     arriving = true;
     if (r.picked.length) tapped += 1;
     preload();
-    prepare().then((st) => {
+    // The stage is made under the visit's cover: the farm takes the home only once it can be drawn, or the cover goes.
+    within(prepare().then((st) => st.open().then(() => st)), START_MS).then((st) => {
       opening = false;
       if (isOpen || careHold.asleep || st !== ready) {
         uncover();
+        if (!isOpen) st.exit();
         return undefined;
       }
       return enter(st, r, "visit").finally(uncover).then(() => {
@@ -4772,6 +4820,7 @@ const farm = (function farmRoom() {
       }).catch((error) => broken(error, r));
     }, () => {
       uncover();
+      if (!isOpen) ready?.exit();
       // The visit already harvested, so its XP and hearts show even without the farm.
       openFailed();
       flush(r);
@@ -4802,24 +4851,35 @@ const farm = (function farmRoom() {
     preload();
     opening = true;
     button.classList.add("is-loading");
-    // The engine first: a farm made for an engine that never loaded would lose its first-open show.
-    prepare().then((st) => post("open").then(({ status, reply }) => {
+    // The engine first: a farm made for an engine that never loaded would lose its first-open show. The stage is made
+    // before the farm takes the home, and a wait past START_MS gives 텃밭 back; a late reply still counts.
+    const made = prepare().then((st) => post("open").then(({ status, reply }) => {
+      if (reply?.created) first = reply;
+      if (reply) after(reply);
+      if (!reply || !opening) return { st, status, reply };
+      return st.open().then(() => ({ st, status, reply }));
+    }));
+    within(made, START_MS).then(({ st, status, reply }) => {
       opening = false;
       button.classList.remove("is-loading");
       if (!reply) {
         care.fx.say(status === 409 ? ASLEEP : FAILED);
         return;
       }
-      if (reply.created) first = reply;
-      after(reply);
-      if (isOpen || document.hidden || careHold.asleep || petBusy() || sheetOpen || st !== ready) return;
+      if (isOpen || document.hidden || careHold.asleep || petBusy() || sheetOpen || st !== ready) {
+        if (!isOpen) st.exit();
+        return;
+      }
       const r = first ? { ...first, farm: reply.farm, hearts: reply.hearts } : reply;
       enter(st, r, first ? "tutorial" : "open").then(() => {
         // Still open means the tutorial played through; 집으로 mid-show keeps it for the next open.
         if (isOpen) first = null;
         flush(r);
       }, (error) => broken(error, r));
-    }), openFailed);
+    }, () => {
+      if (!isOpen) ready?.exit();
+      openFailed();
+    });
   }
 
   // The visit's own celebration plays first; the farm takes the window once the screen has been quiet a moment.

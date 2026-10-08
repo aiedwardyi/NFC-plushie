@@ -95,16 +95,9 @@ function tasteWords(p) {
   return `맛보기! ${mins < 60 ? `${mins}분` : `${Math.round(mins / 60)}시간`} 뒤에 익어요`;
 }
 
-async function img(url) {
-  const i = new Image();
-  i.src = url;
-  await i.decode();
-  return i;
-}
-
 export async function createFarm(api) {
   // A retry's query reaches the stage module too: a failed module import stays failed for its URL.
-  const { makeStage } = await import(`./stage.js${new URL(import.meta.url).search}`);
+  const { makeStage, loadImage: img } = await import(`./stage.js${new URL(import.meta.url).search}`);
   const P = window.PIXI;
   const FX = P.filters;
   const { win, pet: petEl } = api;
@@ -821,6 +814,14 @@ export async function createFarm(api) {
     return el;
   }
   const domAnim = (el, frames, o) => el.animate(frames, { fill: "forwards", ...o }).finished.catch(() => {});
+  // The home pet's own moves, one at a time and held here so every way out cancels them by hand: a finished animation
+  // that is only forgotten keeps its last frame on the pet once collected (Chromium 141 and older), out of getAnimations().
+  let petAnim = null;
+  function petMove(frames, o) {
+    petAnim?.cancel();
+    petAnim = petEl.animate(frames, o);
+    return petAnim;
+  }
   function bigText(text, cls = "", hold = 900) {
     const el = domAdd(`f-big ${cls}`);
     el.textContent = text;
@@ -1234,7 +1235,7 @@ export async function createFarm(api) {
     thump({ gain: 0.8 });
     shake = 4;
     burst(gx, floor, 10, { tex: T.dust, a0: Math.PI, a1: Math.PI * 2, v0: 40, v1: 120, s0: 0.3, s1: 0.6, l0: 0.5, l1: 0.8, layer: S.homeFx });
-    if (!calm) domAnim(petEl, [{ transform: "translateY(0)" }, { transform: "translateY(-16px)", offset: 0.45 }, { transform: "translateY(0)" }], { duration: 420, easing: "ease-out", fill: "none" });
+    if (!calm) petMove([{ transform: "translateY(0)" }, { transform: "translateY(-16px)", offset: 0.45 }, { transform: "translateY(0)" }], { duration: 420, easing: "ease-out" });
     voice("happy", { at: 120, rate: 1.05 });
     const bs = box.scale.x;
     await hold(tween(260, (k) => {
@@ -1297,12 +1298,17 @@ export async function createFarm(api) {
     sfx("whoosh", { gain: 0.9 });
     S.holder.style.visibility = "visible";
     const pr = petEl.getBoundingClientRect();
+    const ms = calm ? 300 : 600;
     const out = calm
-      ? domAnim(petEl, [{ opacity: 1 }, { opacity: 0 }], { duration: 300 })
-      : domAnim(petEl, [{ transform: "translateX(0)", opacity: 1 }, { transform: `translateX(${-pr.width * 0.6}px)`, opacity: 0 }], { duration: 600, easing: "cubic-bezier(.6,0,.3,1)" });
-    out.then(() => {
-      if (entered) petEl.style.visibility = "hidden";
-    });
+      ? petMove([{ opacity: 1 }, { opacity: 0 }], { duration: ms, fill: "forwards" })
+      : petMove([{ transform: "translateX(0)", opacity: 1 }, { transform: `translateX(${-pr.width * 0.6}px)`, opacity: 0 }], { duration: ms, easing: "cubic-bezier(.6,0,.3,1)", fill: "forwards" });
+    // Out of sight, the pet is hidden for real and the slide dropped, so no last frame is left for a later cancel to find.
+    later(() => {
+      petEl.style.visibility = "hidden";
+      if (petAnim !== out) return;
+      out.cancel();
+      petAnim = null;
+    }, ms);
     await hold(tween(700, (k) => {
       S.farm.x = W * (1 - k);
     }, E.io));
@@ -2109,8 +2115,11 @@ export async function createFarm(api) {
     }
     return undefined;
   }
-  // The home pet as the home shows it: no inline visibility, and no slide's last frame hiding it.
+  // The home pet as the home shows it, at once: its own move cancelled by hand, no inline visibility, and any CSS
+  // animation on it dropped too (getAnimations() is only the fallback for those).
   function restorePet() {
+    petAnim?.cancel();
+    petAnim = null;
     petEl.style.visibility = "";
     petEl.getAnimations().forEach((a) => a.cancel());
   }
@@ -2124,8 +2133,15 @@ export async function createFarm(api) {
   }
 
   return {
+    // Makes the stage ahead of play(), so the app takes the screen only once the farm can be drawn there.
+    async open() {
+      const g = gen;
+      await ready();
+      // Given up on while it was being made: the stage goes.
+      if (g !== gen && !entered) teardown();
+    },
     // Draws the field as it was before `r` and brings the farm in; "tutorial" plays the whole first open.
-    async enter(r, how = "open") {
+    async play(r, how = "open") {
       const g = gen;
       await ready();
       // 집으로 while the stage was still being made: stay shut, and let the stage go.
@@ -2318,16 +2334,18 @@ export async function createFarm(api) {
       paintCta();
       schedule();
     },
-    // 집으로: the app has the home back already. The farm slides out over it as decoration, and its stage goes once
-    // it is out, or after LEAVE_MS whatever the frames do; a stage that faulted goes at once.
-    leave() {
+    // 집으로, or a farm the app gave up on: the pet is back at once. A farm on screen slides out over the home as
+    // decoration, and its stage goes once it is out, or after LEAVE_MS whatever the frames do; one never shown, or
+    // faulted, goes at once.
+    exit() {
       if (!built) {
-        // Mid-build there is no stage to slide out; the bump keeps a pending enter or refit shut.
+        // Mid-build there is no stage to slide out; the bump keeps a pending open, play or refit shut.
         gen += 1;
         entered = false;
         restorePet();
         return;
       }
+      const shown = entered;
       cut();
       entered = false;
       clearTimeout(growTimer);
@@ -2336,14 +2354,11 @@ export async function createFarm(api) {
         p.tag?.remove();
         p.tag = null;
       }
-      const away = petEl.style.visibility === "hidden";
       restorePet();
-      if (!stage.live) {
+      if (!shown || !stage.live) {
         teardown();
         return;
       }
-      const pr = petEl.getBoundingClientRect();
-      if (away && !calm) domAnim(petEl, [{ transform: `translateX(${-pr.width * 0.6}px)`, opacity: 0 }, { transform: "translateX(0)", opacity: 1 }], { duration: 520, easing: "cubic-bezier(.3,0,.2,1)", fill: "none" });
       const g = gen;
       const gone = () => {
         if (g === gen && !entered) teardown();

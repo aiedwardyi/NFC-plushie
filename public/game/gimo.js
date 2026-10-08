@@ -94,16 +94,9 @@ function iconSvg(id, px) {
   return `<svg viewBox="0 0 32 32" data-icon="${id}" aria-hidden="true">${SI[id]}</svg>`;
 }
 
-async function img(url) {
-  const i = new Image();
-  i.src = url;
-  await i.decode();
-  return i;
-}
-
 export async function createGimo(api) {
   // A retry's query reaches the stage module too: a failed module import stays failed for its URL.
-  const { makeStage } = await import(`./stage.js${new URL(import.meta.url).search}`);
+  const { makeStage, loadImage: img } = await import(`./stage.js${new URL(import.meta.url).search}`);
   const P = window.PIXI;
   const FX = P.filters;
   const { win, pet: petEl } = api;
@@ -549,8 +542,7 @@ export async function createGimo(api) {
   // A frame that threw or a lost context: the game ends, or the stage goes if none is on.
   function lost(error) {
     console.error(error);
-    if (done) exit("aborted");
-    else teardown();
+    exit("aborted");
   }
   // Bloom only lights the effects; on the sky or the fur it washes the frame out.
   function applyCamFilters() {
@@ -884,8 +876,12 @@ export async function createGimo(api) {
   // Leaving, from any phase: the pet is back on the home and play() settles once, whatever else fails on the way.
   // Only "again" keeps the stage, for the run that follows at once.
   function exit(value) {
-    if (!done) return;
     gen += 1;
+    if (!done) {
+      // Nothing on screen yet: an open the app gave up on, so whatever it made goes.
+      teardown();
+      return;
+    }
     const ended = done;
     done = null;
     phase = "idle";
@@ -934,14 +930,29 @@ export async function createGimo(api) {
     facesFrom = "";
   }
 
+  // The stage for a game, made while the room still shows 준비 중…, or the one kept from the last round while the window
+  // is the same size (the browser's bars can change it): the app takes the screen only once this has settled.
+  // One open at a time; exit() lets a pending one go.
+  let opening = null;
+  function open() {
+    opening ||= (async () => {
+      const g = gen;
+      if (!built || changed()) {
+        teardown();
+        await setupStage();
+      } else {
+        await loadFaces();
+      }
+      if (g !== gen) throw STOP;
+    })().finally(() => {
+      opening = null;
+    });
+    return opening;
+  }
+
+  // Everything up to the first await shows at once: play() puts the game on screen in the same task the app takes it.
   async function begin() {
-    // The window can change size (the browser's bars), so a stale stage is rebuilt first.
-    if (!built || changed()) {
-      teardown();
-      await hold(setupStage());
-    } else {
-      await hold(loadFaces());
-    }
+    if (!built) throw new Error("기 모으기 played without its stage");
     resetStage();
     hudEl = domAdd("g-hud", `<div class="g-timer"><i></i></div><p class="g-height"><small>예상 높이</small><b>0</b><span>m</span></p>${str > 0 ? `
       <p class="g-bonus">힘 +${str >= 1 ? Math.round(str) : str}%</p>` : ""}
@@ -1377,7 +1388,8 @@ export async function createGimo(api) {
   }
 
   return {
-    // Settles once, with "again", "quit" or "aborted".
+    open,
+    // On screen at once, after open(); settles once, with "again", "quit" or "aborted".
     play(how, record) {
       if (done) return done.promise;
       let resolve;

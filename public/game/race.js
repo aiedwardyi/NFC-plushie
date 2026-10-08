@@ -9,6 +9,7 @@ const HIP = 0.6;
 const STARTER_X = -3.4;
 const HINT_ART = `<svg viewBox="0 0 40 56" aria-hidden="true"><rect x="6" y="2" width="28" height="52" rx="6" class="h-phone"/><circle cx="20" cy="22" r="7" class="h-spot"/><circle cx="12" cy="9" r="2.2" class="h-cam"/></svg>`;
 const TAU = Math.PI * 2;
+const STOP = Symbol("stop");
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, k) => a + (b - a) * k;
 const smooth = (k) => (k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k));
@@ -16,13 +17,6 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 // The roster's art under /game/art/race/, which phones keep a day; bump ART_V when one changes.
 const ART_V = 2;
 const faceUrl = (kind, face, px) => px ? `/themes/px/${kind}${face === "canon" ? "" : face === "blink" ? "-closed" : "-happy"}-px.png` : `/mascot-${kind}-${face === "canon" ? "512-v3.png" : face === "blink" ? "closed-512.webp" : "happy-512.webp"}`;
-
-async function image(url) {
-  const i = new Image();
-  i.src = url;
-  await i.decode();
-  return i;
-}
 
 // The drawn part of a 512 px frame, so the rig bends the plush and not its empty margin.
 function cropOf(img) {
@@ -40,7 +34,7 @@ function cropOf(img) {
 export async function createRace(api) {
   // A retry's query reaches the parts too: a failed module import stays failed for its URL.
   const v = new URL(import.meta.url).search;
-  const [{ RACE, eta, newRace, picker, raceTap, stepRace }, { WORLD_ART, canvas, sprites }, { DEFAULT_KIND, KINDS, kindOf }, { makeStage }] = await Promise.all([import(`./race-model.js${v}`), import(`./race-art.js${v}`), import(`../kinds.js${v}`), import(`./stage.js${v}`)]);
+  const [{ RACE, eta, newRace, picker, raceTap, stepRace }, { WORLD_ART, canvas, sprites }, { DEFAULT_KIND, KINDS, kindOf }, { makeStage, loadImage: image }] = await Promise.all([import(`./race-model.js${v}`), import(`./race-art.js${v}`), import(`../kinds.js${v}`), import(`./stage.js${v}`)]);
   const PETS = Object.fromEntries(KINDS.map((k) => [k.id, k.name]));
   const P = window.PIXI;
   const FX = P.filters;
@@ -93,8 +87,9 @@ export async function createRace(api) {
   }));
   const first = kindOf(document.documentElement.dataset.mascot).id;
   try {
-    // 8-bit sizes every runner off the 말 sprite, so its texels land on the pixel grid.
-    await loadFaces([first, kindOf(first).rival, ...(px ? [DEFAULT_KIND] : [])]);
+    // 8-bit sizes every runner off the 말 sprite, so its texels land on the pixel grid. The rival's faces are only a head
+    // start: a race whose rival is late picks another.
+    await Promise.all([loadFaces([first, ...(px ? [DEFAULT_KIND] : [])]), loadFaces([kindOf(first).rival]).catch(() => {})]);
   } catch (error) {
     shell.remove();
     throw error;
@@ -680,14 +675,28 @@ export async function createRace(api) {
   let hintSeen = false;
   try { hintSeen = localStorage.getItem("pokkey-race-hint") === "1"; } catch {}
 
+  // Fades and drops that end in a state are held per element, so the timer that sets that state, and every way out,
+  // cancels them by hand: a finished animation that is only forgotten keeps its last frame once collected (Chromium 141
+  // and older), out of reach of getAnimations().
+  const fills = new Map();
+  function fillTo(el, frames, o) {
+    fills.get(el)?.cancel();
+    const a = el.animate(frames, { ...o, fill: "forwards" });
+    fills.set(el, a);
+    return a;
+  }
+  function unfill(el) {
+    fills.get(el)?.cancel();
+    fills.delete(el);
+  }
+
   function say(text, cls = "") {
     big.textContent = text;
     big.className = `r-big ${cls}`;
-    big.getAnimations().forEach((a) => a.cancel());
     const pop = px ? "steps(3)" : "cubic-bezier(.2,1.5,.4,1)";
     const frames = still ? [{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 1, offset: 0.82 }, { opacity: 0 }]
       : [{ transform: "scale(.2) rotate(-12deg)", opacity: 0, easing: pop }, { transform: "scale(1) rotate(-4deg)", opacity: 1, offset: 0.24, easing: "linear" }, { transform: "scale(1.04) rotate(-4deg)", opacity: 1, offset: 0.8, easing: px ? "steps(2)" : "cubic-bezier(.5,0,.9,.5)" }, { transform: "scale(1.5) rotate(-4deg)", opacity: 0 }];
-    big.animate(frames, { duration: cls === "is-count" ? 720 : cls === "is-go" ? 900 : 1150, fill: "forwards" });
+    fillTo(big, frames, { duration: cls === "is-count" ? 720 : cls === "is-go" ? 900 : 1150 });
   }
 
   function setPhase(p) {
@@ -749,7 +758,7 @@ export async function createRace(api) {
       ${agi > 0 ? `<p class="r-bonus">민첩 +${agi >= 1 ? Math.round(agi) : agi}%</p>` : ""}
       <button type="button" class="r-go">시작</button>`;
     ready();
-    $(".r-pick").getAnimations().forEach((a) => a.cancel());
+    unfill($(".r-pick"));
     $(".r-pick").style.pointerEvents = "";
     $(".r-pick").hidden = false;
     cam.lift = crane();
@@ -802,8 +811,12 @@ export async function createRace(api) {
     if (quick) sheet.hidden = true;
     else {
       sheet.style.pointerEvents = "none";
-      sheet.animate(still ? [{ opacity: 1 }, { opacity: 0 }] : [{ transform: "none" }, { transform: "translateY(115%)" }], { duration: still ? 140 : 300, easing: "cubic-bezier(.5,0,.8,.4)", fill: "forwards" });
-      after(320, () => { if (phase !== "pick") sheet.hidden = true; });
+      fillTo(sheet, still ? [{ opacity: 1 }, { opacity: 0 }] : [{ transform: "none" }, { transform: "translateY(115%)" }], { duration: still ? 140 : 300, easing: "cubic-bezier(.5,0,.8,.4)" });
+      after(320, () => {
+        if (phase === "pick") return;
+        sheet.hidden = true;
+        unfill(sheet);
+      });
     }
     $(".r-hud").hidden = false;
     motion($(".r-hud"), [{ transform: "translateY(-46px)", opacity: 0 }, { transform: "none", opacity: 1 }], 520, 120);
@@ -814,7 +827,7 @@ export async function createRace(api) {
     if (!hintSeen) {
       const fine = matchMedia("(pointer: fine)").matches;
       $(".r-hint").innerHTML = mode === "nfc" ? `${HINT_ART}화면을 톡톡! 인형을 톡 하면 부스터!` : `화면을 톡톡 눌러서 달려요!${fine ? " 스페이스바도 돼요" : ""}`;
-      $(".r-hint").getAnimations().forEach((a) => a.cancel());
+      unfill($(".r-hint"));
       $(".r-hint").hidden = false;
       hintSeen = true;
       try { localStorage.setItem("pokkey-race-hint", "1"); } catch {}
@@ -955,9 +968,12 @@ export async function createRace(api) {
       if (!still) { slowUntil = clock + 0.55; cam.rv += lead ? 0.5 : -0.5; }
     }
     const hint = $(".r-hint");
-    if (!hint.hidden && model.time > 3.5 && !hint.getAnimations().length) {
-      hint.animate([{ opacity: 1 }, { opacity: 0, transform: "translateY(8px)" }], { duration: 400, easing: "ease-in", fill: "forwards" });
-      after(420, () => { hint.hidden = true; });
+    if (!hint.hidden && model.time > 3.5 && !fills.has(hint)) {
+      fillTo(hint, [{ opacity: 1 }, { opacity: 0, transform: "translateY(8px)" }], { duration: 400, easing: "ease-in" });
+      after(420, () => {
+        hint.hidden = true;
+        unfill(hint);
+      });
     }
     if (!spurt && Math.max(...model.distance) >= 80) {
       spurt = true;
@@ -1087,8 +1103,12 @@ export async function createRace(api) {
     // The finish photo lifts off the scene before the card lands.
     const shot = $(".r-photo");
     if (!shot.hidden) {
-      shot.animate(still ? [{ opacity: 0 }] : [{ transform: "translateY(-70px) rotate(-7deg) scale(.88)", opacity: 0 }], { duration: 260, easing: "cubic-bezier(.5,0,.9,.4)", fill: "forwards" });
-      after(280, () => { if (phase === "result") shot.hidden = true; });
+      fillTo(shot, still ? [{ opacity: 0 }] : [{ transform: "translateY(-70px) rotate(-7deg) scale(.88)", opacity: 0 }], { duration: 260, easing: "cubic-bezier(.5,0,.9,.4)" });
+      after(280, () => {
+        if (phase !== "result") return;
+        shot.hidden = true;
+        unfill(shot);
+      });
     }
     $(".r-card").innerHTML = `<div class="g-badge r-medal${result.won ? " is-win" : ""}">${result.won ? "1등" : "2등"}</div>
       <p class="g-place">${result.won ? "멋지게 달렸어요!" : "끝까지 달렸어요!"}</p>
@@ -1481,8 +1501,8 @@ export async function createRace(api) {
     $(".r-photo figcaption b").textContent = `${result.gap.toFixed(2)}초 차이`;
     $(".r-photo").hidden = false;
     const tilt = world === "milk" ? -4 : px ? 0 : -1.5;
-    $(".r-photo").getAnimations().forEach((a) => a.cancel());
-    if (!still) $(".r-photo").animate([{ transform: "scale(1.15) rotate(0deg)", opacity: 0 }, { transform: `scale(.97) rotate(${tilt}deg)`, opacity: 1, offset: 0.45 }, { transform: `scale(1) rotate(${tilt}deg)`, opacity: 1 }], { duration: 560, easing: px ? "steps(5)" : "cubic-bezier(.2,1.2,.4,1)", fill: "forwards" });
+    unfill($(".r-photo"));
+    if (!still) fillTo($(".r-photo"), [{ transform: "scale(1.15) rotate(0deg)", opacity: 0 }, { transform: `scale(.97) rotate(${tilt}deg)`, opacity: 1, offset: 0.45 }, { transform: `scale(1) rotate(${tilt}deg)`, opacity: 1 }], { duration: 560, easing: px ? "steps(5)" : "cubic-bezier(.2,1.2,.4,1)" });
   }
 
   function hud() {
@@ -1569,11 +1589,12 @@ export async function createRace(api) {
       if (g !== gen) return;
       shell.hidden = true;
       shell.style.pointerEvents = "";
+      for (const el of [...fills.keys()]) unfill(el);
       down();
     };
     clearTimeout(fadeTimer);
     if (fade && !shell.hidden && shell.style.visibility !== "hidden") {
-      shell.animate([{ opacity: 1 }, { opacity: 0, transform: still ? "none" : "scale(1.04)" }], { duration: 240, easing: "ease-in", fill: "forwards" });
+      fillTo(shell, [{ opacity: 1 }, { opacity: 0, transform: still ? "none" : "scale(1.04)" }], { duration: 240, easing: "ease-in" });
       fadeTimer = setTimeout(close, 260);
     } else close();
     done?.(out);
@@ -1585,36 +1606,38 @@ export async function createRace(api) {
     exit(false, "aborted");
   }
 
-  async function open(g, input, race, kind, raced) {
+  // Faces, stage and scene for a race, made while the room still shows 준비 중…: the app takes the screen only once this
+  // has settled, and play() shows it at once.
+  async function make(race, kind, raced) {
+    const g = gen;
     const next = kindOf(kind).id;
-    const rival = raced && raced !== next ? raced : kindOf(next).rival;
-    // An animal picked since the race was made, or the rival raced last, loads its faces first.
-    await loadFaces([next, rival]);
-    if (g !== gen) return;
+    const wanted = raced && raced !== next ? raced : kindOf(next).rival;
+    // The pet's own faces are a must; a rival whose art is late races as an animal whose art is here.
+    const [mine, theirs] = await Promise.allSettled([loadFaces([next]), loadFaces([wanted])]);
+    if (mine.status === "rejected") throw mine.reason;
+    const rival = theirs.status === "fulfilled" ? wanted : Object.keys(looks).find((k) => k !== next);
+    if (!rival) throw theirs.reason;
+    if (g !== gen) throw STOP;
     state = race || {};
     own = next;
     match = picker(rival, (k) => loadFaces([k]));
-    mode = input;
     still = Boolean(api.still());
     shell.classList.toggle("r-still", still);
-    // Laid out for its size but unseen until the stage is in: the iris opens on a drawn scene.
+    // Laid out for its size but unseen until play(): the iris opens on a drawn scene.
+    unfill(shell);
     shell.style.visibility = "hidden";
     shell.style.pointerEvents = "";
     shell.hidden = false;
-    shell.getAnimations().forEach((a) => a.cancel());
     measure();
     // A stage still fading out from the last race goes first: one context at a time.
     down();
     await up();
     if (g !== gen) {
       down();
-      return;
+      throw STOP;
     }
     kinds();
     build();
-    pick();
-    enter();
-    stage.run(tick, shot);
   }
 
   // State changes ride timers, not animation promises: a finished promise is not guaranteed to settle.
@@ -1641,7 +1664,7 @@ export async function createRace(api) {
     tap("screen");
   }
   function key(event) {
-    if (shell.hidden) return;
+    if (shell.hidden || shell.style.visibility === "hidden") return;
     if (event.code === "Escape") exit(true);
     else if (event.code === "Space" && phase === "run") { event.preventDefault(); if (!event.repeat) tap("screen"); }
     else if (event.code === "Tab") {
@@ -1685,18 +1708,31 @@ export async function createRace(api) {
   });
   observer.observe(shell);
 
+  // One open at a time; exit() lets a pending one go.
+  let opening = null;
+
   return {
     get phase() { return phase; },
     tap,
     exit,
-    // Settles once, with "quit" or "aborted", however the race is left.
-    play(input, race, kind, raced) {
-      if (resolve) exit();
-      const g = ++gen;
-      const done = new Promise((res) => { resolve = res; });
-      open(g, input, race, kind, raced).catch((error) => {
-        if (g === gen) broke(error);
+    open(race, kind, raced) {
+      opening ||= make(race, kind, raced).finally(() => {
+        opening = null;
       });
+      return opening;
+    },
+    // On screen at once, after open(); settles once, with "quit" or "aborted", however the race is left.
+    play(input) {
+      mode = input;
+      const done = new Promise((res) => { resolve = res; });
+      try {
+        if (!S) throw new Error("race played without its stage");
+        pick();
+        enter();
+        stage.run(tick, shot);
+      } catch (error) {
+        broke(error);
+      }
       return done;
     },
     dispose() {

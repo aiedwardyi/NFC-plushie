@@ -1,5 +1,29 @@
 /* The scenes' one Pixi setup. A stage lives only while its scene is on screen: made on the way in, dropped on the way out,
-   so the page holds one WebGL context at most. A frame that throws or a lost context ends the scene once, through `fault`. */
+   so the page holds one WebGL context at most. A frame that throws or a lost context ends the scene once, through `fault`.
+   Everything a scene waits on before it shows has a deadline, so a stalled load can never hold the page. */
+
+const IMAGE_MS = 8000;
+
+// An image once it has arrived, by its load event: decode() rides the compositor and can stall on a phone under GPU
+// pressure. Past `ms` the load fails instead.
+export function loadImage(url, ms = IMAGE_MS) {
+  return new Promise((resolve, reject) => {
+    const i = new Image();
+    const timer = setTimeout(() => {
+      i.onload = i.onerror = null;
+      reject(new Error(`${url} did not load in ${ms} ms`));
+    }, ms);
+    i.onload = () => {
+      clearTimeout(timer);
+      resolve(i);
+    };
+    i.onerror = () => {
+      clearTimeout(timer);
+      reject(new Error(`${url} did not load`));
+    };
+    i.src = url;
+  });
+}
 
 // Pixi reads the shader precision on a WebGL context of its own and keeps that context; read here first and dropped, it never sits beside a stage.
 let probed = false;
