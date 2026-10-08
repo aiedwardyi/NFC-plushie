@@ -2,6 +2,8 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import cookieParser from "cookie-parser";
 import { DEFAULT_KIND, KINDS, KIND_IDS, kindOf } from "../public/kinds.js";
+import { CITY_IDS } from "../public/cities.js";
+import { cityLevel } from "../public/game/race-model.js";
 import * as binding from "./binding.js";
 import { hash, ownerToken, recoveryCode } from "./secrets.js";
 import { EMPTY_FOUND, EMPTY_SEEN } from "./db.js";
@@ -14,7 +16,8 @@ import { FARM, addGiftSeeds, buySeed, farmDot, farmView, feedCrop, giftSeeds, ha
 import { KIND_CSS, awayLine, devPage, heartHalves, milestoneLine, page, petPage, previewPetPage, strangerPage, themeOf } from "./pages.js";
 import { mountTalk, purgeTalk, takeQuestion } from "./chat.js";
 import { mountDiag } from "./diag.js";
-import { EDITIONS, STAT_KEYS, editionOf, parseStats, setBoost, statSheet, train, useBoost } from "./stats.js";
+import { EDITIONS, STAT_KEYS, editionOf, parseStats, setBoost, statBonus, statSheet, train, useBoost } from "./stats.js";
+import { CITY, addWin, boardShown, cityPid, dayTickets, joinCity, leaveCity, matchId, matchRefusal, newsLine, noBidi, pastInbox, shownName, spendTicket, ticketsLeft, validMatch, validPid, weekOf, winsThisWeek } from "./city.js";
 
 const cookieAge = 400 * 24 * 60 * 60 * 1000;
 const cooldown = 15 * 60 * 1000;
@@ -178,6 +181,25 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     const kind = animalOf(row, req);
     return { kind, edition: editionOf(row.uid, editions, row.edition), sheet: sheetOf(row, parseStats(row.stats), kind) };
   };
+  // 우리 동네 shows another owner's pet only by this card: never its uid, its owner or a way to its page.
+  const publicCard = (row) => {
+    const kind = row.kind || DEFAULT_KIND;
+    return { id: row.city_pid, name: shownName(row.pet_name, kind), kind, edition: editionOf(row.uid, editions, row.edition), level: levelForXp(row.xp ?? 0), city: row.city };
+  };
+  const cityState = (row) => ({ city: row.city ?? null, cityPid: row.city_pid ?? null, cityDay: row.city_day ?? null, cityTickets: row.city_tickets ?? 0, cityWeek: row.city_week ?? null, cityWins: row.city_wins ?? 0 });
+  const saveTown = (uid, s) => db.prepare("UPDATE plushies SET city = ?, city_pid = ?, city_week = ?, city_wins = ? WHERE uid = ?").run(s.city, s.cityPid, s.cityWeek, s.cityWins, uid);
+  const townOf = (row, t) => ({ city: row.city, tickets: ticketsLeft(cityState(row), t), tapped: row.city_day === seoulDayKey(t), wins: winsThisWeek(cityState(row), t), me: publicCard(row) });
+  // Every real tap that isn't a stale replay calls this; only the Seoul day's first fills, so spent tickets don't come back.
+  const tapTickets = (uid, t) => {
+    const fill = dayTickets(t);
+    db.prepare("UPDATE plushies SET city_day = ?, city_tickets = ? WHERE uid = ? AND city_day IS NOT ?").run(fill.cityDay, fill.cityTickets, uid, fill.cityDay);
+  };
+  const cityNews = (uid) => db.prepare("SELECT COUNT(*) AS n FROM city_matches WHERE defender = ? AND done_at IS NOT NULL AND seen = 0").get(uid).n;
+  // A demo pet starts clean: out of its city, no tickets, no news and no records of its own.
+  const purgeCity = (uid) => {
+    db.prepare("DELETE FROM city_matches WHERE defender = ? OR (challenger = ? AND done_at IS NULL)").run(uid, uid);
+    db.prepare("UPDATE plushies SET city = NULL, city_pid = NULL, city_day = NULL, city_tickets = NULL, city_week = NULL, city_wins = NULL WHERE uid = ?").run(uid);
+  };
 
   // One care beat's write, for 밥 놀이 잠 and for a hungry pet's farm snack.
   function saveCare(uid, out, t) {
@@ -280,6 +302,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       arcadeLeft: xpPlaysLeft(care, t),
       giBest: care.giBest,
       race: raceState(fresh.race),
+      city: { id: fresh.city || "", news: cityNews(fresh.uid) },
       farm: { dot: farmDot(farm, levelForXp(farmRow.xp ?? 0), t), next: farm ? nextRipeAt(farm, t) : null, now: t, visit: extra.visit || null },
     };
   }
@@ -446,6 +469,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           rng,
         });
         raiseMirror();
+        if (out.reason !== "stale") tapTickets(serial, t);
         let extra = null;
         if (out.rewarded) extra = writePetReward(serial, st, out, getRow(serial), t, today);
         const fresh = getRow(serial);
@@ -489,7 +513,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     if (!decisions.canRename(row, req.cookies.owner_token || null, hash)) {
       return res.status(403).send(row ? strangerPage(row, "", { theme: req.theme, card: cardOf(row, req) }) : page(null, "<p>먼저 인형에 폰을 톡 대서 친구를 만나 보세요.</p>", { theme: req.theme }));
     }
-    const trimmed = typeof name === "string" ? name.trim() : "";
+    const trimmed = typeof name === "string" ? noBidi(name).trim() : "";
     if (!trimmed || Array.from(trimmed).length > 24) {
       return res.status(400).send(page(row, `<p>이름은 1글자에서 24글자 사이로 지어주세요.</p><a class="button" href="/t?uid=${uid}">다시 지어볼래요</a>`, { theme: req.theme }));
     }
@@ -551,6 +575,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     if (counter !== null && (st.lastCounter === null || counter > st.lastCounter)) {
       db.prepare("UPDATE plushies SET last_counter = ? WHERE uid = ?").run(counter, uid);
     }
+    tapTickets(uid, t);
     if (out.rewarded) writePetReward(uid, st, out, getRow(uid), t, seoulDayKey(t));
     const fresh = getRow(uid);
     const xp = xpProgress(fresh.xp);
@@ -588,6 +613,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         if (counter !== null && (st.lastCounter === null || counter > st.lastCounter)) {
           db.prepare("UPDATE plushies SET last_counter = ? WHERE uid = ?").run(counter, uid);
         }
+        tapTickets(uid, t);
       }
       return { ok: true, combo: c.combo, same: c.same, tapCount: getRow(uid).tap_count };
     })();
@@ -667,6 +693,110 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     res.json(reply);
   });
 
+  // 우리 동네: one route per step, each for a named pet's owner by its uid; other pets go only by their public ids.
+  function cityRoute(path, valid, handle) {
+    app.post(path, (req, res) => {
+      const body = req.body || {};
+      if (!validUid(body.uid) || !valid(body)) return res.status(400).json({ ok: false });
+      const reply = db.transaction(() => {
+        const row = getRow(body.uid);
+        if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row.pet_name) return 403;
+        return handle(row, body, now(), req);
+      })();
+      if (typeof reply === "number") return res.status(reply).json({ ok: false });
+      res.json(reply);
+    });
+  }
+
+  cityRoute("/city/join", ({ city }) => CITY_IDS.includes(city), (row, { city }, t) => {
+    const next = joinCity(cityState(row), city, cityPid());
+    if (next) saveTown(row.uid, next);
+    return { ok: true, ...townOf(getRow(row.uid), t) };
+  });
+
+  cityRoute("/city/leave", () => true, (row) => {
+    if (!row.city) return 409;
+    saveTown(row.uid, leaveCity());
+    return { ok: true, city: null };
+  });
+
+  // Whom this pet owes a 복수전, newest first: challengers that beat it in a record it still holds from the last 7 days, not beaten since in a race of its own, on the card they raced with.
+  const revengeOf = (row, t) => db.prepare("SELECT challenger, card, MAX(done_at) AS lost FROM city_matches WHERE defender = ? AND won = 1 AND done_at >= ? GROUP BY challenger ORDER BY lost DESC")
+    .all(row.uid, t - CITY.revengeMs)
+    .filter((m) => !db.prepare("SELECT 1 FROM city_matches WHERE challenger = ? AND defender = ? AND won = 1 AND done_at > ?").get(row.uid, m.challenger, m.lost))
+    .map((m) => db.prepare("SELECT * FROM plushies WHERE uid = ? AND city_pid = ?").get(m.challenger, JSON.parse(m.card).id))
+    .filter(Boolean).map(publicCard);
+
+  // The city's other pets, the closest levels first, past the 복수전 it is owed; a pet that hasn't joined gets its tickets and no one.
+  cityRoute("/city/roster", () => true, (row, body, t) => {
+    if (!row.city) return { ok: true, ...townOf(row, t), rivals: [], revenge: [] };
+    const mine = levelForXp(row.xp ?? 0);
+    const revenge = revengeOf(row, t);
+    const rivals = db.prepare("SELECT * FROM plushies WHERE city = ? AND uid != ?").all(row.city, row.uid).map(publicCard)
+      .filter((r) => !revenge.some((v) => v.id === r.id))
+      .sort((a, b) => Math.abs(a.level - mine) - Math.abs(b.level - mine) || b.level - a.level).slice(0, CITY.roster);
+    return { ok: true, ...townOf(row, t), rivals, revenge };
+  });
+
+  // This week's wins, and nothing about rankings until the city has enough pets.
+  cityRoute("/city/board", () => true, (row, body, t) => {
+    if (!row.city || !boardShown(db.prepare("SELECT COUNT(*) AS n FROM plushies WHERE city = ?").get(row.city).n)) return { ok: true, board: null };
+    const board = db.prepare("SELECT * FROM plushies WHERE city = ? AND city_week = ? AND city_wins > 0 ORDER BY city_wins DESC, xp DESC LIMIT ?")
+      .all(row.city, weekOf(t), CITY.board).map((r) => ({ ...publicCard(r), wins: r.city_wins, me: r.uid === row.uid }));
+    return { ok: true, board };
+  });
+
+  // A challenge spends a ticket and issues the one match id its result may use.
+  cityRoute("/city/race", ({ rival }) => validPid(rival), (row, { rival }, t) => {
+    if (row.slept_at !== null || !row.city) return 409;
+    const foe = db.prepare("SELECT * FROM plushies WHERE city_pid = ?").get(rival);
+    const spent = spendTicket(cityState(row), t);
+    if (!foe || foe.uid === row.uid || !spent) return 409;
+    const card = publicCard(foe);
+    // The defender runs on its base, edition and training; a snack boost waits for its own next race.
+    const agi = statSheet(parseStats(foe.stats), card.kind, card.edition).agi;
+    const id = matchId();
+    db.prepare("DELETE FROM city_matches WHERE done_at IS NULL AND expires <= ?").run(t);
+    db.prepare("UPDATE plushies SET city_day = ?, city_tickets = ? WHERE uid = ?").run(spent.cityDay, spent.cityTickets, row.uid);
+    db.prepare("INSERT INTO city_matches (id, game, challenger, defender, card, at, expires) VALUES (?, 'race', ?, ?, ?, ?, ?)")
+      .run(id, row.uid, foe.uid, JSON.stringify(publicCard(row)), t, t + CITY.matchMs);
+    return { ok: true, id, rival: card, level: cityLevel(card.level, statBonus(agi.total - agi.boost)), tickets: spent.cityTickets };
+  });
+
+  // The result is the page's word, like any race, but once per issued match: it lands in the defender's records and uses one of the day's arcade plays.
+  cityRoute("/city/result", ({ id, won }) => validMatch(id) && typeof won === "boolean", (row, { id, won }, t, req) => {
+    if (row.slept_at !== null) return 409;
+    const match = db.prepare("SELECT * FROM city_matches WHERE id = ?").get(id);
+    if (matchRefusal(match, row.uid, t)) return 409;
+    db.prepare("UPDATE city_matches SET won = ?, done_at = ? WHERE id = ?").run(won ? 1 : 0, t, id);
+    const records = db.prepare("SELECT id FROM city_matches WHERE defender = ? AND done_at IS NOT NULL ORDER BY done_at DESC, rowid DESC").all(match.defender);
+    for (const old of pastInbox(records)) db.prepare("DELETE FROM city_matches WHERE id = ?").run(old.id);
+    const winner = won ? row : getRow(match.defender);
+    const win = addWin(cityState(winner), t);
+    db.prepare("UPDATE plushies SET city_week = ?, city_wins = ? WHERE uid = ?").run(win.cityWeek, win.cityWins, winner.uid);
+    const st = petState(row, t);
+    const out = applyPlay(st, st.giBest, t);
+    const xp = st.xp + out.xpGain;
+    const { stats, trained, boostUsed } = playStats(row, "agi", t);
+    db.prepare("UPDATE plushies SET arcade_day = ?, arcade_plays = ?, xp = ?, stats = ? WHERE uid = ?").run(out.arcadeDay, out.arcadePlays, xp, JSON.stringify(stats), row.uid);
+    const after = xpProgress(xp);
+    const { tickets, tapped, wins } = townOf(getRow(row.uid), t);
+    return { ok: true, won, xpGain: out.xpGain, xpLeft: out.xpLeft, level: after.level, leveledUp: after.level > levelForXp(st.xp), xpInto: after.into, xpSpan: after.span,
+      trained, boostUsed, stats: sheetOf(row, stats, animalOf(row, req)), tickets, tapped, wins };
+  });
+
+  // The races run against this pet since its owner last looked, handed out once; a card whose public id is gone can't be raced.
+  cityRoute("/city/inbox", () => true, (row, body, t) => {
+    const unseen = db.prepare("SELECT * FROM city_matches WHERE defender = ? AND done_at IS NOT NULL AND seen = 0 ORDER BY done_at DESC, rowid DESC").all(row.uid);
+    db.prepare("UPDATE city_matches SET seen = 1 WHERE defender = ? AND done_at IS NOT NULL AND seen = 0").run(row.uid);
+    const news = unseen.map((m) => {
+      const card = JSON.parse(m.card);
+      return { card, held: m.won === 0, at: m.done_at, gone: !db.prepare("SELECT 1 FROM plushies WHERE city_pid = ?").get(card.id) };
+    });
+    const { tickets, tapped } = townOf(row, t);
+    return { ok: true, news, line: news.length ? newsLine(news) : "", tickets, tapped };
+  });
+
   app.post("/kind", (req, res) => {
     const { uid, kind, fill } = req.body || {};
     if (!validUid(uid) || !TOGGLE_KINDS.includes(kind)) return res.status(400).json({ ok: false });
@@ -734,6 +864,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     app.post("/demo/fresh-start", (req, res) => {
       const uid = req.body?.uid;
       if (!demoUids.includes(uid)) return res.status(403).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>", { theme: req.theme }));
+      purgeCity(uid);
       db.prepare("DELETE FROM plushies WHERE uid = ?").run(uid);
       purgeTalk(db, uid);
       clearCelebrate(res);
@@ -744,6 +875,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       const uid = req.body?.uid;
       if (!demoUids.includes(uid)) return res.status(403).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>", { theme: req.theme }));
       db.prepare("UPDATE plushies SET fed_at = NULL, meals = NULL, played_at = NULL, plays = NULL, slept_at = NULL WHERE uid = ?").run(uid);
+      purgeCity(uid);
       setSkip(res, uid);
       res.redirect(303, `/t?uid=${uid}`);
     });

@@ -3,6 +3,13 @@ export const RACE = { meters: 100, step: 1 / 240, cap: 20 };
 
 export const rivalTime = (level) => 13.6 * 0.972 ** (level - 1);
 
+// A city rival races as its own level, plus its 민첩 bonus as the same speed it gives the pet, counted in race levels;
+// capped at the top built-in rival, which taps alone still beat.
+export function cityLevel(level, agi) {
+  const lift = Math.log(1 + agi / 100) / Math.log(rivalTime(1) / rivalTime(2));
+  return Math.max(1, Math.min(RACE.cap, Math.round(level + lift)));
+}
+
 const smooth = (k) => (k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k));
 
 // A quick start, a breathing pace and a late kick, so leads change and the end stays close.

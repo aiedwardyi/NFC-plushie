@@ -1,4 +1,6 @@
 import { DEFAULT_KIND, KINDS, kindOf } from "../public/kinds.js";
+import { cityName } from "../public/cities.js";
+import { cityPicker } from "../public/game/city.js";
 import { GIFTS, GIFT_COUNT, GIFT_TIERS } from "./gifts.js";
 import { FARM, isRipe } from "./farm.js";
 import { seoulDayKey } from "./pet.js";
@@ -535,6 +537,17 @@ function talkBar(name) {
   </form>`;
 }
 
+// 우리 동네 in 우리 기록: the pet's city, changed or left here; picking one is joining.
+function recordTown(city) {
+  return `<div class="record-town" data-town data-city="${escapeHtml(city)}">
+        <dl class="record-list"><div><dt>우리 동네</dt><dd data-town-name>${cityName(city) || "아직 없어요"}</dd></div></dl>
+        <div class="town-acts" data-town-idle><button type="button" class="copy" data-town-change>${city ? "동네 바꾸기" : "동네 고르기"}</button><button type="button" class="copy" data-town-leave${city ? "" : " hidden"}>나가기</button></div>
+        <div class="town-pick" data-town-pick hidden>${cityPicker(city)}<div class="town-acts"><button type="button" class="copy" data-town-cancel>취소</button></div></div>
+        <div class="town-ask" data-town-confirm hidden><p>나가면 동네 친구들 목록에서 빠지고, 도전도 받지 않아요.</p><div class="town-acts"><button type="button" class="copy is-go" data-town-go>나갈게요</button><button type="button" class="copy" data-town-cancel>취소</button></div></div>
+        <p class="town-fail" data-town-fail role="alert" hidden>지금은 못 바꿨어요. 잠시 후 다시 해볼까요?</p>
+      </div>`;
+}
+
 // The owner's way back into the guide, kept the sheet's last row.
 const GUIDE_REPLAY = `<button type="button" class="record-guide" data-guide-replay>가이드 다시 보기<span class="g-chev" aria-hidden="true">›</span></button>`;
 
@@ -547,7 +560,8 @@ function homeExtras(row, pet, found, mascot, talk, keyed) {
     dock: dockHtml({ gift: Boolean(pet?.gift), want: pet?.want, meals: pet?.meals, plays: pet?.plays, uid: row.uid, combo: pet?.combo, later: pet?.comboLaterLine, arcadeLeft: pet?.arcadeLeft, giBest: pet?.giBest, farmDot: Boolean(pet?.farm?.dot) }),
     sheets: arcadeSheet(pet, found, mascot)
       + sheetHtml("gifts", "선물함", giftCollection(found, pet?.gift || null))
-      + sheetHtml("record", "우리 기록", `${recordSheet(row, pet)}${keyed ? `\n      ${recordKey()}` : ""}${GUIDE_REPLAY}`)
+      + sheetHtml("record", "우리 기록", `${recordSheet(row, pet)}${keyed ? `\n      ${recordKey()}` : ""}${pet?.city ? `\n      ${recordTown(pet.city.id)}` : ""}${GUIDE_REPLAY}`)
+      + (pet?.city?.news ? sheetHtml("news", "우리 동네 소식", '<div class="news" data-news></div>') : "")
       + SHOP
       + (talk ? talkBar(row.pet_name) : ""),
   };
