@@ -3234,7 +3234,8 @@ html.g-on .window { touch-action: none; }
 .g-chev { margin-left: auto; font-size: 1.2rem; }
 
 .g2-stage { position: absolute; inset: 0; z-index: 1; border-radius: inherit; overflow: hidden; pointer-events: none; }
-.g2-stage canvas { display: block; width: 100% !important; height: 100% !important; }
+/* The canvas fills its window but never stretches: a size it was not drawn for shows it whole and in shape until it is redrawn. */
+.g2-stage canvas { display: block; width: 100% !important; height: 100% !important; object-fit: contain; }
 
 .g-hud { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
 .g-timer { position: absolute; left: 26px; right: 26px; top: 18px; height: 10px; border-radius: 999px; background: var(--g-track); overflow: hidden; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .45); transition: opacity .3s; }
@@ -3355,7 +3356,7 @@ html.f-layout main > footer { display: none; }
 @keyframes f-load { to { transform: translateY(2px) scale(.94); } }
 
 .f-stage { position: absolute; inset: 0; z-index: 2; border-radius: inherit; overflow: hidden; pointer-events: none; }
-.f-stage canvas { display: block; width: 100% !important; height: 100% !important; }
+.f-stage canvas { display: block; width: 100% !important; height: 100% !important; object-fit: contain; }
 .f-layer { position: absolute; inset: 0; z-index: 4; border-radius: inherit; overflow: hidden; pointer-events: none; color: #4a2c20; font-family: "Pretendard Variable", Pretendard, system-ui, sans-serif; container-type: size; }
 .f-field { position: absolute; inset: 0; }
 

@@ -3958,7 +3958,7 @@ function petBusy() {
 // 시작 gives the NFC reader this long, then plays on screen taps: an unanswered permission prompt must not hold the game.
 const NFC_WAIT_MS = 600;
 
-/* 오락실: 기 모으기 on a WebGL stage, loaded when the room first opens; the first 3 plays a day give XP. */
+/* 오락실: 기 모으기 on a WebGL stage made for each game, its code and art loaded when the room first opens; the first 3 plays a day give XP. */
 const arcade = (function arcadeRoom() {
   const dock = document.querySelector(".dock[data-care-uid]");
   const sheet = document.querySelector('[data-sheet="arcade"]');
@@ -4100,7 +4100,7 @@ const arcade = (function arcadeRoom() {
       game = made;
       made.then((g) => {
         if (game === made) ready = g;
-        else g.destroy();
+        else g.dispose();
       }, () => {
         if (game === made) game = null;
       });
@@ -4117,7 +4117,7 @@ const arcade = (function arcadeRoom() {
       start.disabled = true;
       return;
     }
-    // The engine loads behind a live 시작; a tap meanwhile waits for it.
+    // The engine and the art load behind a live 시작, the stage only once a game starts; a tap meanwhile waits for them.
     if (!ready) prepare().catch(() => {
       if (!held && sheetOpen === sheet) blurb.textContent = FAILED;
     });
@@ -4157,6 +4157,7 @@ const arcade = (function arcadeRoom() {
       playing = false;
     }
     if (out === "quit") care.fx.say("재밌었어요! 또 놀아요!");
+    else if (out === "aborted") care.fx.say(FAILED);
   }
 
   // A tap is held until the engine is up and the NFC reader has had its moment; closing the sheet first drops it.
@@ -4194,7 +4195,7 @@ const arcade = (function arcadeRoom() {
     const old = game;
     game = null;
     ready = null;
-    old.then((g) => g.destroy(), () => {});
+    old.then((g) => g.dispose(), () => {});
   }
 
   button.addEventListener("click", open);
@@ -4207,14 +4208,14 @@ const arcade = (function arcadeRoom() {
     if (document.hidden) ready?.pause();
   });
   window.addEventListener("pagehide", () => {
-    ready?.destroy();
+    ready?.dispose();
     game = null;
     ready = null;
   });
   return { restyle };
 })();
 
-/* 오락실: 달리기 시합 on its own full-screen stage, loaded when the room first opens; a finished race uses one of the day's 3 XP plays. */
+/* 오락실: 달리기 시합 on its own full-screen stage made for each game, its code and art loaded when the room first opens; a finished race uses one of the day's 3 XP plays. */
 const racing = (function raceRoom() {
   const dock = document.querySelector(".dock[data-care-uid]");
   const sheet = document.querySelector('[data-sheet="arcade"]');
@@ -4225,6 +4226,7 @@ const racing = (function raceRoom() {
   const thumb = start.closest(".g-card").querySelector(".g-thumb-pet");
   const label = blurb.textContent;
   const button = dock.querySelector('[data-open="arcade"]');
+  const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
   let state = JSON.parse(start.dataset.race || "{}");
   // The rival raced last stays picked for the rest of this visit, across themes too.
   let raced = null;
@@ -4267,7 +4269,7 @@ const racing = (function raceRoom() {
     if (!game) {
       const made = loadPixi().then(() => import(`/game/race.js${retry ? `?retry=${retry}` : ""}`)).then((m) => m.createRace(api));
       game = made;
-      made.then((g) => { if (game === made) ready = g; else g.destroy(); }, () => { if (game === made) { game = null; retry++; } });
+      made.then((g) => { if (game === made) ready = g; else g.dispose(); }, () => { if (game === made) { game = null; retry++; } });
     }
     return game;
   }
@@ -4294,6 +4296,7 @@ const racing = (function raceRoom() {
       button.focus({ preventScroll: true });
     }
     if (out === "quit") care.fx.say("재밌었어요! 또 달려요!");
+    else if (out === "aborted") care.fx.say(FAILED);
   }
   function begin() {
     if (held || playing || careHold.asleep || petBusy()) return;
@@ -4322,7 +4325,7 @@ const racing = (function raceRoom() {
     const old = game;
     game = null;
     ready = null;
-    old?.then((g) => g.destroy(), () => {});
+    old?.then((g) => g.dispose(), () => {});
   }
   button.addEventListener("click", () => {
     held = null;
@@ -4406,7 +4409,7 @@ const farm = (function farmRoom() {
   const api = {
     win,
     pet,
-    // The open farm's size even while it is shut, so the stage is built once instead of rebuilt on the first open.
+    // The open farm's size even while it is shut, so the art is painted ahead at the size the stage will have.
     size() {
       const shut = !root.classList.contains("f-layout");
       if (shut) root.classList.add("f-layout");
@@ -4468,7 +4471,7 @@ const farm = (function farmRoom() {
       game = made;
       made.then((g) => {
         if (game === made) ready = g;
-        else g.destroy();
+        else g.dispose();
       }, () => {
         if (game === made) game = null;
       });
@@ -4713,6 +4716,7 @@ const farm = (function farmRoom() {
     return st.enter(reply, how);
   }
 
+  // The home is back at once; the farm's slide-out is decoration over it and never holds the page.
   function close() {
     if (!isOpen) return;
     isOpen = false;
@@ -4724,18 +4728,17 @@ const farm = (function farmRoom() {
     win.removeEventListener("pointerup", onUp);
     win.removeEventListener("pointercancel", onUp);
     drag = null;
-    root.classList.remove("f-on");
+    root.classList.remove("f-on", "f-layout");
+    care.release();
     paintButton(false);
     playSfx(`care-${kit()}-press`);
     buzz(10);
-    const st = ready;
-    (st ? st.leave() : Promise.resolve()).catch(() => {}).then(() => {
-      if (isOpen) return;
-      root.classList.remove("f-layout");
-      care.release();
+    try {
+      ready?.leave();
+    } finally {
       if (stale) restyle();
-    });
-    paintDot();
+      paintDot();
+    }
   }
 
   function openFailed() {
@@ -4861,7 +4864,7 @@ const farm = (function farmRoom() {
     const old = game;
     game = null;
     ready = null;
-    old.then((g) => g.destroy(), () => {});
+    old.then((g) => g.dispose(), () => {});
   }
 
   button.addEventListener("click", open);
@@ -4901,15 +4904,13 @@ const farm = (function farmRoom() {
       if (!isOpen) open();
     }, prefersReducedMotion() ? 0 : 320);
   });
+  // The stage fits itself into a new size at once, undistorted; it is built again at that size once nothing shows.
   window.addEventListener("resize", () => {
     window.clearTimeout(fitTimer);
     fitTimer = window.setTimeout(function fit() {
       if (!isOpen || !ready) return;
       if (ready.busy) fitTimer = window.setTimeout(fit, 500);
-      else ready.refit().catch((error) => {
-        console.error(error);
-        close();
-      });
+      else ready.refit().catch((error) => broken(error));
     }, 300);
   });
   document.addEventListener("visibilitychange", () => {
@@ -4920,7 +4921,7 @@ const farm = (function farmRoom() {
   window.addEventListener("pagehide", () => {
     window.clearInterval(cookieTimer);
     window.clearTimeout(dotTimer);
-    ready?.destroy();
+    ready?.dispose();
     game = null;
     ready = null;
   });
