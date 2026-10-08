@@ -252,14 +252,15 @@ test("the font CDN stylesheet never blocks first paint", async (t) => {
   assert.match(boot, /https:\/\/cdn\.jsdelivr\.net\/npm\/pretendard@1\.3\.9\//);
 });
 
-test("farm resize waits for a pantry request and its show before refitting", () => {
+test("farm resize waits for a pantry request, its show and the farm coming in before refitting", () => {
   const farm = readFileSync(new URL("../public/game/farm.js", import.meta.url), "utf8");
   const busy = farm.match(/get busy\(\) \{\s*return ([^;]+);/);
   assert.ok(busy);
-  const isBusy = new Function("showing", "acting", `return ${busy[1]};`);
-  assert.equal(isBusy(false, true), true);
-  assert.equal(isBusy(true, false), true);
-  assert.equal(isBusy(false, false), false);
+  const isBusy = new Function("showing", "acting", "entered", `return ${busy[1]};`);
+  assert.equal(isBusy(false, true, true), true);
+  assert.equal(isBusy(true, false, true), true);
+  assert.equal(isBusy(false, false, false), true);
+  assert.equal(isBusy(false, false, true), false);
   const app = readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
   assert.match(app, /if \(ready\.busy\) fitTimer = window\.setTimeout\(fit, 500\);\s*else ready\.refit\(\)/);
 });

@@ -2231,10 +2231,23 @@ const care = (function careLoop() {
   const FACES = { closed: "blink", happy: "react" };
   const face = (name) => facePet(FACES[name] || name);
 
+  // Each element's one pose, kept to be cancelled by hand: a finished one only forgotten stays drawn once collected (Chromium 141 and older), out of getAnimations().
+  const poses = new WeakMap();
+
   // Poses hold their last frame until the action ends; reduced motion keeps only the timing.
   function move(el, frames, options) {
     if (still()) return wait(options.duration);
-    return el.animate(frames, { fill: "forwards", ...options }).finished.catch(() => {});
+    poses.get(el)?.cancel();
+    const pose = el.animate(frames, { fill: "forwards", ...options });
+    poses.set(el, pose);
+    return pose.finished.catch(() => {});
+  }
+
+  // Back at rest: its pose cancelled by hand, then any CSS animation on it (getAnimations() is only the fallback for those).
+  function rest(el) {
+    poses.get(el)?.cancel();
+    poses.delete(el);
+    el.getAnimations().forEach((a) => a.cancel());
   }
 
   let wantEl = null;
@@ -2380,13 +2393,13 @@ const care = (function careLoop() {
     setWant(null);
     hush();
     pet.classList.add("is-care");
-    motion.getAnimations().forEach((a) => a.cancel());
+    rest(motion);
   }
 
   let danceAsked = -Infinity;
 
   function end() {
-    motion.getAnimations().forEach((a) => a.cancel());
+    rest(motion);
     layer.replaceChildren();
     pet.classList.remove("is-care");
     careHold.busy = false;
@@ -2625,7 +2638,7 @@ const care = (function careLoop() {
     careHold.busy = true;
     setWant(null);
     pet.classList.add("is-care");
-    motion.getAnimations().forEach((a) => a.cancel());
+    rest(motion);
     const b = box();
     let wind = [];
     pet.style.transformOrigin = "50% 100%";
@@ -2693,7 +2706,7 @@ const care = (function careLoop() {
       ], { duration: 640, easing: "ease-in-out" });
     } finally {
       for (const el of wind) el.remove();
-      pet.getAnimations().forEach((a) => a.cancel());
+      rest(pet);
       pet.style.transformOrigin = "";
       end();
       dancing = false;
@@ -2916,7 +2929,7 @@ const care = (function careLoop() {
     delete document.body.dataset.morning;
     pet.classList.remove("is-sleeping");
     pet.classList.add("is-care");
-    motion.getAnimations().forEach((a) => a.cancel());
+    rest(motion);
     const flash = document.createElement("div");
     flash.className = "sun-flash";
     flash.setAttribute("aria-hidden", "true");
@@ -3002,11 +3015,11 @@ const care = (function careLoop() {
     careHold.busy = true;
     setWant(null);
     pet.classList.add("is-care");
-    motion.getAnimations().forEach((a) => a.cancel());
+    rest(motion);
   }
 
   function release() {
-    motion.getAnimations().forEach((a) => a.cancel());
+    rest(motion);
     pet.classList.remove("is-care");
     careHold.busy = false;
     face();
@@ -4016,6 +4029,23 @@ function loadPixi() {
   return VENDOR.reduce((done, src) => done.then(() => vendorScript(src)), Promise.resolve());
 }
 
+// How long 시작 or 텃밭 waits for its scene to be ready to show; past that it comes back with a retry line.
+const START_MS = 10000;
+
+// A wait that gives up after `ms`: nothing a room waits on before its scene shows may hold the page.
+function inTime(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("timed out")), ms);
+    promise.then((value) => {
+      window.clearTimeout(timer);
+      resolve(value);
+    }, (error) => {
+      window.clearTimeout(timer);
+      reject(error);
+    });
+  });
+}
+
 function petBusy() {
   return Boolean(careHold.busy || waking || document.documentElement.classList.contains("has-reveal")
     || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump"));
@@ -4024,7 +4054,7 @@ function petBusy() {
 // 시작 gives the NFC reader this long, then plays on screen taps: an unanswered permission prompt must not hold the game.
 const NFC_WAIT_MS = 600;
 
-/* 오락실: 기 모으기 on a WebGL stage, loaded when the room first opens; the first 3 plays a day give XP. */
+/* 오락실: 기 모으기 on a WebGL stage made for each game, its code and art loaded when the room first opens; the first 3 plays a day give XP. */
 const arcade = (function arcadeRoom() {
   const dock = document.querySelector(".dock[data-care-uid]");
   const sheet = document.querySelector('[data-sheet="arcade"]');
@@ -4166,7 +4196,7 @@ const arcade = (function arcadeRoom() {
       game = made;
       made.then((g) => {
         if (game === made) ready = g;
-        else g.destroy();
+        else g.dispose();
       }, () => {
         if (game === made) game = null;
       });
@@ -4183,7 +4213,7 @@ const arcade = (function arcadeRoom() {
       start.disabled = true;
       return;
     }
-    // The engine loads behind a live 시작; a tap meanwhile waits for it.
+    // The engine and the art load behind a live 시작, the stage only once a game starts; a tap meanwhile waits for them.
     if (!ready) prepare().catch(() => {
       if (!held && sheetOpen === sheet) blurb.textContent = FAILED;
     });
@@ -4205,6 +4235,7 @@ const arcade = (function arcadeRoom() {
     ready.tap("screen");
   }
 
+  // The game is on screen in the same task the home is taken: its open() settled before this runs.
   async function run(g, mode) {
     closeSheet();
     combo.end();
@@ -4214,7 +4245,15 @@ const arcade = (function arcadeRoom() {
     document.addEventListener("pointerdown", onScreen, true);
     let out = "again";
     try {
-      while (out === "again") out = await g.play(mode, Number(dock.dataset.giBest) || 0);
+      out = await g.play(mode, Number(dock.dataset.giBest) || 0);
+      // A round again keeps its stage; a window that changed size meanwhile gets a new one first, within the same bound.
+      while (out === "again") {
+        await inTime(g.open(), START_MS);
+        out = await g.play(mode, Number(dock.dataset.giBest) || 0);
+      }
+    } catch {
+      g.exit();
+      out = "aborted";
     } finally {
       combo.sink(null);
       document.removeEventListener("pointerdown", onScreen, true);
@@ -4223,9 +4262,11 @@ const arcade = (function arcadeRoom() {
       playing = false;
     }
     if (out === "quit") care.fx.say("재밌었어요! 또 놀아요!");
+    else if (out === "aborted") care.fx.say(FAILED);
   }
 
-  // A tap is held until the engine is up and the NFC reader has had its moment; closing the sheet first drops it.
+  // A tap is held while the engine, the art and the stage get ready and the NFC reader has its moment; the home is
+  // taken only once the game can show. Closing the sheet first drops the tap, and a wait past START_MS gives 시작 back.
   function begin() {
     if (playing || held || careHold.asleep || petBusy()) return;
     const tap = {};
@@ -4238,20 +4279,29 @@ const arcade = (function arcadeRoom() {
     const listening = "NDEFReader" in window ? combo.listen() : null;
     const reader = listening && Promise.race([listening, new Promise((resolve) => window.setTimeout(() => resolve(null), NFC_WAIT_MS))]);
     // After a failed load, this tap tries again.
-    Promise.all([prepare(), reader]).then(([g, nfc]) => {
-      if (held !== tap) return;
-      held = null;
-      paintStart();
-      // While it waited, the sheet may have closed, the page hidden, the stage been rebuilt or a combo begun.
-      if (sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) return;
+    const opened = prepare().then((g) => (held === tap ? g.open().then(() => g) : g));
+    Promise.all([inTime(opened, START_MS), reader]).then(([g, nfc]) => {
+      const mine = held === tap;
+      if (mine) {
+        held = null;
+        paintStart();
+      }
+      // While it waited, the sheet may have closed, the page hidden, the stage been rebuilt or a combo begun: a stage
+      // made for nothing goes, unless a newer tap waits on it.
+      if (!mine || sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) {
+        if (!held && !playing) g.exit();
+        return;
+      }
       playing = true;
       run(g, nfc ? "nfc" : "screen");
     }, () => {
-      if (held !== tap) return;
-      held = null;
-      start.textContent = "시작";
-      start.disabled = false;
-      blurb.textContent = FAILED;
+      if (held === tap) {
+        held = null;
+        start.textContent = "시작";
+        start.disabled = false;
+        blurb.textContent = FAILED;
+      }
+      if (!held && !playing) ready?.exit();
     });
   }
 
@@ -4260,7 +4310,7 @@ const arcade = (function arcadeRoom() {
     const old = game;
     game = null;
     ready = null;
-    old.then((g) => g.destroy(), () => {});
+    old.then((g) => g.dispose(), () => {});
   }
 
   button.addEventListener("click", open);
@@ -4273,14 +4323,14 @@ const arcade = (function arcadeRoom() {
     if (document.hidden) ready?.pause();
   });
   window.addEventListener("pagehide", () => {
-    ready?.destroy();
+    ready?.dispose();
     game = null;
     ready = null;
   });
   return { restyle };
 })();
 
-/* 오락실: 달리기 시합 on its own full-screen stage, loaded when the room first opens; a finished race uses one of the day's 3 XP plays. */
+/* 오락실: 달리기 시합 on its own full-screen stage made for each game, its code and art loaded when the room first opens; a finished race uses one of the day's 3 XP plays. */
 const racing = (function raceRoom() {
   const dock = document.querySelector(".dock[data-care-uid]");
   const sheet = document.querySelector('[data-sheet="arcade"]');
@@ -4291,6 +4341,7 @@ const racing = (function raceRoom() {
   const thumb = start.closest(".g-card").querySelector(".g-thumb-pet");
   const label = blurb.textContent;
   const button = dock.querySelector('[data-open="arcade"]');
+  const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
   let state = JSON.parse(start.dataset.race || "{}");
   // The rival raced last stays picked for the rest of this visit, across themes too.
   let raced = null;
@@ -4333,7 +4384,7 @@ const racing = (function raceRoom() {
     if (!game) {
       const made = loadPixi().then(() => import(`/game/race.js${retry ? `?retry=${retry}` : ""}`)).then((m) => m.createRace(api));
       game = made;
-      made.then((g) => { if (game === made) ready = g; else g.destroy(); }, () => { if (game === made) { game = null; retry++; } });
+      made.then((g) => { if (game === made) ready = g; else g.dispose(); }, () => { if (game === made) { game = null; retry++; } });
     }
     return game;
   }
@@ -4342,6 +4393,7 @@ const racing = (function raceRoom() {
     start.textContent = held ? "준비 중…" : "시작";
     blurb.textContent = careHold.asleep ? "쿨쿨 자는 중이에요" : label;
   }
+  // The race is on screen in the same task the home is taken: its open() settled before this runs.
   async function run(g, mode) {
     playing = true;
     closeSheet();
@@ -4350,7 +4402,7 @@ const racing = (function raceRoom() {
     root.classList.add("g-on", "r-on");
     combo.sink(() => g.tap("nfc"));
     let out = "quit";
-    try { out = await g.play(mode, state, root.dataset.mascot, raced); }
+    try { out = await g.play(mode); }
     finally {
       combo.sink(null);
       combo.end();
@@ -4360,7 +4412,9 @@ const racing = (function raceRoom() {
       button.focus({ preventScroll: true });
     }
     if (out === "quit") care.fx.say("재밌었어요! 또 달려요!");
+    else if (out === "aborted") care.fx.say(FAILED);
   }
+  // As in 기 모으기: the home is taken only once the race can show, and a wait past START_MS gives 시작 back.
   function begin() {
     if (held || playing || careHold.asleep || petBusy()) return;
     const tap = {};
@@ -4370,17 +4424,25 @@ const racing = (function raceRoom() {
     tryVibrate(12);
     const listening = "NDEFReader" in window ? combo.listen() : null;
     const reader = listening && Promise.race([listening, new Promise((done) => setTimeout(() => done(null), NFC_WAIT_MS))]);
-    Promise.all([prepare(), reader]).then(([g, nfc]) => {
-      if (held !== tap) return;
-      held = null;
-      paint();
-      if (sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) return;
+    const opened = prepare().then((g) => (held === tap ? g.open(state, root.dataset.mascot, raced).then(() => g) : g));
+    Promise.all([inTime(opened, START_MS), reader]).then(([g, nfc]) => {
+      const mine = held === tap;
+      if (mine) {
+        held = null;
+        paint();
+      }
+      if (!mine || sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) {
+        if (!held && !playing) g.exit();
+        return;
+      }
       run(g, nfc ? "nfc" : "screen");
     }, () => {
-      if (held !== tap) return;
-      held = null;
-      paint();
-      blurb.textContent = "지금은 열 수 없어요. 다시 눌러 주세요";
+      if (held === tap) {
+        held = null;
+        paint();
+        blurb.textContent = "지금은 열 수 없어요. 다시 눌러 주세요";
+      }
+      if (!held && !playing) ready?.exit();
     });
   }
   function restyle() {
@@ -4388,7 +4450,7 @@ const racing = (function raceRoom() {
     const old = game;
     game = null;
     ready = null;
-    old?.then((g) => g.destroy(), () => {});
+    old?.then((g) => g.dispose(), () => {});
   }
   button.addEventListener("click", () => {
     held = null;
@@ -4472,7 +4534,7 @@ const farm = (function farmRoom() {
   const api = {
     win,
     pet,
-    // The open farm's size even while it is shut, so the stage is built once instead of rebuilt on the first open.
+    // The open farm's size even while it is shut, so the art is painted ahead at the size the stage will have.
     size() {
       const shut = !root.classList.contains("f-layout");
       if (shut) root.classList.add("f-layout");
@@ -4534,7 +4596,7 @@ const farm = (function farmRoom() {
       game = made;
       made.then((g) => {
         if (game === made) ready = g;
-        else g.destroy();
+        else g.dispose();
       }, () => {
         if (game === made) game = null;
       });
@@ -4776,9 +4838,10 @@ const farm = (function farmRoom() {
     win.addEventListener("pointermove", onMove);
     win.addEventListener("pointerup", onUp);
     win.addEventListener("pointercancel", onUp);
-    return st.enter(reply, how);
+    return st.play(reply, how);
   }
 
+  // The home is back at once; the farm's slide-out is decoration over it and never holds the page.
   function close() {
     if (!isOpen) return;
     isOpen = false;
@@ -4790,19 +4853,18 @@ const farm = (function farmRoom() {
     win.removeEventListener("pointerup", onUp);
     win.removeEventListener("pointercancel", onUp);
     drag = null;
-    root.classList.remove("f-on");
+    root.classList.remove("f-on", "f-layout");
+    care.release();
     care.fx.say("재밌었어요! 또 놀아요!");
     paintButton(false);
     playSfx(`care-${kit()}-press`);
     buzz(10);
-    const st = ready;
-    (st ? st.leave() : Promise.resolve()).catch(() => {}).then(() => {
-      if (isOpen) return;
-      root.classList.remove("f-layout");
-      care.release();
+    try {
+      ready?.exit();
+    } finally {
       if (stale) restyle();
-    });
-    paintDot();
+      paintDot();
+    }
   }
 
   function openFailed() {
@@ -4819,10 +4881,12 @@ const farm = (function farmRoom() {
     arriving = true;
     if (r.picked.length) tapped += 1;
     preload();
-    prepare().then((st) => {
+    // The stage is made under the visit's cover: the farm takes the home only once it can be drawn, or the cover goes.
+    inTime(prepare().then((st) => st.open().then(() => st)), START_MS).then((st) => {
       opening = false;
       if (isOpen || careHold.asleep || st !== ready) {
         uncover();
+        if (!isOpen) st.exit();
         return undefined;
       }
       return enter(st, r, "visit").finally(uncover).then(() => {
@@ -4836,6 +4900,7 @@ const farm = (function farmRoom() {
       }).catch((error) => broken(error, r));
     }, () => {
       uncover();
+      if (!isOpen) ready?.exit();
       // The visit already harvested, so its XP and hearts show even without the farm.
       openFailed();
       flush(r);
@@ -4866,24 +4931,41 @@ const farm = (function farmRoom() {
     preload();
     opening = true;
     button.classList.add("is-loading");
-    // The engine first: a farm made for an engine that never loaded would lose its first-open show.
-    prepare().then((st) => post("open").then(({ status, reply }) => {
+    // The engine first: a farm made for an engine that never loaded would lose its first-open show. The stage is made
+    // while the open request is out, before the farm takes the home; a wait past START_MS gives 텃밭 back, a late reply still counts.
+    const made = prepare().then((st) => {
+      const asked = post("open");
+      const staged = opening ? st.open() : null;
+      staged?.catch(() => {});
+      return asked.then(({ status, reply }) => {
+        if (reply?.created) first = reply;
+        if (reply) after(reply);
+        if (!reply || !opening) return { st, status, reply };
+        return (staged || st.open()).then(() => ({ st, status, reply }));
+      });
+    });
+    inTime(made, START_MS).then(({ st, status, reply }) => {
       opening = false;
       button.classList.remove("is-loading");
       if (!reply) {
+        if (!isOpen) st.exit();
         care.fx.say(status === 409 ? ASLEEP : FAILED);
         return;
       }
-      if (reply.created) first = reply;
-      after(reply);
-      if (isOpen || document.hidden || careHold.asleep || petBusy() || sheetOpen || st !== ready) return;
+      if (isOpen || document.hidden || careHold.asleep || petBusy() || sheetOpen || st !== ready) {
+        if (!isOpen) st.exit();
+        return;
+      }
       const r = first ? { ...first, farm: reply.farm, hearts: reply.hearts } : reply;
       enter(st, r, first ? "tutorial" : "open").then(() => {
         // Still open means the tutorial played through; 집으로 mid-show keeps it for the next open.
         if (isOpen) first = null;
         flush(r);
       }, (error) => broken(error, r));
-    }), openFailed);
+    }, () => {
+      if (!isOpen) ready?.exit();
+      openFailed();
+    });
   }
 
   // The visit's own celebration plays first; the farm takes the window once the screen has been quiet a moment.
@@ -4928,7 +5010,7 @@ const farm = (function farmRoom() {
     const old = game;
     game = null;
     ready = null;
-    old.then((g) => g.destroy(), () => {});
+    old.then((g) => g.dispose(), () => {});
   }
 
   button.addEventListener("click", open);
@@ -4968,15 +5050,13 @@ const farm = (function farmRoom() {
       if (!isOpen) open();
     }, prefersReducedMotion() ? 0 : 320);
   });
+  // The stage fits itself into a new size at once, undistorted; it is built again at that size once nothing shows.
   window.addEventListener("resize", () => {
     window.clearTimeout(fitTimer);
     fitTimer = window.setTimeout(function fit() {
       if (!isOpen || !ready) return;
       if (ready.busy) fitTimer = window.setTimeout(fit, 500);
-      else ready.refit().catch((error) => {
-        console.error(error);
-        close();
-      });
+      else ready.refit().catch((error) => broken(error));
     }, 300);
   });
   document.addEventListener("visibilitychange", () => {
@@ -4987,7 +5067,7 @@ const farm = (function farmRoom() {
   window.addEventListener("pagehide", () => {
     window.clearInterval(cookieTimer);
     window.clearTimeout(dotTimer);
-    ready?.destroy();
+    ready?.dispose();
     game = null;
     ready = null;
   });

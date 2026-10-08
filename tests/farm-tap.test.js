@@ -204,6 +204,9 @@ function visitStart({ celebrate = false } = {}) {
     "let isOpen = false;",
     "let opening = false;",
     "let ready = null;",
+    // The start deadline has its own test; here a wait is as long as the test makes it.
+    "const START_MS = 10000;",
+    "function inTime(promise) { return promise; }",
     "function prepare() { s.engine.then((g) => { ready = g; }, () => {}); log.push('prepare'); return s.engine; }",
     "function enter(st, r, how) { isOpen = true; log.push(`enter ${how}`); return s.entered; }",
     { re: /\n  const uncover = [^\n]+\n/, optional: true },
@@ -223,7 +226,7 @@ function visitStart({ celebrate = false } = {}) {
       for (const fn of timers.splice(0)) fn();
       await settled();
     },
-    async load() { s.engine.resolve({ promptTouch: later }); await settled(); },
+    async load() { s.engine.resolve({ promptTouch: later, open: async () => {}, exit() {} }); await settled(); },
     async loadFails() { s.engine.reject(new Error("no engine")); await settled(); },
     async enterDone() { s.entered.resolve(); await settled(); },
     async enterFails() { s.entered.reject(new Error("stage")); await settled(); },
