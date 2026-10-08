@@ -75,13 +75,13 @@
   }
 
   // The owner's own page also saves the animal on the server; anyone else's toggle stays in this browser.
-  function saveKind(next) {
+  function saveKind(next, fill = false) {
     const dock = document.querySelector(".dock[data-care-uid]");
     if (!dock || !document.querySelector("[data-mascot-toggle][data-owner]")) return;
     fetch("/kind", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid: dock.dataset.careUid, kind: next }),
+      body: JSON.stringify({ uid: dock.dataset.careUid, kind: next, fill }),
       credentials: "same-origin",
     })
       .then((res) => (res.ok ? res.json() : null))
@@ -124,6 +124,8 @@
   const choice = new URLSearchParams(window.location.search).get("mascot");
   if (KINDS.includes(choice)) persist(choice);
   applyArt(kind);
+  // The server can't see localStorage, so the owner's page fills an unsaved pet's animal.
+  if (!document.querySelector('meta[name="pet-kind"]')) saveKind(kind, true);
 
   let skipClick = false;
 

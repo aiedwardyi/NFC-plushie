@@ -131,19 +131,19 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     },
   }));
 
-  // Dad demo: ?mascot= picks a switch kind (cookie), else the default kind. Does not touch binding.js.
+  // Dad demo: ?mascot= picks a switch kind (cookie), else none was said. Does not touch binding.js.
   const resolveDemoMascot = (req, res) => {
     const q = typeof req.query?.mascot === "string" ? req.query.mascot : "";
     if (TOGGLE_KINDS.includes(q)) {
       res.cookie("mascot", q, { httpOnly: false, sameSite: "lax", secure: production, maxAge: cookieAge, path: "/" });
       return q;
     }
-    return TOGGLE_KINDS.includes(req.cookies?.mascot) ? req.cookies.mascot : DEFAULT_KIND;
+    return TOGGLE_KINDS.includes(req.cookies?.mascot) ? req.cookies.mascot : "";
   };
   app.use((req, res, next) => {
     const mascot = resolveDemoMascot(req, res);
     req.demoMascot = mascot;
-    if (mascot === DEFAULT_KIND) return next();
+    if (!mascot || mascot === DEFAULT_KIND) return next();
     const send = res.send.bind(res);
     const from = `mascot-${DEFAULT_KIND}`;
     res.send = (body) => {
@@ -409,7 +409,8 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         const view = !skip && req.query.view === "1";
         if (!skip && !view) db.prepare("UPDATE plushies SET tap_count = tap_count + 1, last_tap_at = ? WHERE uid = ?").run(stamp, serial);
         const afterTap = getRow(serial);
-        if (afterTap.pet_name && !afterTap.kind) db.prepare("UPDATE plushies SET kind = ? WHERE uid = ?").run(req.demoMascot || DEFAULT_KIND, serial);
+        // Safari ends the script-set mascot cookie after 7 days while localStorage keeps the animal, so without it the page fills the kind.
+        if (afterTap.pet_name && !afterTap.kind && req.demoMascot) db.prepare("UPDATE plushies SET kind = ? WHERE uid = ?").run(req.demoMascot, serial);
         const raiseMirror = () => {
           if (counter !== null && (afterTap.last_counter === null || counter > afterTap.last_counter)) {
             db.prepare("UPDATE plushies SET last_counter = ? WHERE uid = ?").run(counter, serial);
@@ -662,13 +663,15 @@ export function createApp({ db, decisions = binding, production = process.env.NO
   });
 
   app.post("/kind", (req, res) => {
-    const { uid, kind } = req.body || {};
+    const { uid, kind, fill } = req.body || {};
     if (!validUid(uid) || !TOGGLE_KINDS.includes(kind)) return res.status(400).json({ ok: false });
     const reply = db.transaction(() => {
       const row = getRow(uid);
       if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row.pet_name) return null;
-      db.prepare("UPDATE plushies SET kind = ? WHERE uid = ?").run(kind, uid);
-      return { ok: true, kind, name: kindOf(kind).name, stats: sheetOf(row, parseStats(row.stats), kind) };
+      // A page's fill only sets an empty kind, so an animal picked meanwhile stays.
+      const saved = fill === true && row.kind ? row.kind : kind;
+      db.prepare("UPDATE plushies SET kind = ? WHERE uid = ?").run(saved, uid);
+      return { ok: true, kind: saved, name: kindOf(saved).name, stats: sheetOf(row, parseStats(row.stats), saved) };
     })();
     if (!reply) return res.status(403).json({ ok: false });
     res.json(reply);

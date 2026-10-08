@@ -562,6 +562,7 @@ test("the stat card shows a 포근 클래식 말 at 50/40/70/60, closed until as
   assert.match(card, /<button type="button" class="st-snack" data-stat-farm>텃밭에서 간식 주기<\/button>/);
   assert.match(home.html, /<button type="button" class="level-open" data-open="stats" aria-haspopup="dialog" aria-label="능력치 보기, Lv\. 1">/);
   assert.deepEqual(petStatsOf(home.html), { str: { total: 50, bonus: 1.7, boost: 0 }, int: { total: 40, bonus: 0, boost: 0 }, agi: { total: 70, bonus: 5, boost: 0 }, cha: { total: 60, bonus: 3.3, boost: 0 } });
+  setA(ctx, "kind = 'horse'");
   const sheep = await ctx.request(`/t?uid=${A}&view=1`, { jar: { ...jar, mascot: "sheep" } });
   assert.deepEqual(totalsOf(statCardOf(sheep.html)), [50, 40, 70, 60]);
 });
