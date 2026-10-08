@@ -272,8 +272,10 @@ test("a crisis message always ends with both numbers: a refusal, a failure or a 
   ]) {
     ctx.provider.replyWith = replyWith;
     assert.deepEqual((await say(ctx, jar, "나 죽고 싶어")).body, { ok: true, text: TALK_LINES.crisis, sources: [] });
+    assert.deepEqual((await say(ctx, jar, "아빠가 나를 때려요")).body, { ok: true, text: TALK_LINES.crisis, sources: [] });
   }
   assert.deepEqual((await say(ctx, jar, "I want to die")).body, { ok: true, text: TALK_LINES.crisisEn, sources: [] });
+  assert.deepEqual((await say(ctx, jar, "my dad hits me")).body, { ok: true, text: TALK_LINES.crisisEn, sources: [] });
   for (const [line, adult] of [[TALK_LINES.crisis, /어른/], [TALK_LINES.crisisEn, /adult/]]) {
     for (const re of [/(?<!\d)109(?!\d)/, /(?<!\d)1388(?!\d)/, /(?<!\d)119(?!\d)/, adult]) assert.match(line, re);
   }
@@ -284,13 +286,13 @@ test("the crisis check is narrow: the listed phrases match in Korean and English
   const jar = await meet(ctx, A, "Mochi");
   ctx.provider.replyWith = async () => ({ ok: true, stop: "end_turn", text: "그랬구나!", sources: [], usage: { input: 900, output: 5, searches: 0 }, ms: 5 });
   const lineFor = async (said) => (await say(ctx, jar, said)).body.text;
-  for (const said of ["나 죽고 싶어", "그냥 죽고싶다", "자살하고 싶어", "자해했어", "살기 싫어", "사라지고 싶어", "극단적 선택 생각함", "뒤지고 싶다 진짜"]) {
+  for (const said of ["나 죽고 싶어", "그냥 죽고싶다", "자살하고 싶어", "자해했어", "살기 싫어", "사라지고 싶어", "극단적 선택 생각함", "뒤지고 싶다 진짜", "아빠가 나를 때려요", "엄마가 맨날 때려", "선생님이 저를 자꾸 때려요", "엄마한테 맞았어"]) {
     assert.equal(await lineFor(said), TALK_LINES.crisis, said);
   }
-  for (const said of ["I want to die", "i wanna die", "I'm going to kill myself", "thinking about suicide", "I self-harm sometimes", "self harm"]) {
+  for (const said of ["I want to die", "i wanna die", "I'm going to kill myself", "thinking about suicide", "I self-harm sometimes", "self harm", "my dad hits me", "Mom keeps hurting me", "my parents abuse me"]) {
     assert.equal(await lineFor(said), TALK_LINES.crisisEn, said);
   }
-  for (const said of ["배고파 죽겠어", "웃겨 죽겠다 ㅋㅋㅋ", "졸려 죽겠어", "축구하다 자살골 넣었어", "숙제 빨리 끝내고 싶어", "I'm dying to see it", "this homework is killing me", "I want to diet"]) {
+  for (const said of ["배고파 죽겠어", "웃겨 죽겠다 ㅋㅋㅋ", "졸려 죽겠어", "축구하다 자살골 넣었어", "숙제 빨리 끝내고 싶어", "I'm dying to see it", "this homework is killing me", "I want to diet", "아빠가 공을 때렸어", "엄마가 맞았어", "동생이 나를 때렸어 ㅋㅋ", "my dad beat me at chess"]) {
     assert.equal(await lineFor(said), "그랬구나!", said);
   }
 });
@@ -639,6 +641,22 @@ test("notebook limits: 20 newest facts, 40 characters, 5 open plans within 60 da
     { ask_on: "2026-05-06", question: "여섯" },
   ] }, { noteIds: ids(), today, t: 3 });
   assert.deepEqual(db.prepare("SELECT question FROM talk_plans WHERE asked_on IS NULL ORDER BY id").all().map((r) => r.question), ["하나", "둘", "셋", "넷", "다섯"]);
+});
+
+test("the notebook never stores self-harm, suicide or abuse, even when the model returns it", (t) => {
+  const dir = mkdtempSync(join(process.cwd(), ".test-data-"));
+  const db = openDatabase(dir);
+  t.after(() => {
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  applyChanges(db, A, {
+    add: ["자해한 적 있음", "죽고 싶다고 함", "아빠한테 맞음", "엄마가 때림", "abused at home", "딸기를 좋아함", "수학 100점 맞음"],
+    drop: [],
+    plans: [{ ask_on: "2026-05-02", question: "아빠가 또 때렸어요?" }, { ask_on: "2026-05-03", question: "소풍 재밌었어요?" }],
+  }, { noteIds: [], today: "2026-05-01", t: 1 });
+  assert.deepEqual(db.prepare("SELECT fact FROM talk_notes WHERE uid = ? ORDER BY id").all(A).map((r) => r.fact), ["딸기를 좋아함", "수학 100점 맞음"]);
+  assert.deepEqual(db.prepare("SELECT question FROM talk_plans WHERE uid = ? ORDER BY id").all(A).map((r) => r.question), ["소풍 재밌었어요?"]);
 });
 
 test("a bad notebook answer changes nothing", async (t) => {

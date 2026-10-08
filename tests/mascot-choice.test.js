@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 
-function page({ saved = null, preference = "horse", lapsed = false, query = "", picker = false, owner = false } = {}) {
+function page({ saved = null, preference = "horse", lapsed = false, query = "", picker = false, owner = false, kept = null } = {}) {
   let stored = preference;
   let cookie = preference && !lapsed ? `mascot=${preference}` : "";
   let art = saved || "horse";
@@ -33,8 +33,9 @@ function page({ saved = null, preference = "horse", lapsed = false, query = "", 
     window: { location: { href, search: new URL(href).search }, history: { replaceState: (_, __, value) => { href = value; } } },
     localStorage: { getItem: () => stored, setItem: (_, value) => { stored = value; } },
     fetch: async (url, init) => {
-      posts.push([url, JSON.parse(init.body)]);
-      return { ok: true, json: async () => ({ ok: true, stats: {} }) };
+      const body = JSON.parse(init.body);
+      posts.push([url, body]);
+      return { ok: true, json: async () => ({ ok: true, kind: kept || body.kind, stats: {} }) };
     },
     paintStats() {},
     armReveal() {},
@@ -99,6 +100,12 @@ test("only the owner's page of an unsaved pet fills its animal, even from localS
   for (const [saved, owner] of [[null, false], ["horse", true], ["tiger", true], ["horse", false]]) {
     assert.deepEqual(page({ saved, preference: "sheep", lapsed: true, owner }).posts(), [], `${saved} ${owner}`);
   }
+});
+
+test("a fill that finds an animal saved meanwhile shows it and keeps this browser's choice", async () => {
+  const p = page({ preference: "sheep", lapsed: true, owner: true, kept: "tiger" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(p.choice(), { cookie: "", stored: "sheep", art: "tiger" });
 });
 
 test("an explicit mascot query persists the choice while saved pet art still wins", () => {

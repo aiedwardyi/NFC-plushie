@@ -28,8 +28,11 @@ export const talkLength = (text) => Array.from(String(text).trim()).length;
 // Narrow on purpose: hyperbole like 배고파 죽겠어 and words like 자살골 never match.
 const CRISIS = /죽고\s*싶|[뒤디]지고\s*싶|자살(?!골)|자해|살기\s*싫|살고\s*싶지\s*않|사라지고\s*싶|없어지고\s*싶|극단적\s*(?:인\s*)?선택|\bwant(?:s|ed)?\s+to\s+die\b|\bwanna\s+die\b|\bkill(?:ing)?\s+myself\b|\bend(?:ing)?\s+my\s+life\b|\bsuicid|\bself[\s-]?harm/i;
 
+// An adult hitting the owner counts too; a sibling, 공을 때렸어 or 엄마가 맞았어 (mom was right) never match.
+const HIT = /(?:아빠|엄마|아버지|어머니|선생님|어른|삼촌|이모|고모)(?:[가-힣]{0,2}\s*(?:(?:나|날|저|절)(?:를|을)?\s*)?(?:(?:자꾸|맨날|매일|막|또|계속)\s*)?(?:때리|때려|때린|때렸)|\s*(?:한테|에게)\s*(?:(?:자꾸|맨날|매일|막|또|계속)\s*)?맞았)|\b(?:dad|mom|mum|father|mother|stepdad|stepmom|parents?|teacher|uncle)\s+(?:is\s+|keeps\s+)?(?:hit(?:s|ting)?|hurt(?:s|ing)?|abus(?:e|es|ed|ing))\s+me\b/i;
+
 function crisisLine(text) {
-  if (!CRISIS.test(text)) return "";
+  if (!CRISIS.test(text) && !HIT.test(text)) return "";
   return /[가-힣]/.test(text) ? TALK_LINES.crisis : TALK_LINES.crisisEn;
 }
 
@@ -53,6 +56,9 @@ export const addDays = (day, n) => new Date(Date.parse(`${day}T00:00:00Z`) + n *
 export function privateText(text) {
   return /\d(?:[\s.-]?\d){5,}/.test(text) || text.includes("@") || /https?:|www\.|\b[a-z0-9-]+\.(?:com|net|org|kr|co|io|me|ly)\b/i.test(text);
 }
+
+// The notebook prompt forbids these too; a slip is never stored, and a broad match only drops a note.
+const hurtText = (text) => CRISIS.test(text) || /학대|폭력|때리|때려|때린|때렸|때림|(?:한테|에게)\s*맞|\babus/i.test(text);
 
 function seoulClock(t) {
   const d = new Date(t + PET.seoulOffsetMs);
@@ -204,7 +210,7 @@ export function applyChanges(db, uid, changes, { noteIds, today, t }) {
   const have = new Set(db.prepare("SELECT fact FROM talk_notes WHERE uid = ?").all(uid).map((r) => r.fact));
   for (const raw of changes.add) {
     const fact = oneLine(raw);
-    if (!fact || Array.from(fact).length > TALK.factChars || privateText(fact) || have.has(fact)) continue;
+    if (!fact || Array.from(fact).length > TALK.factChars || privateText(fact) || hurtText(fact) || have.has(fact)) continue;
     db.prepare("INSERT INTO talk_notes (uid, fact, at) VALUES (?, ?, ?)").run(uid, fact, t);
     have.add(fact);
   }
@@ -217,7 +223,7 @@ export function applyChanges(db, uid, changes, { noteIds, today, t }) {
     const question = oneLine(p.question);
     const day = /^\d{4}-\d{2}-\d{2}$/.test(p.ask_on) && addDays(p.ask_on, 0) === p.ask_on ? p.ask_on : "";
     if (open >= TALK.plans || !day || day < first || day > last) continue;
-    if (!question || Array.from(question).length > TALK.planChars || privateText(question) || asked.has(question)) continue;
+    if (!question || Array.from(question).length > TALK.planChars || privateText(question) || hurtText(question) || asked.has(question)) continue;
     db.prepare("INSERT INTO talk_plans (uid, ask_on, question, at) VALUES (?, ?, ?, ?)").run(uid, day, question, t);
     asked.add(question);
     open += 1;

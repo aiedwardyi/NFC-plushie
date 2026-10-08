@@ -87,6 +87,11 @@
       .then((res) => (res.ok ? res.json() : null))
       .then((reply) => {
         if (!reply?.ok) return;
+        // A fill keeps an animal another page saved meanwhile, so show that one.
+        if (fill && kind === next && reply.kind !== next) {
+          kind = reply.kind;
+          applyArt(kind);
+        }
         paintStats(reply.stats);
         const animal = document.querySelector("[data-stat-animal]");
         if (animal) animal.textContent = reply.name;
