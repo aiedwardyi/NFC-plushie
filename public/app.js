@@ -1699,6 +1699,8 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+// The 꾸미기 sheet's 창틀과 이름 tiles; the sheet fills it in, and the edition calls it whenever it changes.
+let syncLooks = () => {};
 const themeSheet = document.querySelector('[data-sheet="theme"]');
 if (themeSheet) {
   const root = document.documentElement;
@@ -1898,6 +1900,60 @@ if (themeSheet) {
     const card = event.target.closest("[data-pick]");
     if (card) pick(card);
   });
+
+  // 창틀과 이름: any frame up to the plushie's edition, stored like the world; the ones above only say which plushie is their key.
+  const lookGrid = themeSheet.querySelector("[data-look-grid]");
+  if (lookGrid) {
+    const RANK = { classic: 0, rare: 1, legendary: 2 };
+    const LOOK_LINES = { classic: "포근하게 돌아왔어요!", rare: "금실이 반짝반짝해요!", legendary: "별밤처럼 빛나요!" };
+    const LOCK_LINES = { rare: "금실 레어 인형이 열쇠예요!", legendary: "별밤 레전더리 인형이 열쇠예요!" };
+    const looks = Array.from(themeSheet.querySelectorAll("[data-look]"));
+    const plush = () => root.dataset.edition || "classic";
+    const worn = () => root.dataset.look || "classic";
+
+    syncLooks = () => {
+      for (const el of looks) {
+        const locked = RANK[el.dataset.look] > RANK[plush()];
+        el.classList.toggle("is-locked", locked);
+        el.setAttribute("aria-disabled", String(locked));
+        el.setAttribute("aria-pressed", String(el.dataset.look === worn()));
+        el.setAttribute("aria-label", locked ? el.dataset.lockLabel : el.dataset.label);
+        el.querySelector(".look-note").hidden = !locked;
+      }
+      const lede = themeSheet.querySelector("[data-look-lede]");
+      lede.textContent = lede.dataset[plush()];
+    };
+
+    function pickLook(card) {
+      const id = card.dataset.look;
+      const still = prefersReducedMotion();
+      if (RANK[id] > RANK[plush()]) {
+        card.classList.remove("is-shake");
+        void card.offsetWidth;
+        card.classList.add("is-shake");
+        speak(LOCK_LINES[id], still);
+        return;
+      }
+      if (id === worn()) return;
+      // The plushie's own edition needs no cookie, so the cookie only ever holds a lower frame.
+      document.cookie = id === plush()
+        ? "look=;path=/;max-age=0;samesite=lax"
+        : `look=${id};path=/;max-age=${400 * 24 * 60 * 60};samesite=lax`;
+      if (id === "classic") delete root.dataset.look;
+      else root.dataset.look = id;
+      root.classList.add("is-look-on");
+      window.setTimeout(() => root.classList.remove("is-look-on"), 600);
+      playSfx(`care-${root.dataset.theme === "8bit" ? "chip" : "soft"}-press`);
+      tryVibrate(18);
+      speak(LOOK_LINES[id], still);
+      syncLooks();
+    }
+
+    lookGrid.addEventListener("click", (event) => {
+      const card = event.target.closest("[data-look]");
+      if (card) pickLook(card);
+    });
+  }
 }
 
 /* Care: 밥 · 놀이 · 잠 with a want bubble, lights out, and the wake on the next plushie tap. */
@@ -2145,8 +2201,8 @@ const care = (function careLoop() {
       win.appendChild(spark);
       window.setTimeout(() => spark.remove(), 900 + i * 45);
     }
-    // A 별밤 레전더리's touch also sends one small shooting star.
-    if (document.documentElement.dataset.edition !== "legendary") return;
+    // A touch in the 별밤 레전더리 frame also sends one small shooting star.
+    if (document.documentElement.dataset.look !== "legendary") return;
     const shoot = document.createElement("span");
     shoot.className = "sparkle is-shoot";
     shoot.style.left = `${x - 10}px`;
@@ -2173,10 +2229,23 @@ const care = (function careLoop() {
   const FACES = { closed: "blink", happy: "react" };
   const face = (name) => facePet(FACES[name] || name);
 
+  // Each element's one pose, kept to be cancelled by hand: a finished one only forgotten stays drawn once collected (Chromium 141 and older), out of getAnimations().
+  const poses = new WeakMap();
+
   // Poses hold their last frame until the action ends; reduced motion keeps only the timing.
   function move(el, frames, options) {
     if (still()) return wait(options.duration);
-    return el.animate(frames, { fill: "forwards", ...options }).finished.catch(() => {});
+    poses.get(el)?.cancel();
+    const pose = el.animate(frames, { fill: "forwards", ...options });
+    poses.set(el, pose);
+    return pose.finished.catch(() => {});
+  }
+
+  // Back at rest: its pose cancelled by hand, then any CSS animation on it (getAnimations() is only the fallback for those).
+  function rest(el) {
+    poses.get(el)?.cancel();
+    poses.delete(el);
+    el.getAnimations().forEach((a) => a.cancel());
   }
 
   let wantEl = null;
@@ -2322,13 +2391,13 @@ const care = (function careLoop() {
     setWant(null);
     hush();
     pet.classList.add("is-care");
-    motion.getAnimations().forEach((a) => a.cancel());
+    rest(motion);
   }
 
   let danceAsked = -Infinity;
 
   function end() {
-    motion.getAnimations().forEach((a) => a.cancel());
+    rest(motion);
     layer.replaceChildren();
     pet.classList.remove("is-care");
     careHold.busy = false;
@@ -2340,13 +2409,15 @@ const care = (function careLoop() {
   }
 
   async function feed(beat) {
+    // The kind's mouth from /kinds.css, or the 말's where the page has none.
+    const mouth = Number(getComputedStyle(root).getPropertyValue("--mouth")) || 0.52;
     const a = art();
     const b = box();
     const sip = a.bite === "sip";
     const s = b.w * (sip ? 0.3 : 0.27);
-    // Food tops out just under the mouth so the munch face stays visible; the carton's straw tip sits in it.
+    // Food tops out just under the kind's mouth so the munch face stays visible; the carton's straw tip sits in it.
     const x = sip ? b.x + b.w / 2 - s * 0.38 : b.x + b.w / 2 - s / 2;
-    const y = sip ? b.y + b.h * 0.5 - s * 0.03 : b.y + b.h * (world() === "8bit" ? 0.56 : 0.535);
+    const y = sip ? b.y + b.h * (mouth - 0.02) - s * 0.03 : b.y + b.h * (mouth + (world() === "8bit" ? 0.04 : 0.015));
     const el = prop(a.food(), s, x, y, sip ? 1.2 : 1);
     const fall = b.y + b.h * 0.6;
     sound("drop");
@@ -2567,7 +2638,7 @@ const care = (function careLoop() {
     careHold.busy = true;
     setWant(null);
     pet.classList.add("is-care");
-    motion.getAnimations().forEach((a) => a.cancel());
+    rest(motion);
     const b = box();
     let wind = [];
     pet.style.transformOrigin = "50% 100%";
@@ -2635,7 +2706,7 @@ const care = (function careLoop() {
       ], { duration: 640, easing: "ease-in-out" });
     } finally {
       for (const el of wind) el.remove();
-      pet.getAnimations().forEach((a) => a.cancel());
+      rest(pet);
       pet.style.transformOrigin = "";
       end();
       dancing = false;
@@ -2858,7 +2929,7 @@ const care = (function careLoop() {
     delete document.body.dataset.morning;
     pet.classList.remove("is-sleeping");
     pet.classList.add("is-care");
-    motion.getAnimations().forEach((a) => a.cancel());
+    rest(motion);
     const flash = document.createElement("div");
     flash.className = "sun-flash";
     flash.setAttribute("aria-hidden", "true");
@@ -2944,11 +3015,11 @@ const care = (function careLoop() {
     careHold.busy = true;
     setWant(null);
     pet.classList.add("is-care");
-    motion.getAnimations().forEach((a) => a.cancel());
+    rest(motion);
   }
 
   function release() {
-    motion.getAnimations().forEach((a) => a.cancel());
+    rest(motion);
     pet.classList.remove("is-care");
     careHold.busy = false;
     face();
@@ -3111,9 +3182,15 @@ function paintStats(sheet) {
 function showEdition(edition, name, stats) {
   const root = document.documentElement;
   if (!document.querySelector("[data-name-input]")) {
-    if (edition === "rare" || edition === "legendary") root.dataset.edition = edition;
-    else delete root.dataset.edition;
+    if (edition === "rare" || edition === "legendary") {
+      root.dataset.edition = edition;
+      root.dataset.look = edition;
+    } else {
+      delete root.dataset.edition;
+      delete root.dataset.look;
+    }
     delete root.dataset.editionReveal;
+    syncLooks();
   }
   const pill = document.querySelector(".st-edition > span");
   if (pill && name) pill.textContent = name;
@@ -3129,6 +3206,8 @@ function revealEdition() {
   if (!edition) return;
   delete root.dataset.editionReveal;
   root.dataset.edition = edition;
+  root.dataset.look = edition;
+  syncLooks();
   if (prefersReducedMotion()) return;
   root.classList.add("is-edition-lit");
   window.setTimeout(() => root.classList.remove("is-edition-lit"), 1800);
@@ -3950,6 +4029,24 @@ function loadPixi() {
   return VENDOR.reduce((done, src) => done.then(() => vendorScript(src)), Promise.resolve());
 }
 
+// How long 시작 or 텃밭 waits for its scene to be ready to show; past that it comes back with a retry line.
+const START_MS = 10000;
+const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
+
+// A wait that gives up after `ms`: nothing a room waits on before its scene shows may hold the page.
+function inTime(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("timed out")), ms);
+    promise.then((value) => {
+      window.clearTimeout(timer);
+      resolve(value);
+    }, (error) => {
+      window.clearTimeout(timer);
+      reject(error);
+    });
+  });
+}
+
 function petBusy() {
   return Boolean(careHold.busy || waking || document.documentElement.classList.contains("has-reveal")
     || document.querySelector("canvas.celebrate-layer, .is-evolving, .is-still-celebrate, .is-reunion-jump"));
@@ -3958,7 +4055,7 @@ function petBusy() {
 // 시작 gives the NFC reader this long, then plays on screen taps: an unanswered permission prompt must not hold the game.
 const NFC_WAIT_MS = 600;
 
-/* 오락실: 기 모으기 on a WebGL stage, loaded when the room first opens; the first 3 plays a day give XP. */
+/* 오락실: 기 모으기 on a WebGL stage made for each game, its code and art loaded when the room first opens; the first 3 plays a day give XP. */
 const arcade = (function arcadeRoom() {
   const dock = document.querySelector(".dock[data-care-uid]");
   const sheet = document.querySelector('[data-sheet="arcade"]');
@@ -3974,7 +4071,6 @@ const arcade = (function arcadeRoom() {
   const world = () => root.dataset.theme || "classic";
   const kit = () => (world() === "8bit" ? "chip" : "soft");
   const BLURB = blurb.textContent;
-  const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
   const SOUNDS = ["count", "go", "note-c5", "note-c6", "note-c7", "tier", "rocket", "ding", "chime", "chime-low", "fall", "result", "best", "wind-2", "wind-3", "wind-4"];
   let retry = 0;
   let posted = 0;
@@ -4100,7 +4196,7 @@ const arcade = (function arcadeRoom() {
       game = made;
       made.then((g) => {
         if (game === made) ready = g;
-        else g.destroy();
+        else g.dispose();
       }, () => {
         if (game === made) game = null;
       });
@@ -4117,7 +4213,7 @@ const arcade = (function arcadeRoom() {
       start.disabled = true;
       return;
     }
-    // The engine loads behind a live 시작; a tap meanwhile waits for it.
+    // The engine and the art load behind a live 시작, the stage only once a game starts; a tap meanwhile waits for them.
     if (!ready) prepare().catch(() => {
       if (!held && sheetOpen === sheet) blurb.textContent = FAILED;
     });
@@ -4139,6 +4235,7 @@ const arcade = (function arcadeRoom() {
     ready.tap("screen");
   }
 
+  // The game is on screen in the same task the home is taken: its open() settled before this runs.
   async function run(g, mode) {
     closeSheet();
     combo.end();
@@ -4148,7 +4245,16 @@ const arcade = (function arcadeRoom() {
     document.addEventListener("pointerdown", onScreen, true);
     let out = "again";
     try {
-      while (out === "again") out = await g.play(mode, Number(dock.dataset.giBest) || 0);
+      out = await g.play(mode, Number(dock.dataset.giBest) || 0);
+      // A round again keeps its stage; a window that changed size meanwhile gets a new one first, within the same bound.
+      while (out === "again") {
+        await inTime(g.open(), START_MS);
+        out = await g.play(mode, Number(dock.dataset.giBest) || 0);
+      }
+    } catch (error) {
+      console.error(error);
+      g.exit();
+      out = "aborted";
     } finally {
       combo.sink(null);
       document.removeEventListener("pointerdown", onScreen, true);
@@ -4157,9 +4263,11 @@ const arcade = (function arcadeRoom() {
       playing = false;
     }
     if (out === "quit") care.fx.say("재밌었어요! 또 놀아요!");
+    else if (out === "aborted") care.fx.say(FAILED);
   }
 
-  // A tap is held until the engine is up and the NFC reader has had its moment; closing the sheet first drops it.
+  // A tap is held while the engine, the art and the stage get ready and the NFC reader has its moment; the home is
+  // taken only once the game can show. Closing the sheet first drops the tap, and a wait past START_MS gives 시작 back.
   function begin() {
     if (playing || held || careHold.asleep || petBusy()) return;
     const tap = {};
@@ -4172,20 +4280,29 @@ const arcade = (function arcadeRoom() {
     const listening = "NDEFReader" in window ? combo.listen() : null;
     const reader = listening && Promise.race([listening, new Promise((resolve) => window.setTimeout(() => resolve(null), NFC_WAIT_MS))]);
     // After a failed load, this tap tries again.
-    Promise.all([prepare(), reader]).then(([g, nfc]) => {
-      if (held !== tap) return;
-      held = null;
-      paintStart();
-      // While it waited, the sheet may have closed, the page hidden, the stage been rebuilt or a combo begun.
-      if (sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) return;
+    const opened = prepare().then((g) => (held === tap ? g.open().then(() => g) : g));
+    Promise.all([inTime(opened, START_MS), reader]).then(([g, nfc]) => {
+      const mine = held === tap;
+      if (mine) {
+        held = null;
+        paintStart();
+      }
+      // While it waited, the sheet may have closed, the page hidden, the stage been rebuilt or a combo begun: a stage
+      // made for nothing goes, unless a newer tap waits on it.
+      if (!mine || sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) {
+        if (!held && !playing) g.exit();
+        return;
+      }
       playing = true;
       run(g, nfc ? "nfc" : "screen");
     }, () => {
-      if (held !== tap) return;
-      held = null;
-      start.textContent = "시작";
-      start.disabled = false;
-      blurb.textContent = FAILED;
+      if (held === tap) {
+        held = null;
+        start.textContent = "시작";
+        start.disabled = false;
+        blurb.textContent = FAILED;
+      }
+      if (!held && !playing) ready?.exit();
     });
   }
 
@@ -4194,7 +4311,7 @@ const arcade = (function arcadeRoom() {
     const old = game;
     game = null;
     ready = null;
-    old.then((g) => g.destroy(), () => {});
+    old.then((g) => g.dispose(), () => {});
   }
 
   button.addEventListener("click", open);
@@ -4207,14 +4324,14 @@ const arcade = (function arcadeRoom() {
     if (document.hidden) ready?.pause();
   });
   window.addEventListener("pagehide", () => {
-    ready?.destroy();
+    ready?.dispose();
     game = null;
     ready = null;
   });
   return { restyle };
 })();
 
-/* 오락실: 달리기 시합 on its own full-screen stage, loaded when the room first opens; a finished race uses one of the day's 3 XP plays. */
+/* 오락실: 달리기 시합 on its own full-screen stage made for each game, its code and art loaded when the room first opens; a finished race uses one of the day's 3 XP plays. */
 const racing = (function raceRoom() {
   const dock = document.querySelector(".dock[data-care-uid]");
   const sheet = document.querySelector('[data-sheet="arcade"]');
@@ -4267,7 +4384,7 @@ const racing = (function raceRoom() {
     if (!game) {
       const made = loadPixi().then(() => import(`/game/race.js${retry ? `?retry=${retry}` : ""}`)).then((m) => m.createRace(api));
       game = made;
-      made.then((g) => { if (game === made) ready = g; else g.destroy(); }, () => { if (game === made) { game = null; retry++; } });
+      made.then((g) => { if (game === made) ready = g; else g.dispose(); }, () => { if (game === made) { game = null; retry++; } });
     }
     return game;
   }
@@ -4276,6 +4393,7 @@ const racing = (function raceRoom() {
     start.textContent = held ? "준비 중…" : "시작";
     blurb.textContent = careHold.asleep ? "쿨쿨 자는 중이에요" : label;
   }
+  // The race is on screen in the same task the home is taken: its open() settled before this runs.
   async function run(g, mode) {
     playing = true;
     closeSheet();
@@ -4284,7 +4402,7 @@ const racing = (function raceRoom() {
     root.classList.add("g-on", "r-on");
     combo.sink(() => g.tap("nfc"));
     let out = "quit";
-    try { out = await g.play(mode, state, root.dataset.mascot, raced); }
+    try { out = await g.play(mode); }
     finally {
       combo.sink(null);
       combo.end();
@@ -4294,7 +4412,9 @@ const racing = (function raceRoom() {
       button.focus({ preventScroll: true });
     }
     if (out === "quit") care.fx.say("재밌었어요! 또 달려요!");
+    else if (out === "aborted") care.fx.say(FAILED);
   }
+  // As in 기 모으기: the home is taken only once the race can show, and a wait past START_MS gives 시작 back.
   function begin() {
     if (held || playing || careHold.asleep || petBusy()) return;
     const tap = {};
@@ -4304,17 +4424,25 @@ const racing = (function raceRoom() {
     tryVibrate(12);
     const listening = "NDEFReader" in window ? combo.listen() : null;
     const reader = listening && Promise.race([listening, new Promise((done) => setTimeout(() => done(null), NFC_WAIT_MS))]);
-    Promise.all([prepare(), reader]).then(([g, nfc]) => {
-      if (held !== tap) return;
-      held = null;
-      paint();
-      if (sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) return;
+    const opened = prepare().then((g) => (held === tap ? g.open(state, root.dataset.mascot, raced).then(() => g) : g));
+    Promise.all([inTime(opened, START_MS), reader]).then(([g, nfc]) => {
+      const mine = held === tap;
+      if (mine) {
+        held = null;
+        paint();
+      }
+      if (!mine || sheetOpen !== sheet || document.hidden || ready !== g || careHold.asleep || petBusy()) {
+        if (!held && !playing) g.exit();
+        return;
+      }
       run(g, nfc ? "nfc" : "screen");
     }, () => {
-      if (held !== tap) return;
-      held = null;
-      paint();
-      blurb.textContent = "지금은 열 수 없어요. 다시 눌러 주세요";
+      if (held === tap) {
+        held = null;
+        paint();
+        blurb.textContent = FAILED;
+      }
+      if (!held && !playing) ready?.exit();
     });
   }
   function restyle() {
@@ -4322,7 +4450,7 @@ const racing = (function raceRoom() {
     const old = game;
     game = null;
     ready = null;
-    old?.then((g) => g.destroy(), () => {});
+    old?.then((g) => g.dispose(), () => {});
   }
   button.addEventListener("click", () => {
     held = null;
@@ -4353,7 +4481,6 @@ const farm = (function farmRoom() {
   const cap = button.querySelector(".dock-cap");
   const FARM_ICON = cap.innerHTML;
   const HOME_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>';
-  const FAILED = "지금은 열 수 없어요. 잠시 후에 다시 해 볼까요?";
   const ASLEEP = `쿨쿨 자는 중이에요. ${TAP_SPOT === "desk" ? "새로고침해서" : "폰에 인형을 톡 해서"} 깨워 주세요`;
   const COOKIE_MS = 60 * 1000;
   const CALM_MS = 400;
@@ -4406,7 +4533,7 @@ const farm = (function farmRoom() {
   const api = {
     win,
     pet,
-    // The open farm's size even while it is shut, so the stage is built once instead of rebuilt on the first open.
+    // The open farm's size even while it is shut, so the art is painted ahead at the size the stage will have.
     size() {
       const shut = !root.classList.contains("f-layout");
       if (shut) root.classList.add("f-layout");
@@ -4429,7 +4556,7 @@ const farm = (function farmRoom() {
     hearts: (n) => care.hearts(n),
     levelPop() {
       if (prefersReducedMotion()) return;
-      for (const el of document.querySelectorAll(".level-badge, .level-pin")) {
+      for (const el of document.querySelectorAll(".level-badge")) {
         el.animate([{ transform: "scale(1)" }, { transform: "scale(1.45)" }, { transform: "scale(1)" }], { duration: 480, easing: "cubic-bezier(.3,1.4,.5,1)" });
       }
     },
@@ -4468,7 +4595,7 @@ const farm = (function farmRoom() {
       game = made;
       made.then((g) => {
         if (game === made) ready = g;
-        else g.destroy();
+        else g.dispose();
       }, () => {
         if (game === made) game = null;
       });
@@ -4710,9 +4837,10 @@ const farm = (function farmRoom() {
     win.addEventListener("pointermove", onMove);
     win.addEventListener("pointerup", onUp);
     win.addEventListener("pointercancel", onUp);
-    return st.enter(reply, how);
+    return st.play(reply, how);
   }
 
+  // The home is back at once; the farm's slide-out is decoration over it and never holds the page.
   function close() {
     if (!isOpen) return;
     isOpen = false;
@@ -4724,18 +4852,18 @@ const farm = (function farmRoom() {
     win.removeEventListener("pointerup", onUp);
     win.removeEventListener("pointercancel", onUp);
     drag = null;
-    root.classList.remove("f-on");
+    root.classList.remove("f-on", "f-layout");
+    care.release();
+    care.fx.say("재밌었어요! 또 놀아요!");
     paintButton(false);
     playSfx(`care-${kit()}-press`);
     buzz(10);
-    const st = ready;
-    (st ? st.leave() : Promise.resolve()).catch(() => {}).then(() => {
-      if (isOpen) return;
-      root.classList.remove("f-layout");
-      care.release();
+    try {
+      ready?.exit();
+    } finally {
       if (stale) restyle();
-    });
-    paintDot();
+      paintDot();
+    }
   }
 
   function openFailed() {
@@ -4752,10 +4880,12 @@ const farm = (function farmRoom() {
     arriving = true;
     if (r.picked.length) tapped += 1;
     preload();
-    prepare().then((st) => {
+    // The stage is made under the visit's cover: the farm takes the home only once it can be drawn, or the cover goes.
+    inTime(prepare().then((st) => st.open().then(() => st)), START_MS).then((st) => {
       opening = false;
       if (isOpen || careHold.asleep || st !== ready) {
         uncover();
+        if (!isOpen) st.exit();
         return undefined;
       }
       return enter(st, r, "visit").finally(uncover).then(() => {
@@ -4769,6 +4899,7 @@ const farm = (function farmRoom() {
       }).catch((error) => broken(error, r));
     }, () => {
       uncover();
+      if (!isOpen) ready?.exit();
       // The visit already harvested, so its XP and hearts show even without the farm.
       openFailed();
       flush(r);
@@ -4799,24 +4930,41 @@ const farm = (function farmRoom() {
     preload();
     opening = true;
     button.classList.add("is-loading");
-    // The engine first: a farm made for an engine that never loaded would lose its first-open show.
-    prepare().then((st) => post("open").then(({ status, reply }) => {
+    // The engine first: a farm made for an engine that never loaded would lose its first-open show. The stage is made
+    // while the open request is out, before the farm takes the home; a wait past START_MS gives 텃밭 back, a late reply still counts.
+    const made = prepare().then((st) => {
+      const asked = post("open");
+      const staged = opening ? st.open() : null;
+      staged?.catch(() => {});
+      return asked.then(({ status, reply }) => {
+        if (reply?.created) first = reply;
+        if (reply) after(reply);
+        if (!reply || !opening) return { st, status, reply };
+        return (staged || st.open()).then(() => ({ st, status, reply }));
+      });
+    });
+    inTime(made, START_MS).then(({ st, status, reply }) => {
       opening = false;
       button.classList.remove("is-loading");
       if (!reply) {
+        if (!isOpen) st.exit();
         care.fx.say(status === 409 ? ASLEEP : FAILED);
         return;
       }
-      if (reply.created) first = reply;
-      after(reply);
-      if (isOpen || document.hidden || careHold.asleep || petBusy() || sheetOpen || st !== ready) return;
+      if (isOpen || document.hidden || careHold.asleep || petBusy() || sheetOpen || st !== ready) {
+        if (!isOpen) st.exit();
+        return;
+      }
       const r = first ? { ...first, farm: reply.farm, hearts: reply.hearts } : reply;
       enter(st, r, first ? "tutorial" : "open").then(() => {
         // Still open means the tutorial played through; 집으로 mid-show keeps it for the next open.
         if (isOpen) first = null;
         flush(r);
       }, (error) => broken(error, r));
-    }), openFailed);
+    }, () => {
+      if (!isOpen) ready?.exit();
+      openFailed();
+    });
   }
 
   // The visit's own celebration plays first; the farm takes the window once the screen has been quiet a moment.
@@ -4861,7 +5009,7 @@ const farm = (function farmRoom() {
     const old = game;
     game = null;
     ready = null;
-    old.then((g) => g.destroy(), () => {});
+    old.then((g) => g.dispose(), () => {});
   }
 
   button.addEventListener("click", open);
@@ -4901,15 +5049,13 @@ const farm = (function farmRoom() {
       if (!isOpen) open();
     }, prefersReducedMotion() ? 0 : 320);
   });
+  // The stage fits itself into a new size at once, undistorted; it is built again at that size once nothing shows.
   window.addEventListener("resize", () => {
     window.clearTimeout(fitTimer);
     fitTimer = window.setTimeout(function fit() {
       if (!isOpen || !ready) return;
       if (ready.busy) fitTimer = window.setTimeout(fit, 500);
-      else ready.refit().catch((error) => {
-        console.error(error);
-        close();
-      });
+      else ready.refit().catch((error) => broken(error));
     }, 300);
   });
   document.addEventListener("visibilitychange", () => {
@@ -4920,7 +5066,7 @@ const farm = (function farmRoom() {
   window.addEventListener("pagehide", () => {
     window.clearInterval(cookieTimer);
     window.clearTimeout(dotTimer);
-    ready?.destroy();
+    ready?.dispose();
     game = null;
     ready = null;
   });
@@ -6021,13 +6167,15 @@ const coach = (function coachLayer() {
       from = null;
     }
     box = next;
+    const dialog = dialogBox?.getBoundingClientRect();
+    const side = dialog && r.top >= dialog.bottom;
     // The tip rests on the target's near edge, so the hand never covers what it points at; a big target takes it inside.
-    const down = r.top + r.height / 2 > window.innerHeight * 0.5;
+    const down = !side && r.top + r.height / 2 > window.innerHeight * 0.5;
     const reach = r.height > 120 ? r.height * 0.38 : 7;
     const tipX = r.left + r.width * 0.58;
-    const tipY = down ? r.top + reach : r.top + r.height - reach;
+    const tipY = side ? r.top + r.height / 2 : down ? r.top + reach : r.top + r.height - reach;
     const text = label?.() || "";
-    const key = [box.x, box.y, box.w, box.h, tipX, tipY, down, text].map((v) => (typeof v === "number" ? v.toFixed(1) : v)).join();
+    const key = [box.x, box.y, box.w, box.h, tipX, tipY, down, side, dialog?.top, dialog?.bottom, text].map((v) => (typeof v === "number" ? v.toFixed(1) : v)).join();
     if (key === drawn) return;
     drawn = key;
     const radius = `${Math.min(box.w, box.h) / 2}px`;
@@ -6041,6 +6189,17 @@ const coach = (function coachLayer() {
     finger.style.left = `${tipX}px`;
     finger.style.top = `${tipY}px`;
     finger.classList.toggle("is-down", down);
+    hand.style.transform = side ? `rotate(${tipX > window.innerWidth / 2 ? 90 : -90}deg)` : "";
+    if (dialog?.width) {
+      const h = hand.getBoundingClientRect();
+      // Reserve the full tap travel, including the SVG stroke, outside the dialog.
+      const gap = 18;
+      if (h.right + gap > dialog.left && h.left - gap < dialog.right && h.bottom + gap > dialog.top && h.top - gap < dialog.bottom) {
+        const above = dialog.top - gap - h.bottom;
+        const below = dialog.bottom + gap - h.top;
+        finger.style.top = `${tipY + (Math.abs(above) < Math.abs(below) ? above : below)}px`;
+      }
+    }
     tag.textContent = text;
     tag.style.left = `${box.x + box.w / 2}px`;
     tag.style.top = `${box.y - 6}px`;
@@ -6181,7 +6340,7 @@ const coach = (function coachLayer() {
     // Not a step of its own: the crop step's wait, a soft ring on the growing plot until it ripens.
     grow: {
       rect: () => farm?.growRect(),
-      line: () => "새싹이 쑥쑥 자라는 중! 다 자라면 알려 줄게요",
+      line: () => "쑥쑥 자라는 중! 다 자라면 알려 줄게요",
       farm: true,
       soft: true,
       tag: () => {

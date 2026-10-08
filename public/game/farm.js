@@ -95,14 +95,9 @@ function tasteWords(p) {
   return `맛보기! ${mins < 60 ? `${mins}분` : `${Math.round(mins / 60)}시간`} 뒤에 익어요`;
 }
 
-async function img(url) {
-  const i = new Image();
-  i.src = url;
-  await i.decode();
-  return i;
-}
-
 export async function createFarm(api) {
+  // A retry's query reaches the stage module too: a failed module import stays failed for its URL.
+  const { makeStage, loadImage: img } = await import(`./stage.js${new URL(import.meta.url).search}`);
   const P = window.PIXI;
   const FX = P.filters;
   const { win, pet: petEl } = api;
@@ -136,31 +131,47 @@ export async function createFarm(api) {
   /* ---------- textures ---------- */
   const T = {};
   const owned = [];
+  // Art is painted once and uploaded again by each stage, so an open waits only on the GPU side.
+  const painted = new Map();
   let seed = 11;
   const R = (a, b) => a + ((seed = (seed * 16807) % 2147483647) / 2147483647) * (b - a);
-  function canvasTex(cw, ch, draw) {
-    const c = document.createElement("canvas");
-    c.width = Math.max(1, Math.round(cw));
-    c.height = Math.max(1, Math.round(ch));
-    draw(c.getContext("2d"), c.width, c.height);
+  function paint(key, cw, ch, draw) {
+    const w = Math.max(1, Math.round(cw));
+    const h = Math.max(1, Math.round(ch));
+    let c = painted.get(key);
+    if (!c || c.width !== w || c.height !== h) {
+      c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      draw(c.getContext("2d"), w, h);
+      painted.set(key, c);
+    }
+    return c;
+  }
+  function texOf(c) {
     const t = P.Texture.from(c);
     owned.push(t);
     return t;
   }
+  const canvasTex = (key, cw, ch, draw) => texOf(paint(key, cw, ch, draw));
   async function art(name) {
-    const i = await img(artUrl(name));
-    return canvasTex(i.naturalWidth, i.naturalHeight, (x, cw, ch) => x.drawImage(i, 0, 0, cw, ch));
+    const key = `art:${name}`;
+    if (!painted.has(key)) {
+      const i = await img(artUrl(name));
+      paint(key, i.naturalWidth, i.naturalHeight, (x, cw, ch) => x.drawImage(i, 0, 0, cw, ch));
+    }
+    return texOf(painted.get(key));
   }
-  function radial(size, stops) {
-    return canvasTex(size, size, (x, s) => {
+  function radial(key, size, stops) {
+    return canvasTex(key, size, size, (x, s) => {
       const g = x.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
       stops.forEach(([o, c]) => g.addColorStop(o, c));
       x.fillStyle = g;
       x.fillRect(0, 0, s, s);
     });
   }
-  function vgrad(cw, ch, stops) {
-    return canvasTex(cw, ch, (x) => {
+  function vgrad(key, cw, ch, stops) {
+    return canvasTex(key, cw, ch, (x) => {
       const g = x.createLinearGradient(0, 0, 0, ch);
       stops.forEach(([o, c]) => g.addColorStop(o, c));
       x.fillStyle = g;
@@ -168,7 +179,7 @@ export async function createFarm(api) {
     });
   }
   function bedTex(wet) {
-    return canvasTex(240, 96, (x, cw, ch) => {
+    return canvasTex(wet ? "bedWet" : "bedDry", 240, 96, (x, cw, ch) => {
       const [top, furrow, rim] = wet ? ["#5f3c22", "#4a2e19", "#523320"] : ["#a8713f", "#8d5c33", "#8a5a36"];
       x.fillStyle = rim;
       x.beginPath();
@@ -204,15 +215,20 @@ export async function createFarm(api) {
     return c && c.startsWith("url(") ? c.slice(5, -2) : el.currentSrc || el.src;
   }
   const FACES = ["canon", "blink", "react", "munch"];
+  const pics = new Map();
+  const picOf = (url) => pics.get(url) || img(url).then((i) => {
+    pics.set(url, i);
+    return i;
+  });
   let facesFrom = "";
   async function loadFaces() {
     const urls = FACES.map(faceUrl);
     if (urls.join() === facesFrom) return;
-    const pics = await Promise.all(urls.map(img));
+    const faces = await Promise.all(urls.map(picOf));
     for (const t of Object.values(T.pet || {})) t.destroy(true);
     T.pet = {};
     FACES.forEach((name, i) => {
-      const t = P.Texture.from(pics[i]);
+      const t = new P.Texture({ source: new P.ImageSource({ resource: faces[i] }) });
       if (kit === "chip") t.source.scaleMode = "nearest";
       T.pet[name] = t;
     });
@@ -222,15 +238,15 @@ export async function createFarm(api) {
 
   async function buildTextures() {
     seed = 11;
-    T.glow = radial(128, [[0, "rgba(255,255,255,1)"], [0.3, "rgba(255,255,255,.7)"], [0.65, "rgba(255,255,255,.15)"], [1, "rgba(255,255,255,0)"]]);
-    T.ring = canvasTex(128, 128, (x) => {
+    T.glow = radial("glow", 128, [[0, "rgba(255,255,255,1)"], [0.3, "rgba(255,255,255,.7)"], [0.65, "rgba(255,255,255,.15)"], [1, "rgba(255,255,255,0)"]]);
+    T.ring = canvasTex("ring", 128, 128, (x) => {
       x.strokeStyle = "#fff";
       x.lineWidth = 7;
       x.beginPath();
       x.arc(64, 64, 52, 0, Math.PI * 2);
       x.stroke();
     });
-    T.rays = canvasTex(512, 512, (x) => {
+    T.rays = canvasTex("rays", 512, 512, (x) => {
       x.translate(256, 256);
       for (let i = 0; i < 16; i++) {
         x.rotate((Math.PI * 2) / 16);
@@ -246,9 +262,9 @@ export async function createFarm(api) {
         x.fill();
       }
     });
-    T.sky = vgrad(8, 256, [[0, "#bfe1f4"], [1, "#fff6e6"]]);
-    T.dusk = vgrad(8, 256, [[0, "#f6a77d"], [0.55, "#ffcf9e"], [1, "#ffe9c9"]]);
-    T.night = canvasTex(W, Math.round(H * 0.5), (x, cw, ch) => {
+    T.sky = vgrad("sky", 8, 256, [[0, "#bfe1f4"], [1, "#fff6e6"]]);
+    T.dusk = vgrad("dusk", 8, 256, [[0, "#f6a77d"], [0.55, "#ffcf9e"], [1, "#ffe9c9"]]);
+    T.night = canvasTex("night", W, Math.round(H * 0.5), (x, cw, ch) => {
       const g = x.createLinearGradient(0, 0, 0, ch);
       g.addColorStop(0, "#16204a");
       g.addColorStop(1, "#3a4a85");
@@ -261,7 +277,7 @@ export async function createFarm(api) {
         x.fill();
       }
     });
-    T.moonN = canvasTex(64, 64, (x) => {
+    T.moonN = canvasTex("moonN", 64, 64, (x) => {
       x.fillStyle = "#fff4cf";
       x.beginPath();
       x.arc(32, 32, 20, 0, Math.PI * 2);
@@ -271,7 +287,7 @@ export async function createFarm(api) {
       x.arc(42, 26, 18, 0, Math.PI * 2);
       x.fill();
     });
-    T.hills = canvasTex(W, Math.round(H * 0.2), (x, cw, ch) => {
+    T.hills = canvasTex("hills", W, Math.round(H * 0.2), (x, cw, ch) => {
       x.fillStyle = "#d3e8b9";
       x.beginPath();
       x.moveTo(0, ch);
@@ -297,7 +313,7 @@ export async function createFarm(api) {
         x.fill();
       }
     });
-    T.grass = canvasTex(W, Math.round(H * 0.5), (x, cw, ch) => {
+    T.grass = canvasTex("grass", W, Math.round(H * 0.5), (x, cw, ch) => {
       const g = x.createLinearGradient(0, 0, 0, ch);
       g.addColorStop(0, "#d6eab0");
       g.addColorStop(1, "#bfdc93");
@@ -321,19 +337,23 @@ export async function createFarm(api) {
     });
     T.bedDry = bedTex(false);
     T.bedWet = bedTex(true);
-    T.dust = radial(64, [[0, "rgba(214,196,160,.9)"], [0.6, "rgba(214,196,160,.45)"], [1, "rgba(214,196,160,0)"]]);
-    T.dirt = radial(24, [[0, "rgba(120,78,44,1)"], [0.7, "rgba(120,78,44,1)"], [1, "rgba(120,78,44,0)"]]);
+    T.dust = radial("dust", 64, [[0, "rgba(214,196,160,.9)"], [0.6, "rgba(214,196,160,.45)"], [1, "rgba(214,196,160,0)"]]);
+    T.dirt = radial("dirt", 24, [[0, "rgba(120,78,44,1)"], [0.7, "rgba(120,78,44,1)"], [1, "rgba(120,78,44,0)"]]);
     const [pieces] = await Promise.all([Promise.all(ART.map(art)), loadFaces()]);
     T.art = Object.fromEntries(ART.map((n, i) => [n, pieces[i]]));
   }
   const plantTex = (crop, stage) => T.art[stage < 2 ? `plant-${stage}${crop === "gold" ? "-gold" : ""}` : `plant-${crop}-${stage}`];
   const itemTex = (crop) => T.art[`item-${crop}`];
 
-  /* ---------- stage ---------- */
+  /* ---------- stage: made on open, dropped after 집으로 ---------- */
+  let stage = null;
   let app = null;
   let built = false;
   let W = 0;
   let H = 0;
+  // The stage as built (W x H) fitted into the window: scale and offset, until it is rebuilt at the window's size.
+  let fitted = { s: 1, x: 0, y: 0 };
+  const inStage = (x, y) => ({ x: (x - fitted.x) / fitted.s, y: (y - fitted.y) / fitted.s });
   let petH = 0;
   let calm = false;
   let shake = 0;
@@ -440,8 +460,8 @@ export async function createFarm(api) {
     });
   }
 
-  function frame(tk) {
-    const dt = Math.min(0.05, tk.deltaMS / 1000);
+  function frame(ms) {
+    const dt = Math.min(0.05, ms / 1000);
     const t = performance.now() / 1000;
     for (let i = tweens.length - 1; i >= 0; i--) {
       const tw = tweens[i];
@@ -505,10 +525,9 @@ export async function createFarm(api) {
     ({ W, H } = measure());
     petH = Math.min(0.28 * H, 0.3 * W);
     await buildTextures();
-    app = new P.Application();
-    await app.init({ width: W, height: H, resolution: Math.min(2, window.devicePixelRatio || 1), autoDensity: true, backgroundAlpha: 0, antialias: true, preference: "webgl" });
-    // Plot taps are hit-tested in the DOM; Pixi's own pointer events would keep its shared ticker running while the farm is shut.
-    app.renderer.events.setTargetElement(null);
+    stage = await makeStage(P, { width: W, height: H, fault: lost });
+    app = stage.app;
+    fitted = { s: 1, x: 0, y: 0 };
     S = {};
     const holder = document.createElement("div");
     holder.className = "f-stage";
@@ -647,27 +666,48 @@ export async function createFarm(api) {
     L.cta.hidden = true;
     L.cta.setAttribute("role", "status");
     L.dom.appendChild(L.cta);
-    app.ticker.add(frame);
     // Warm the ripple's shader before the first harvest needs it.
     const warm = new FX.ShockwaveFilter({ center: { x: W / 2, y: H / 2 }, amplitude: 1, wavelength: 50, radius: 10 });
     S.cam.filters = [warm];
-    app.renderer.render(app.stage);
+    stage.draw();
     S.cam.filters = null;
     warm.destroy();
-    sleep();
     resetPet();
+    S.fitting = new ResizeObserver(fit);
+    S.fitting.observe(win);
     built = true;
   }
 
-  // Pixi's renderer also runs texture housekeeping on the shared system ticker: the farm keeps that stopped, so it runs
-  // one ticker while open and none while shut (its textures live until teardown anyway).
-  function sleep() {
-    app.ticker.stop();
-    P.Ticker.system.stop();
+  // The window changed size under the open farm: the stage as built goes into it whole and undistorted at once, its DOM
+  // layer with it, until refit() builds it again at the new size once nothing is showing.
+  function fit() {
+    if (!built || !entered) return;
+    const { W: w, H: h } = measure();
+    const s = Math.min(w / W, h / H);
+    const next = { s, x: (w - W * s) / 2, y: (h - H * s) / 2 };
+    if (next.s === fitted.s && next.x === fitted.x && next.y === fitted.y) return;
+    fitted = next;
+    const whole = s === 1 && !next.x && !next.y;
+    stage.resize(w, h);
+    app.stage.scale.set(s);
+    app.stage.position.set(next.x, next.y);
+    Object.assign(L.dom.style, whole ? { width: "", height: "", transformOrigin: "", transform: "" }
+      : { width: `${W}px`, height: `${H}px`, transformOrigin: "0 0", transform: `translate(${next.x}px, ${next.y}px) scale(${s})` });
+    // Drawn now, so no frame shows the resized canvas blank.
+    try {
+      stage.draw();
+    } catch (error) {
+      lost(error);
+    }
   }
-  function wake() {
-    P.Ticker.system.stop();
-    app.ticker.start();
+
+  // A frame that threw or a lost context: an open farm closes through the app, which says so; a shut one just lets its stage go.
+  function lost(error) {
+    if (entered) api.fail(error);
+    else {
+      console.error(error);
+      teardown();
+    }
   }
 
   // Sky follows the app's time of day: day, dusk or night over the same farm.
@@ -774,6 +814,13 @@ export async function createFarm(api) {
     return el;
   }
   const domAnim = (el, frames, o) => el.animate(frames, { fill: "forwards", ...o }).finished.catch(() => {});
+  // Held so every exit cancels it.
+  let petAnim = null;
+  function petMove(frames, o) {
+    petAnim?.cancel();
+    petAnim = petEl.animate(frames, o);
+    return petAnim;
+  }
   function bigText(text, cls = "", hold = 900) {
     const el = domAdd(`f-big ${cls}`);
     el.textContent = text;
@@ -789,6 +836,7 @@ export async function createFarm(api) {
     el.style.left = `${Math.max(half + 4, Math.min(W - half - 4, x))}px`;
   }
   function plotTag(p, text, cls = "", ms = 3200) {
+    L.field.querySelector(".f-tag.is-say")?.remove();
     const el = domAdd(`f-tag is-say ${cls}`, "", L.field);
     el.textContent = text;
     placeTag(el, p.cx);
@@ -1187,7 +1235,7 @@ export async function createFarm(api) {
     thump({ gain: 0.8 });
     shake = 4;
     burst(gx, floor, 10, { tex: T.dust, a0: Math.PI, a1: Math.PI * 2, v0: 40, v1: 120, s0: 0.3, s1: 0.6, l0: 0.5, l1: 0.8, layer: S.homeFx });
-    if (!calm) domAnim(petEl, [{ transform: "translateY(0)" }, { transform: "translateY(-16px)", offset: 0.45 }, { transform: "translateY(0)" }], { duration: 420, easing: "ease-out", fill: "none" });
+    if (!calm) petMove([{ transform: "translateY(0)" }, { transform: "translateY(-16px)", offset: 0.45 }, { transform: "translateY(0)" }], { duration: 420, easing: "ease-out" });
     voice("happy", { at: 120, rate: 1.05 });
     const bs = box.scale.x;
     await hold(tween(260, (k) => {
@@ -1250,12 +1298,17 @@ export async function createFarm(api) {
     sfx("whoosh", { gain: 0.9 });
     S.holder.style.visibility = "visible";
     const pr = petEl.getBoundingClientRect();
+    const ms = calm ? 300 : 600;
     const out = calm
-      ? domAnim(petEl, [{ opacity: 1 }, { opacity: 0 }], { duration: 300 })
-      : domAnim(petEl, [{ transform: "translateX(0)", opacity: 1 }, { transform: `translateX(${-pr.width * 0.6}px)`, opacity: 0 }], { duration: 600, easing: "cubic-bezier(.6,0,.3,1)" });
-    out.then(() => {
-      if (entered) petEl.style.visibility = "hidden";
-    });
+      ? petMove([{ opacity: 1 }, { opacity: 0 }], { duration: ms, fill: "forwards" })
+      : petMove([{ transform: "translateX(0)", opacity: 1 }, { transform: `translateX(${-pr.width * 0.6}px)`, opacity: 0 }], { duration: ms, easing: "cubic-bezier(.6,0,.3,1)", fill: "forwards" });
+    // Out of sight, the pet is hidden for real and the slide dropped, so no last frame is left for a later cancel to find.
+    later(() => {
+      petEl.style.visibility = "hidden";
+      if (petAnim !== out) return;
+      out.cancel();
+      petAnim = null;
+    }, ms);
     await hold(tween(700, (k) => {
       S.farm.x = W * (1 - k);
     }, E.io));
@@ -1498,11 +1551,13 @@ export async function createFarm(api) {
     for (let h = 0; h < 6; h++) emit(T.art.heart, { x: S.petC.x + rnd(-30, 30), y: S.petC.y - petH * 0.7, vx: rnd(-20, 20), vy: rnd(-90, -60), life: 1.2, s0: 0.3, s1: 0.5 });
   }
 
-  // The pet takes a crop in its paw and eats it in three bites, lifting it to its mouth (texture y 262 of 512) each time.
+  // The pet takes a crop in its paw and eats it in three bites, lifting it to its kind's mouth each time.
   async function munch(crop, from) {
     await hold(hop(xOf(0.2), yOf(0.875), 300, 16, 1));
-    const CHIN = -0.42 * petH;
-    const MOUTH = -0.475 * petH;
+    // The kind's mouth from /kinds.css, or the 말's where the page has none.
+    const mouth = Number(getComputedStyle(document.documentElement).getPropertyValue("--mouth")) || 0.52;
+    const MOUTH = (mouth - 1) * petH;
+    const CHIN = MOUTH + 0.055 * petH;
     const handAt = (y) => S.farm.toLocal(S.hand.toGlobal(new P.Point(0, y)));
     const holdAt = handAt(CHIN);
     const item = sprite(itemTex(crop), S.fx, from.x, from.y, 0.5, 0.5, flySize(crop, 30));
@@ -1742,13 +1797,12 @@ export async function createFarm(api) {
   async function xpFlight(r) {
     if (r.xpGain <= 0) return;
     const box = win.getBoundingClientRect();
-    const pin = (document.querySelector(".level-pin") || win).getBoundingClientRect();
     const el = domAdd("f-xp f-delivery", `+${r.xpGain} XP`, document.body);
-    el.style.left = `${box.left + W * 0.64}px`;
-    el.style.top = `${box.top + H * 0.4}px`;
-    const dx = pin.left + pin.width / 2 - box.left - W * 0.64;
-    const dy = pin.top + pin.height / 2 - box.top - H * 0.4;
-    await hold(domAnim(el, [{ transform: "translate(-50%, 0) scale(1.4)", opacity: 1 }, { transform: `translate(calc(-50% + ${dx}px), ${dy}px) scale(.6)`, opacity: 1 }], { duration: calm ? 300 : 850, easing: "ease-in-out" }));
+    const x0 = box.left + fitted.x + W * 0.64 * fitted.s;
+    const y0 = box.top + fitted.y + H * 0.4 * fitted.s;
+    el.style.left = `${x0}px`;
+    el.style.top = `${y0}px`;
+    await hold(domAnim(el, [{ transform: "translate(-50%, 0) scale(1.4)", opacity: 1 }, { transform: "translate(-50%, -36px) scale(1)", opacity: 0 }], { duration: calm ? 300 : 850, easing: "ease-in-out" }));
     el.remove();
     game("result", { gain: 0.9 });
     flushRound();
@@ -1822,8 +1876,8 @@ export async function createFarm(api) {
     if (!(gain > 0)) return;
     const box = win.getBoundingClientRect();
     const to = api.coinBox()?.getBoundingClientRect();
-    const x0 = box.left + xOf(0.5);
-    const y0 = box.top + yOf(0.36);
+    const x0 = box.left + fitted.x + xOf(0.5) * fitted.s;
+    const y0 = box.top + fitted.y + yOf(0.36) * fitted.s;
     const flying = [];
     if (to?.width) {
       const n = Math.min(6, Math.max(2, Math.round(gain / 5)));
@@ -2011,10 +2065,13 @@ export async function createFarm(api) {
     const box = win.getBoundingClientRect();
     const floor = plots[0].cy + plots[0].w * 0.3;
     const top = p.i >= 3 ? Math.max(p.cy - p.w * reach, floor) : p.cy - p.w * reach;
-    return { left: box.left + p.cx - p.w * 0.55, top: box.top + top, width: p.w * 1.1, height: p.cy + p.w * 0.3 - top };
+    const { s } = fitted;
+    return { left: box.left + fitted.x + (p.cx - p.w * 0.55) * s, top: box.top + fitted.y + top * s, width: p.w * 1.1 * s, height: (p.cy + p.w * 0.3 - top) * s };
   }
 
   /* ---------- build, enter, leave ---------- */
+  // How long 집으로's slide-out may keep the stage, whatever its frames do.
+  const LEAVE_MS = 700;
   function changed() {
     const m = measure();
     return m.W !== W || m.H !== H;
@@ -2025,11 +2082,14 @@ export async function createFarm(api) {
     clearTimeout(growTimer);
     for (const id of timers) clearTimeout(id);
     timers.clear();
+    S.fitting?.disconnect();
     S.holder?.remove();
     L.dom?.remove();
-    app?.destroy(true, { children: true });
+    stage?.drop();
+    stage = null;
     app = null;
     S = {};
+    fitted = { s: 1, x: 0, y: 0 };
     for (const t of owned) t.destroy(true);
     owned.length = 0;
     for (const t of Object.values(T.pet || {})) t.destroy(true);
@@ -2037,29 +2097,56 @@ export async function createFarm(api) {
     facesFrom = "";
     ctaText = "";
   }
+  // One stage at a time: a farm opened again while its last stage was still being made waits for that one.
+  let making = null;
   async function ready() {
-    if (!built || changed()) {
+    while (making) await making.catch(() => {});
+    if (built && !changed()) return loadFaces();
+    teardown();
+    making = setupStage();
+    try {
+      await making;
+    } catch (error) {
       teardown();
-      await setupStage();
-    } else {
-      await loadFaces();
+      throw error;
+    } finally {
+      making = null;
     }
+    return undefined;
+  }
+  // The home pet as the home shows it, at once: its move cancelled by hand, no inline visibility, no CSS animation left.
+  function restorePet() {
+    petAnim?.cancel();
+    petAnim = null;
+    petEl.style.visibility = "";
+    petEl.getAnimations().forEach((a) => a.cancel());
   }
 
+  // The art is painted now, ahead of any open; the stage itself is made only when the farm opens.
   try {
-    await setupStage();
-  } catch (error) {
+    ({ W, H } = measure());
+    await buildTextures();
+  } finally {
     teardown();
-    throw error;
   }
 
   return {
-    // Draws the field as it was before `r` and brings the farm in; "tutorial" plays the whole first open.
-    async enter(r, how = "open") {
+    // Makes the stage ahead of play(), so the app takes the screen only once the farm can be drawn there.
+    async open() {
       const g = gen;
       await ready();
-      // 집으로 while the stage was still loading: stay shut.
-      if (g !== gen) return undefined;
+      // Given up on while it was being made: the stage goes.
+      if (g !== gen && !entered) teardown();
+    },
+    // Draws the field as it was before `r` and brings the farm in; "tutorial" plays the whole first open.
+    async play(r, how = "open") {
+      const g = gen;
+      await ready();
+      // 집으로 while the stage was still being made: stay shut, and let the stage go.
+      if (g !== gen) {
+        if (!entered) teardown();
+        return undefined;
+      }
       cut();
       calm = Boolean(api.still());
       entered = true;
@@ -2079,7 +2166,7 @@ export async function createFarm(api) {
       for (const i of r.created ? [] : r.opened) pending.add(i);
       S.farm.x = W;
       S.holder.style.visibility = "visible";
-      wake();
+      stage.run(frame);
       tickers.add(twinkle);
       if (how === "tutorial") return show(() => tutorial(r));
       await show(() => slideIn());
@@ -2150,15 +2237,17 @@ export async function createFarm(api) {
       for (const i of r.opened) pending.add(i);
       paintCta();
     },
-    trail(x, y) {
+    trail(wx, wy) {
       if (!entered || showing) return;
+      const { x, y } = inStage(wx, wy);
       burst(x, y, 3, { tex: T.art.spark, tint: [0xffd36a, 0xffffff], v0: 8, v1: 30, s0: 0.2, s1: 0.35, l0: 0.2, l1: 0.4 });
     },
     knock,
     promptTouch,
-    // Which plot a screen tap at window point (x, y) lands on, and what it holds.
-    plotAt(x, y) {
+    // Which plot a screen tap at window point (wx, wy) lands on, and what it holds.
+    plotAt(wx, wy) {
       if (!entered || showing) return null;
+      const { x, y } = inStage(wx, wy);
       const order = [3, 4, 5, 0, 1, 2];
       // A front box starts where the back row's ends, so a tap on a back bed picks the back plot.
       const floor = plots[0].cy + plots[0].w * 0.3;
@@ -2217,21 +2306,25 @@ export async function createFarm(api) {
       for (const i of r.opened) pending.add(i);
       chore(() => aftermath(r, { levelShown: true }));
     },
-    // The window changed size under an open farm: rebuild at the new size and redraw from the truth.
+    // The window changed size under an open farm: once nothing shows, it is built again at the new size from the truth.
     async refit() {
       if (!entered || showing || !changed()) return;
       cut();
       teardown();
       const g = gen;
-      await setupStage();
-      if (g !== gen) return;
+      await ready();
+      // 집으로 while it was being made again: the farm is shut, so the stage goes.
+      if (g !== gen) {
+        teardown();
+        return;
+      }
       entered = true;
       calm = Boolean(api.still());
       paintSky();
       S.farm.x = 0;
       S.holder.style.visibility = "visible";
       petEl.style.visibility = "hidden";
-      wake();
+      stage.run(frame);
       tickers.add(twinkle);
       truth.plots.forEach((d, i) => drawPlot(i, d));
       basket = [...truth.pantry];
@@ -2239,42 +2332,47 @@ export async function createFarm(api) {
       paintCta();
       schedule();
     },
-    async leave() {
-      // Mid-rebuild there is no stage to slide out; the bump keeps a pending enter or refit shut.
+    // 집으로, or a farm given up on: the pet is back at once, and a shown farm slides out as decoration, its stage gone once out or after LEAVE_MS.
+    exit() {
       if (!built) {
+        // Mid-build there is no stage to slide out; the bump keeps a pending open, play or refit shut.
         gen += 1;
         entered = false;
-        petEl.style.visibility = "";
-        // The slide-out's last frame (opacity 0) would keep the home pet invisible.
-        petEl.getAnimations().forEach((a) => a.cancel());
+        restorePet();
         return;
       }
+      const shown = entered;
       cut();
       entered = false;
       clearTimeout(growTimer);
       L.cta.hidden = true;
-      const away = petEl.style.visibility === "hidden";
-      petEl.style.visibility = "";
-      petEl.getAnimations().forEach((a) => a.cancel());
-      const pr = petEl.getBoundingClientRect();
-      if (away && !calm) domAnim(petEl, [{ transform: `translateX(${-pr.width * 0.6}px)`, opacity: 0 }, { transform: "translateX(0)", opacity: 1 }], { duration: 520, easing: "cubic-bezier(.3,0,.2,1)", fill: "none" });
-      const x0 = S.farm.x;
-      const until = cutSignal;
-      await Promise.race([tween(calm ? 1 : 520, (k) => {
-        S.farm.x = lerp(x0, W, E.in2(k));
-      }), until]);
-      if (entered) return;
       for (const p of plots) {
         p.tag?.remove();
         p.tag = null;
       }
-      S.holder.style.visibility = "hidden";
-      sleep();
+      const away = petEl.style.visibility === "hidden";
+      restorePet();
+      const pr = petEl.getBoundingClientRect();
+      if (away && !calm) petMove([{ transform: `translateX(${-pr.width * 0.6}px)`, opacity: 0 }, { transform: "translateX(0)", opacity: 1 }], { duration: 520, easing: "cubic-bezier(.3,0,.2,1)" });
+      if (!shown || !stage.live) {
+        teardown();
+        return;
+      }
+      const g = gen;
+      const gone = () => {
+        if (g === gen && !entered) teardown();
+      };
+      const x0 = S.farm.x;
+      tween(calm ? 1 : 520, (k) => {
+        S.farm.x = lerp(x0, W, E.in2(k));
+      }).then(gone);
+      later(gone, LEAVE_MS);
     },
+    // A farm still coming in counts as busy too: nothing may harvest or open the shop on a stage not yet made.
     get busy() {
-      return showing || acting;
+      return showing || acting || !entered;
     },
-    destroy() {
+    dispose() {
       if (built) cut();
       teardown();
       rowList?.removeEventListener("click", onBasket);

@@ -31,10 +31,21 @@ test("말 and 양 stay the everyday switch, 말 the first look", () => {
   assert.equal(kindOf(undefined).id, "horse");
 });
 
+test("every kind carries the mouth and want-bubble move measured from its art", () => {
+  for (const kind of KINDS) {
+    assert.ok(kind.mouth >= 0.4 && kind.mouth <= 0.62, kind.id);
+    assert.ok(kind.lift >= 0 && kind.lift <= 0.3, kind.id);
+    assert.ok(kind.shift >= 0 && kind.shift <= 0.3, kind.id);
+  }
+  assert.deepEqual([kindOf("horse").lift, kindOf("horse").shift], [0, 0]);
+  assert.ok(kindOf("snake").mouth < kindOf("horse").mouth - 0.05);
+  assert.ok(kindOf("rat").lift > 0.15);
+});
+
 for (const kind of KINDS) {
   test(`${kind.name} (${kind.id}) ships every file the manifest lists`, () => {
     const files = kindFiles(kind, worlds);
-    assert.equal(files.length, kind.reveal ? 22 : 21);
+    assert.equal(files.length, kind.reveal ? 21 : 20);
     assert.equal(files.includes(`/reveal/diamond-${kind.id}.mp4`), Boolean(kind.reveal));
     const missing = files.filter((path) => !existsSync(new URL(`../public${path}`, import.meta.url)));
     assert.deepEqual(missing, []);
@@ -56,4 +67,11 @@ test("/kinds.css points every kind at its own sprites and world previews", () =>
     assert.deepEqual(urls, kindFiles(kind, worlds).filter((path) => path.startsWith("/themes/")), kind.id);
   }
   assert.match(KIND_CSS, /--thumb-najeon: url\("\/themes\/thumbs\/najeon-horse\.webp\?v=2"\);/);
+});
+
+test("/kinds.css hands every kind's art metrics to CSS", () => {
+  for (const kind of KINDS) {
+    const block = KIND_CSS.split("\n").find((line) => line.startsWith(`[data-mascot="${kind.id}"] {`));
+    for (const key of ["mouth", "lift", "shift"]) assert.ok(block.includes(` --${key}: ${kind[key]};`), `${kind.id} ${key}`);
+  }
 });

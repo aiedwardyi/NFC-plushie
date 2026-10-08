@@ -94,14 +94,9 @@ function iconSvg(id, px) {
   return `<svg viewBox="0 0 32 32" data-icon="${id}" aria-hidden="true">${SI[id]}</svg>`;
 }
 
-async function img(url) {
-  const i = new Image();
-  i.src = url;
-  await i.decode();
-  return i;
-}
-
 export async function createGimo(api) {
+  // A retry's query reaches the stage module too: a failed module import stays failed for its URL.
+  const { makeStage, loadImage: img } = await import(`./stage.js${new URL(import.meta.url).search}`);
   const P = window.PIXI;
   const FX = P.filters;
   const { win, pet: petEl } = api;
@@ -140,24 +135,40 @@ export async function createGimo(api) {
   /* ---------- textures ---------- */
   const T = {};
   const owned = [];
-  function canvasTex(cw, ch, draw, nearest) {
-    const c = document.createElement("canvas");
-    c.width = Math.max(1, Math.round(cw));
-    c.height = Math.max(1, Math.round(ch));
-    const x = c.getContext("2d");
-    if (nearest) x.imageSmoothingEnabled = false;
-    draw(x, c.width, c.height);
+  // Art is painted once and uploaded again by each stage, so 시작 waits only on the GPU side.
+  const painted = new Map();
+  function paint(key, cw, ch, draw, nearest) {
+    const w = Math.max(1, Math.round(cw));
+    const h = Math.max(1, Math.round(ch));
+    let c = painted.get(key);
+    if (!c || c.width !== w || c.height !== h) {
+      c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const x = c.getContext("2d");
+      if (nearest) x.imageSmoothingEnabled = false;
+      draw(x, w, h);
+      painted.set(key, c);
+    }
+    return c;
+  }
+  function texOf(c, nearest) {
     const t = P.Texture.from(c);
     if (nearest) t.source.scaleMode = "nearest";
     owned.push(t);
     return t;
   }
+  const canvasTex = (key, cw, ch, draw, nearest) => texOf(paint(key, cw, ch, draw, nearest), nearest);
   async function art(name, nearest) {
-    const i = await img(`/game/art/${name}.svg?v=${ART_V}`);
-    return canvasTex(i.naturalWidth, i.naturalHeight, (x, cw, ch) => x.drawImage(i, 0, 0, cw, ch), nearest);
+    const key = `art:${name}`;
+    if (!painted.has(key)) {
+      const i = await img(`/game/art/${name}.svg?v=${ART_V}`);
+      paint(key, i.naturalWidth, i.naturalHeight, (x, cw, ch) => x.drawImage(i, 0, 0, cw, ch), nearest);
+    }
+    return texOf(painted.get(key), nearest);
   }
-  function radial(size, stops) {
-    return canvasTex(size, size, (x, s) => {
+  function radial(key, size, stops) {
+    return canvasTex(key, size, size, (x, s) => {
       const g = x.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
       stops.forEach(([o, c]) => g.addColorStop(o, c));
       x.fillStyle = g;
@@ -170,15 +181,20 @@ export async function createGimo(api) {
     const c = getComputedStyle(el).content;
     return c && c.startsWith("url(") ? c.slice(5, -2) : el.currentSrc || el.src;
   }
+  const pics = new Map();
+  const picOf = (url) => pics.get(url) || img(url).then((i) => {
+    pics.set(url, i);
+    return i;
+  });
   let facesFrom = "";
   async function loadFaces() {
     const urls = ["canon", "blink", "react"].map(faceUrl);
     if (urls.join() === facesFrom) return;
-    const pics = await Promise.all(urls.map(img));
+    const faces = await Promise.all(urls.map(picOf));
     for (const t of Object.values(T.pet || {})) t.destroy(true);
     T.pet = {};
     ["canon", "blink", "react"].forEach((name, i) => {
-      const t = P.Texture.from(pics[i]);
+      const t = new P.Texture({ source: new P.ImageSource({ resource: faces[i] }) });
       if (px) t.source.scaleMode = "nearest";
       T.pet[name] = t;
     });
@@ -186,12 +202,12 @@ export async function createGimo(api) {
   }
 
   async function buildTextures(W, H) {
-    T.glow = radial(128, [[0, "rgba(255,255,255,1)"], [0.25, "rgba(255,255,255,.75)"], [0.6, "rgba(255,255,255,.18)"], [1, "rgba(255,255,255,0)"]]);
-    T.soft = radial(64, [[0, "rgba(255,255,255,.9)"], [0.5, "rgba(255,255,255,.35)"], [1, "rgba(255,255,255,0)"]]);
-    T.puff = radial(64, [[0, "rgba(255,255,255,.85)"], [0.55, "rgba(255,255,255,.5)"], [1, "rgba(255,255,255,0)"]]);
-    T.ring = canvasTex(128, 128, (x) => { x.strokeStyle = "#fff"; x.lineWidth = 7; x.shadowColor = "#fff"; x.shadowBlur = 10; x.beginPath(); x.arc(64, 64, 52, 0, Math.PI * 2); x.stroke(); });
-    T.streak = canvasTex(8, 128, (x) => { const g = x.createLinearGradient(0, 0, 0, 128); g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(0.6, "rgba(255,255,255,.9)"); g.addColorStop(1, "rgba(255,255,255,0)"); x.fillStyle = g; x.fillRect(2, 0, 4, 128); });
-    T.rays = canvasTex(512, 512, (x) => {
+    T.glow = radial("glow", 128, [[0, "rgba(255,255,255,1)"], [0.25, "rgba(255,255,255,.75)"], [0.6, "rgba(255,255,255,.18)"], [1, "rgba(255,255,255,0)"]]);
+    T.soft = radial("soft", 64, [[0, "rgba(255,255,255,.9)"], [0.5, "rgba(255,255,255,.35)"], [1, "rgba(255,255,255,0)"]]);
+    T.puff = radial("puff", 64, [[0, "rgba(255,255,255,.85)"], [0.55, "rgba(255,255,255,.5)"], [1, "rgba(255,255,255,0)"]]);
+    T.ring = canvasTex("ring", 128, 128, (x) => { x.strokeStyle = "#fff"; x.lineWidth = 7; x.shadowColor = "#fff"; x.shadowBlur = 10; x.beginPath(); x.arc(64, 64, 52, 0, Math.PI * 2); x.stroke(); });
+    T.streak = canvasTex("streak", 8, 128, (x) => { const g = x.createLinearGradient(0, 0, 0, 128); g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(0.6, "rgba(255,255,255,.9)"); g.addColorStop(1, "rgba(255,255,255,0)"); x.fillStyle = g; x.fillRect(2, 0, 4, 128); });
+    T.rays = canvasTex("rays", 512, 512, (x) => {
       x.translate(256, 256);
       for (let i = 0; i < 18; i++) {
         x.rotate((Math.PI * 2) / 18);
@@ -207,8 +223,8 @@ export async function createGimo(api) {
         x.fill();
       }
     });
-    T.pix = canvasTex(4, 4, (x) => { x.fillStyle = "#fff"; x.fillRect(0, 0, 4, 4); }, true);
-    T.pixRing = canvasTex(32, 32, (x) => { x.fillStyle = "#fff"; x.fillRect(0, 0, 32, 3); x.fillRect(0, 29, 32, 3); x.fillRect(0, 0, 3, 32); x.fillRect(29, 0, 3, 32); }, true);
+    T.pix = canvasTex("pix", 4, 4, (x) => { x.fillStyle = "#fff"; x.fillRect(0, 0, 4, 4); }, true);
+    T.pixRing = canvasTex("pixRing", 32, 32, (x) => { x.fillStyle = "#fff"; x.fillRect(0, 0, 32, 3); x.fillRect(0, 29, 32, 3); x.fillRect(0, 0, 3, 32); x.fillRect(29, 0, 3, 32); }, true);
     const names = ART[w] || ART.classic;
     const [shared, pieces] = await Promise.all([
       Promise.all(["spark", "heart", "petal"].map((n) => art(n))),
@@ -252,7 +268,7 @@ export async function createGimo(api) {
       najeon: [[0, "#121119"], [0.5, "#0f0e15"], [1, "#0b0a10"], [1.25, "#07060a"]],
     }[w] || [];
     if (px) {
-      return canvasTex(W, Ht, (x, cw, ch) => {
+      return canvasTex("sky", W, Ht, (x, cw, ch) => {
         const band = (y0, y1, col) => { x.fillStyle = col; x.fillRect(0, y0, cw, y1 - y0); };
         const yOf = (c) => Math.round(at(c) * ch);
         band(0, yOf(0.95), "#000000");
@@ -263,7 +279,7 @@ export async function createGimo(api) {
         dither(yOf(0.55), "#1d2b53", "#29adff");
       }, true);
     }
-    return canvasTex(W, Ht, (x, cw, ch) => {
+    return canvasTex("sky", W, Ht, (x, cw, ch) => {
       const g = x.createLinearGradient(0, 0, 0, ch);
       stops.slice().sort((a, b) => at(a[0]) - at(b[0])).forEach(([c, col]) => g.addColorStop(clamp(at(c), 0, 1), col));
       x.fillStyle = g;
@@ -278,8 +294,8 @@ export async function createGimo(api) {
   }
   function groundTex(W, H) {
     const gh = Math.round(0.27 * H);
-    if (px) return canvasTex(W, gh, (x, cw, ch) => { x.fillStyle = "#00e436"; x.fillRect(0, 0, cw, ch); x.fillStyle = "#008751"; x.fillRect(0, 0, cw, 6); x.fillStyle = "#ab5236"; x.fillRect(0, ch * 0.45, cw, ch); }, true);
-    return canvasTex(W * 2, gh * 2, (x, cw, ch) => {
+    if (px) return canvasTex("ground", W, gh, (x, cw, ch) => { x.fillStyle = "#00e436"; x.fillRect(0, 0, cw, ch); x.fillStyle = "#008751"; x.fillRect(0, 0, cw, 6); x.fillStyle = "#ab5236"; x.fillRect(0, ch * 0.45, cw, ch); }, true);
+    return canvasTex("ground", W * 2, gh * 2, (x, cw, ch) => {
       if (w === "milk") {
         x.fillStyle = "#fff";
         x.fillRect(0, 0, cw, ch);
@@ -306,7 +322,7 @@ export async function createGimo(api) {
   function galaxyTex() {
     let s = 9;
     const R = () => (s = (s * 16807) % 2147483647) / 2147483647;
-    return canvasTex(px ? 200 : 800, px ? 60 : 240, (x, cw, ch) => {
+    return canvasTex("galaxy", px ? 200 : 800, px ? 60 : 240, (x, cw, ch) => {
       if (px) {
         for (let i = 0; i < 520; i++) {
           const xx = Math.floor(R() * cw);
@@ -341,7 +357,8 @@ export async function createGimo(api) {
     }, px);
   }
 
-  /* ---------- stage ---------- */
+  /* ---------- stage: made on 시작, dropped when the game ends ---------- */
+  let stage = null;
   let app = null;
   let built = false;
   let W = 0;
@@ -418,10 +435,18 @@ export async function createGimo(api) {
   }
 
   async function setupStage() {
+    const g = gen;
     ({ W, H, petSize, floorY } = measure());
     await buildTextures(W, H);
-    app = new P.Application();
-    await app.init({ width: W, height: H, resolution: Math.min(2, window.devicePixelRatio || 1), autoDensity: true, backgroundAlpha: 0, antialias: !px, preference: "webgl", roundPixels: px });
+    if (g !== gen) throw STOP;
+    const made = await makeStage(P, { width: W, height: H, roundPixels: px, fault: lost });
+    // Left while the stage was being made: it goes at once.
+    if (g !== gen) {
+      made.drop();
+      throw STOP;
+    }
+    stage = made;
+    app = made.app;
     S = {};
     const holder = document.createElement("div");
     holder.className = "g2-stage";
@@ -498,7 +523,6 @@ export async function createGimo(api) {
     // Fixed filter areas: growing bounds would re-allocate GPU targets mid-show.
     S.fxFront.filterArea = new P.Rectangle(0, 0, W, H);
     S.cam.filterArea = new P.Rectangle(0, 0, W, H);
-    app.ticker.add(frame);
     // Warm every shader before the show.
     S.worldC.visible = true;
     S.worldC.filters = S.blur ? [S.blur] : null;
@@ -506,15 +530,19 @@ export async function createGimo(api) {
     const warm = px ? null : new FX.ShockwaveFilter({ center: { x: W / 2, y: H / 2 }, amplitude: 1, wavelength: 50, radius: 10 });
     S.cam.filters = warm ? [warm] : null;
     S.sparks.moveTo(0, 0).lineTo(1, 1).stroke({ width: 2, color: 0xffffff, alpha: 0.01 });
-    app.renderer.render(app.stage);
+    stage.draw();
     S.cam.filters = null;
     warm?.destroy();
     S.sparks.clear();
     S.worldC.visible = false;
     S.holder.style.visibility = "hidden";
-    app.ticker.stop();
     resetStage();
     built = true;
+  }
+  // A frame that threw or a lost context: the game ends, or the stage goes if none is on.
+  function lost(error) {
+    console.error(error);
+    exit("aborted");
   }
   // Bloom only lights the effects; on the sky or the fur it washes the frame out.
   function applyCamFilters() {
@@ -580,11 +608,11 @@ export async function createGimo(api) {
     S.planetBase = S.planet.scale.x;
   }
 
-  function frame(tk) {
+  function frame(ms) {
     // Paused, the stage still draws its last frame but nothing moves.
     if (paused) return;
-    if (samples) samples.push(tk.deltaMS);
-    const dt = Math.min(0.05, tk.deltaMS / 1000);
+    if (samples) samples.push(ms);
+    const dt = Math.min(0.05, ms / 1000);
     const t = performance.now() / 1000;
     for (let i = tweens.length - 1; i >= 0; i--) {
       const tw = tweens[i];
@@ -779,7 +807,8 @@ export async function createGimo(api) {
 
   /* ---------- game flow ---------- */
   let phase = "idle";
-  let live = null;
+  // Bumped by every play and every exit: a run's awaits find out they are stale through hold().
+  let gen = 0;
   let done = null;
   let taps = 0;
   let nfcTaps = 0;
@@ -794,9 +823,9 @@ export async function createGimo(api) {
 
   // Every await in a run goes through here, so an ended run stops at its next step.
   async function hold(p) {
-    const r = live;
+    const g = gen;
     const v = await p;
-    if (!r || r.dead) throw STOP;
+    if (g !== gen) throw STOP;
     return v;
   }
 
@@ -841,37 +870,44 @@ export async function createGimo(api) {
     S.planet.rotation = 0;
     S.planet.scale.set(S.planetBase);
     applyCamFilters();
-    frame({ deltaMS: 0 });
-    app.renderer.render(app.stage);
+    frame(0);
   }
 
-  function finish(value) {
-    if (!live) return;
-    live.dead = true;
-    live = null;
-    for (const t of timers) clearTimeout(t.id);
-    timers.clear();
-    paused = null;
-    cancelAnimationFrame(heightTween);
-    api.drone.stop();
-    for (const el of doms) {
-      el.getAnimations().forEach((a) => a.cancel());
-      el.remove();
+  // Leaving, from any phase: the pet is back on the home and play() settles once, whatever else fails on the way.
+  // Only "again" keeps the stage, for the run that follows at once.
+  function exit(value) {
+    gen += 1;
+    if (!done) {
+      // Nothing on screen yet: an open the app gave up on, so whatever it made goes.
+      teardown();
+      return;
     }
-    doms.clear();
-    hudEl = null;
-    hintEl = null;
-    samples = null;
-    if (built) {
-      resetStage();
-      S.holder.style.visibility = "hidden";
-      app.ticker.stop();
-    }
-    petEl.style.visibility = "";
-    phase = "idle";
     const ended = done;
     done = null;
-    ended?.resolve(value);
+    phase = "idle";
+    paused = null;
+    petEl.style.visibility = "";
+    try {
+      for (const t of timers) clearTimeout(t.id);
+      timers.clear();
+      cancelAnimationFrame(heightTween);
+      api.drone.stop();
+      for (const el of doms) {
+        el.getAnimations().forEach((a) => a.cancel());
+        el.remove();
+      }
+      doms.clear();
+      hudEl = null;
+      hintEl = null;
+      samples = null;
+      if (value !== "again") teardown();
+      else if (built) {
+        stage.stop();
+        S.holder.style.visibility = "hidden";
+      }
+    } finally {
+      ended.resolve(value);
+    }
   }
 
   function changed() {
@@ -883,7 +919,9 @@ export async function createGimo(api) {
     built = false;
     S.holder?.remove();
     for (const f of [S.bloom, S.blur, S.hue]) f?.destroy();
-    app?.destroy(true, { children: true });
+    S = {};
+    stage?.drop();
+    stage = null;
     app = null;
     for (const t of owned) t.destroy(true);
     owned.length = 0;
@@ -892,14 +930,32 @@ export async function createGimo(api) {
     facesFrom = "";
   }
 
-  async function begin() {
-    // The window can change size (the browser's bars), so a stale stage is rebuilt first.
-    if (!built || changed()) {
-      teardown();
-      await hold(setupStage());
-    } else {
-      await hold(loadFaces());
+  // The stage for a game, or the last round's while the window keeps its size. One open at a time: one asked for while
+  // another is still being made waits for that one, then makes its own; exit() lets a pending one go.
+  let opening = null;
+  async function open() {
+    const g = gen;
+    while (opening) await opening.catch(() => {});
+    if (g !== gen) throw STOP;
+    opening = (async () => {
+      if (!built || changed()) {
+        teardown();
+        await setupStage();
+      } else {
+        await loadFaces();
+      }
+    })();
+    try {
+      await opening;
+    } finally {
+      opening = null;
     }
+    if (g !== gen) throw STOP;
+  }
+
+  // Everything up to the first await shows at once: play() puts the game on screen in the same task the app takes it.
+  async function begin() {
+    if (!built) throw new Error("gimo played without its stage");
     resetStage();
     hudEl = domAdd("g-hud", `<div class="g-timer"><i></i></div><p class="g-height"><small>예상 높이</small><b>0</b><span>m</span></p>${str > 0 ? `
       <p class="g-bonus">힘 +${str >= 1 ? Math.round(str) : str}%</p>` : ""}
@@ -908,10 +964,11 @@ export async function createGimo(api) {
     hudEl.classList.toggle("is-still", calm);
     hudEl.querySelectorAll(".g-tier").forEach((el, i) => { el.style.bottom = `${(TIERS[i].at / MAX) * 100}%`; });
     setHeight(0, true);
-    // Hand the pet over to the stage.
-    S.holder.style.visibility = "visible";
-    app.ticker.start();
+    // Hand the pet over to the stage, drawn fresh before it shows.
     face("canon");
+    stage.draw();
+    S.holder.style.visibility = "visible";
+    stage.run(frame);
     petEl.style.visibility = "hidden";
     tickers.add(auraTick);
     voice("happy");
@@ -1315,8 +1372,8 @@ export async function createGimo(api) {
       ${xp}${r?.leveledUp ? `<p class="g-level">쑥쑥 컸어요! 이제 Lv. ${r.level}!</p>` : ""}
       <div class="g-actions"><button type="button" class="g-again">한 번 더</button><button type="button" class="g-quit">그만할래요</button></div>`);
     card.setAttribute("role", "status");
-    card.querySelector(".g-again").addEventListener("click", () => finish("again"));
-    card.querySelector(".g-quit").addEventListener("click", () => finish("quit"));
+    card.querySelector(".g-again").addEventListener("click", () => exit("again"));
+    card.querySelector(".g-quit").addEventListener("click", () => exit("quit"));
     game(isBest ? "best" : "result");
     if (isBest) {
       for (let i = 0; i < 40; i++) emit(px ? T.pix : T.petal, { x: rnd(W * 0.2, W * 0.8), y: H * 0.18, vx: rnd(-160, 160), vy: rnd(-260, -80), ay: 380, drag: 0.02, life: 1.6, s0: px ? 2 : 0.5, s1: px ? 2 : 0.4, a0: 1, a1: 0.6, spin: rnd(-8, 8), tint: [0xff9aa2, 0xffd38a, 0x9ad7ff, 0xa8f0c0, pl.glow[1]][i % 5], blend: "normal" });
@@ -1325,20 +1382,23 @@ export async function createGimo(api) {
     await hold(domAnim(card, [{ transform: "translateY(24px) scale(.85)", opacity: 0 }, { transform: "translateY(-4px) scale(1.03)", opacity: 1, offset: 0.65 }, { transform: "translateY(0) scale(1)", opacity: 1 }], { duration: 420, easing: "cubic-bezier(.3,1.3,.5,1)" }));
   }
 
+  // The art is painted now, ahead of 시작; the stage itself is made only when a game starts.
   try {
-    await setupStage();
-  } catch (error) {
+    const m = measure();
+    await buildTextures(m.W, m.H);
+  } finally {
     teardown();
-    throw error;
   }
 
   return {
+    open,
+    // On screen at once, after open(); settles once, with "again", "quit" or "aborted".
     play(how, record) {
       if (done) return done.promise;
       let resolve;
       const promise = new Promise((res) => (resolve = res));
       done = { promise, resolve };
-      live = { dead: false };
+      gen += 1;
       phase = "ready";
       mode = how === "nfc" ? "nfc" : "screen";
       best = Number(record) || 0;
@@ -1350,19 +1410,19 @@ export async function createGimo(api) {
       reply = null;
       begin().catch((error) => {
         if (error === STOP) return;
-        finish("aborted");
         console.error(error);
+        exit("aborted");
       });
       return promise;
     },
     tap,
     pause,
+    exit,
     get phase() {
       return phase;
     },
-    destroy() {
-      finish("aborted");
-      teardown();
+    dispose() {
+      exit("aborted");
     },
   };
 }

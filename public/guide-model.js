@@ -28,14 +28,13 @@ export function startGuide(raw, { named = false } = {}) {
 
 // Only a pet with the mic gets the talk step, and only a night tour tucks the pet in before the goodbye.
 export function nextStep(guide, steps, { talk = true, night = false } = {}) {
-  if (!guide || guide.skipped) return null;
+  if (!guide || guide.skipped || guide.done.includes("bye")) return null;
   return steps.find((step) => !guide.done.includes(step) && (talk || step !== "talk") && (night || step !== "sleep")) || null;
 }
 
-// The goodbye ends the home tour, so a later night never comes back to tuck the pet in.
 export function finishStep(guide, step) {
-  const add = (step === "bye" ? ["sleep", "bye"] : [step]).filter((s) => !guide.done.includes(s));
-  return add.length ? { ...guide, done: [...guide.done, ...add] } : guide;
+  if (guide.done.includes(step)) return guide;
+  return { ...guide, done: [...guide.done, step] };
 }
 
 export const skipGuide = (guide) => ({ ...guide, skipped: true });

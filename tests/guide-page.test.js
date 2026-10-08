@@ -37,9 +37,9 @@ test("at night the guide feeds first and tucks the pet in before the goodbye", (
   assert.match(app, /also: \(\) => win\.querySelector\(`\.want\[data-want="\$\{verb\(\)\}"\]:not\(\.is-gone\)`\)/);
 });
 
-test("the farm tour waits on a growing sprout with a soft ring and walks home at the end", () => {
+test("the farm tour waits on a growing crop with a soft ring and walks home at the end", () => {
   const app = read("app.js");
-  assert.match(app, /새싹이 쑥쑥 자라는 중! 다 자라면 알려 줄게요/);
+  assert.match(app, /쑥쑥 자라는 중! 다 자라면 알려 줄게요/);
   assert.match(app, /"farm-home": \{ target: \(\) => dock\.querySelector\("\[data-farm\]"\), line: \(\) => "집으로 가서 오락실도 구경해요!"/);
   const farm = read("game/farm.js");
   assert.match(farm, /growRect\(\) \{/);

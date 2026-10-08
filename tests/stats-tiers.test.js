@@ -118,7 +118,7 @@ test("a 금실 레어 or 별밤 레전더리 page wears its edition from its nam
     for (const html of [home, stranger]) {
       const tag = html.match(/<html [^>]*>/)[0];
       if (edition === "classic") assert.equal(tag, '<html lang="ko" data-mascot="horse">');
-      else assert.equal(tag, `<html lang="ko" data-mascot="horse" data-edition="${edition}">`);
+      else assert.equal(tag, `<html lang="ko" data-mascot="horse" data-edition="${edition}" data-look="${edition}">`);
     }
     assert.match(home, /<button type="button" class="st-share" data-share-card aria-label="카드로 자랑하기">/);
     assert.doesNotMatch(stranger, /data-share-card/);
@@ -147,15 +147,16 @@ test("the admin picker's reply dresses the page and repaints the bars", () => {
     documentElement: { dataset: { editionReveal: "rare" } },
     querySelector: (sel) => (sel === "[data-name-input]" ? (naming ? {} : null) : sel === ".st-edition > span" ? pill : null),
   };
-  const showEdition = lift("showEdition", "document", "paintStats")(document, (sheet) => painted.push(sheet));
+  let synced = 0;
+  const showEdition = lift("showEdition", "document", "paintStats", "syncLooks")(document, (sheet) => painted.push(sheet), () => synced++);
   const root = document.documentElement;
   const sheet = sheetOf("legendary");
   showEdition("legendary", "별밤 레전더리", sheet);
-  assert.deepEqual([root.dataset, pill.textContent, painted], [{ edition: "legendary" }, "별밤 레전더리", [sheet]]);
+  assert.deepEqual([root.dataset, pill.textContent, painted, synced], [{ edition: "legendary", look: "legendary" }, "별밤 레전더리", [sheet], 1]);
   showEdition("classic", "포근 클래식", sheetOf("classic"));
-  assert.deepEqual([root.dataset, pill.textContent, painted.length], [{}, "포근 클래식", 2]);
+  assert.deepEqual([root.dataset, pill.textContent, painted.length, synced], [{}, "포근 클래식", 2, 2]);
   // Before naming the finish waits for the naming; the card still repaints.
   naming = true;
   showEdition("rare", "금실 레어", sheetOf("rare"));
-  assert.deepEqual([root.dataset, pill.textContent, painted.length], [{}, "금실 레어", 3]);
+  assert.deepEqual([root.dataset, pill.textContent, painted.length, synced], [{}, "금실 레어", 3, 2]);
 });

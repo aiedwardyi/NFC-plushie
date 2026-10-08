@@ -81,7 +81,6 @@ html[data-theme="8bit"] .level-pin svg {
 
 /* The window: a pixel frame, banded sky, grass */
 html[data-theme="8bit"] .window {
-  border-radius: 0;
   box-shadow:
     -4px 0 0 0 var(--cream), 4px 0 0 0 var(--cream), 0 -4px 0 0 var(--cream), 0 4px 0 0 var(--cream),
     -8px 0 0 0 var(--ink), 8px 0 0 0 var(--ink), 0 -8px 0 0 var(--ink), 0 8px 0 0 var(--ink),
@@ -388,6 +387,17 @@ html[data-theme="8bit"] .theme-grid .theme-card[aria-pressed="true"]::after {
 }
 html[data-theme="8bit"] .theme-name { font-weight: 700; }
 html[data-theme="8bit"] .theme-lede { font-size: 11px; color: var(--muted); }
+/* The minis are square with a banded sky, each ring a whole pixel like the home's. */
+html[data-theme="8bit"] .look-card .look-frame,
+html[data-theme="8bit"] .look-card .look-frame::after { border-radius: 0; }
+html[data-theme="8bit"] .look-frame { box-shadow: 0 0 0 2px var(--cream), 0 0 0 4px var(--ink); }
+html[data-theme="8bit"] .look-frame::after { background: linear-gradient(180deg, var(--sky-1) 0 26%, var(--sky-2) 26% 52%, var(--sky-3) 52% 78%, var(--grass) 78%); }
+html[data-theme="8bit"] .look-card[data-look="rare"] .look-frame { box-shadow: 0 0 0 2px var(--ink); }
+html[data-theme="8bit"] .look-card[data-look="rare"] .look-frame::after { box-shadow: 0 0 0 2px #ffec27; }
+html[data-theme="8bit"] .look-card[data-look="legendary"] .look-frame { box-shadow: 0 0 0 2px #fff1e8; }
+html[data-theme="8bit"] .look-card[data-look="legendary"] .look-frame::after { box-shadow: 0 0 0 1px #ffec27; }
+html[data-theme="8bit"] .look-name { font-weight: 700; text-shadow: 2px 2px 0 var(--ink); }
+html[data-theme="8bit"] .look-card.is-locked::before { border-radius: 0; background: url("/themes/px/lock.svg") center / 16px 20px no-repeat; box-shadow: none; image-rendering: pixelated; }
 
 /* The reveal stays classic */
 html[data-theme="8bit"] body > .reveal {
@@ -733,34 +743,86 @@ html[data-theme="8bit"] .f-coin-ic,
 html[data-theme="8bit"] .f-coin { border-radius: 0; background: #ffec27; box-shadow: inset -3px -3px 0 #ffa300, inset 0 0 0 2px #ab5236; }
 html[data-theme="8bit"] .f-big.is-snack { font-family: "Galmuri11", monospace; }
 
-/* The edition's finish in pixels: a dithered gold ring for 금실, a night ring with pixel stars for 별밤. */
-html[data-theme="8bit"] .finish {
-  border-radius: 0;
-  clip-path: polygon(4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px), 0 4px, 4px 4px);
-}
-html[data-theme="8bit"][data-edition] .window {
+/* The edition's finish in pixels, hard edges and stepped motion: each tier writes its own inset and outline, and the inner ring is the glass's. */
+html[data-theme="8bit"] { --win-r: 0px; }
+html[data-theme="8bit"][data-look],
+html[data-theme="8bit"] .look-card:not([data-look="classic"]) { --edge: transparent; --edge-w: 0px; }
+html[data-theme="8bit"][data-look] .finish { border-radius: 0; }
+/* The window keeps its rings underneath; the finish carries the hard drop shadow, which the window's own would double. */
+html[data-theme="8bit"][data-look] .window {
   box-shadow:
+    -4px 0 0 0 var(--cream), 4px 0 0 0 var(--cream), 0 -4px 0 0 var(--cream), 0 4px 0 0 var(--cream),
     -8px 0 0 0 var(--ink), 8px 0 0 0 var(--ink), 0 -8px 0 0 var(--ink), 0 8px 0 0 var(--ink),
-    -4px -4px 0 0 var(--ink), 4px -4px 0 0 var(--ink), -4px 4px 0 0 var(--ink), 4px 4px 0 0 var(--ink),
-    10px 14px 0 0 rgba(0, 0, 0, 0.35);
+    -4px -4px 0 0 var(--ink), 4px -4px 0 0 var(--ink), -4px 4px 0 0 var(--ink), 4px 4px 0 0 var(--ink);
 }
-html[data-theme="8bit"][data-edition="rare"] .finish { background: repeating-conic-gradient(#ffec27 0 25%, #ffa300 0 50%) 0 0 / 4px 4px; }
-html[data-theme="8bit"][data-edition="legendary"] .finish {
-  padding: 4px;
-  inset: -4px;
+html[data-theme="8bit"][data-look="rare"] .window::after { box-shadow: 0 0 0 4px #ffec27; }
+html[data-theme="8bit"][data-look="rare"] .finish {
+  inset: -8px;
+  box-shadow: 0 0 0 2px var(--ink), 10px 14px 0 2px rgba(0, 0, 0, .35);
+  --deco:
+    linear-gradient(#ffec27, #ffec27) 5px 5px / 6px 6px no-repeat,
+    linear-gradient(#ffec27, #ffec27) calc(100% - 5px) 5px / 6px 6px no-repeat,
+    linear-gradient(#ffec27, #ffec27) 5px calc(100% - 5px) / 6px 6px no-repeat,
+    linear-gradient(#ffec27, #ffec27) calc(100% - 5px) calc(100% - 5px) / 6px 6px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) 3px 3px / 10px 10px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) calc(100% - 3px) 3px / 10px 10px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) 3px calc(100% - 3px) / 10px 10px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) calc(100% - 3px) calc(100% - 3px) / 10px 10px no-repeat;
+}
+html[data-theme="8bit"][data-look="rare"] .finish::after { top: -2px; right: -2px; width: 4px; height: 4px; background: #fff1e8; }
+html[data-theme="8bit"][data-look="rare"] .finish,
+html[data-theme="8bit"] .look-card[data-look="rare"] .look-frame {
+  background: repeating-conic-gradient(#ffec27 0 25%, #ffa300 0 50%) 0 0 / 4px 4px;
+}
+html[data-theme="8bit"][data-look="legendary"] .window::after { box-shadow: 0 0 0 2px #ffec27; }
+html[data-theme="8bit"][data-look="legendary"] .finish {
+  inset: -12px;
+  box-shadow: 0 0 0 2px #fff1e8, 12px 16px 0 2px rgba(0, 0, 0, .35);
+  --deco:
+    linear-gradient(#ffec27, #ffec27) 4.5px 6.5px / 7px 3px no-repeat,
+    linear-gradient(#ffec27, #ffec27) 6.5px 4.5px / 3px 7px no-repeat,
+    linear-gradient(#ffec27, #ffec27) calc(100% - 4.5px) 6.5px / 7px 3px no-repeat,
+    linear-gradient(#ffec27, #ffec27) calc(100% - 6.5px) 4.5px / 3px 7px no-repeat,
+    linear-gradient(#ffec27, #ffec27) 4.5px calc(100% - 6.5px) / 7px 3px no-repeat,
+    linear-gradient(#ffec27, #ffec27) 6.5px calc(100% - 4.5px) / 3px 7px no-repeat,
+    linear-gradient(#ffec27, #ffec27) calc(100% - 4.5px) calc(100% - 6.5px) / 7px 3px no-repeat,
+    linear-gradient(#ffec27, #ffec27) calc(100% - 6.5px) calc(100% - 4.5px) / 3px 7px no-repeat;
+}
+html[data-theme="8bit"][data-look="legendary"] .finish,
+html[data-theme="8bit"] .look-card[data-look="legendary"] .look-frame {
   background:
-    linear-gradient(#ffec27, #ffec27) 22% 1px / 2px 2px no-repeat,
-    linear-gradient(#fff1e8, #fff1e8) 61% 1px / 2px 2px no-repeat,
-    linear-gradient(#fff1e8, #fff1e8) calc(100% - 1px) 34% / 2px 2px no-repeat,
-    linear-gradient(#ffec27, #ffec27) 40% calc(100% - 1px) / 2px 2px no-repeat,
-    linear-gradient(#fff1e8, #fff1e8) 1px 66% / 2px 2px no-repeat,
-    #1d2b53;
+    linear-gradient(#fff1e8, #fff1e8) 12% 4px / 2px 2px no-repeat,
+    linear-gradient(#ffec27, #ffec27) 30% 3px / 3px 3px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) 47% 5px / 2px 2px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) 66% 4px / 2px 2px no-repeat,
+    linear-gradient(#ffec27, #ffec27) 85% 3px / 3px 3px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) 18% calc(100% - 6px) / 2px 2px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) 40% calc(100% - 5px) / 2px 2px no-repeat,
+    linear-gradient(#ffec27, #ffec27) 62% calc(100% - 7px) / 3px 3px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) 80% calc(100% - 6px) / 2px 2px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) 4px 35% / 2px 2px no-repeat,
+    linear-gradient(#fff1e8, #fff1e8) calc(100% - 6px) 70% / 2px 2px no-repeat,
+    #000;
 }
-html[data-theme="8bit"][data-edition="legendary"] .finish::before,
-html[data-theme="8bit"][data-edition="legendary"] .finish::after { content: none; }
-html[data-theme="8bit"][data-edition] .nameplate { background: none; color: var(--tier-gold-2); filter: none; text-shadow: 3px 3px 0 var(--ink); }
-html[data-theme="8bit"][data-edition="legendary"] .nameplate::before,
-html[data-theme="8bit"][data-edition="legendary"] .nameplate::after {
+/* Both names: pixel gold needs the ink shadow as a drop shadow, since a text-shadow paints over clipped text. */
+html[data-theme="8bit"][data-look] .nameplate,
+html[data-theme="8bit"] .look-card:not([data-look="classic"]) .look-name {
+  text-shadow: none;
+  filter: drop-shadow(3px 3px 0 var(--ink));
+}
+html[data-theme="8bit"][data-look="rare"] .nameplate,
+html[data-theme="8bit"] .look-card[data-look="rare"] .look-name {
+  background-image: linear-gradient(180deg, #fff1e8 0 36%, #ffec27 36% 68%, #ffa300 68% 100%);
+}
+html[data-theme="8bit"][data-look="legendary"] .nameplate,
+html[data-theme="8bit"] .look-card[data-look="legendary"] .look-name {
+  background-image:
+    linear-gradient(90deg, transparent 0 48%, #fff1e8 48% 52%, transparent 52% 100%),
+    linear-gradient(180deg, #fff1e8 0 30%, #ffec27 30% 54%, #ff77a8 54% 78%, #29adff 78% 100%);
+  background-size: 300% 100%, auto;
+}
+html[data-theme="8bit"][data-look="legendary"] .nameplate::before,
+html[data-theme="8bit"][data-look="legendary"] .nameplate::after {
   content: "";
   display: inline-block;
   width: 22px;
@@ -770,8 +832,14 @@ html[data-theme="8bit"][data-edition="legendary"] .nameplate::after {
   background: url("/themes/px/star.svg") center / 22px 22px no-repeat;
   image-rendering: pixelated;
 }
-html[data-theme="8bit"][data-edition="rare"] .sparkle { width: 4px; height: 12px; border-radius: 0; background: #ffec27; }
-html[data-theme="8bit"][data-edition="legendary"] .sparkle { background: #fff1e8; filter: none; }
+/* The one loop, stepped: the 금실 pixel winks, the 별밤 sheen walks in 14 steps; the naming reveal keeps its own easing. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme="8bit"][data-look="legendary"]:not(.is-edition-lit) .nameplate { animation-timing-function: steps(14, end); }
+  html[data-theme="8bit"][data-look="rare"] .finish::after { animation: px-wink 5s steps(1, end) infinite; }
+}
+@keyframes px-wink { 0%, 80% { opacity: 0; } 80.1%, 90% { opacity: 1; } 90.1%, 100% { opacity: 0; } }
+html[data-theme="8bit"][data-look="rare"] .sparkle { width: 4px; height: 12px; border-radius: 0; background: #ffec27; }
+html[data-theme="8bit"][data-look="legendary"] .sparkle { background: #fff1e8; filter: none; }
 html[data-theme="8bit"] .sparkle.is-shoot { height: 4px; border-radius: 0; background: linear-gradient(90deg, transparent 0 30%, rgba(255, 241, 232, .5) 30% 60%, #fff1e8 60%); animation-timing-function: steps(6, end); }
 
 /* Guide: a pixel hand and a square stepped ring, nothing blurred */

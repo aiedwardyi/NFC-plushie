@@ -111,6 +111,15 @@ export function openDatabase(dataDir = process.env.DATA_DIR || "./data") {
       reply TEXT NULL
     );
     CREATE INDEX IF NOT EXISTS talk_log_day ON talk_log(day, uid);
+    CREATE TABLE IF NOT EXISTS diag_log (
+      id INTEGER PRIMARY KEY,
+      at INTEGER NOT NULL,
+      load TEXT NOT NULL,
+      uid TEXT NULL,
+      event TEXT NOT NULL,
+      detail TEXT NOT NULL,
+      context TEXT NOT NULL
+    );
   `);
   db.pragma("foreign_keys = ON");
   migratePetColumns(db);
