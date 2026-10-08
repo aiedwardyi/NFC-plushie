@@ -10,10 +10,14 @@ const STARTER_X = -3.4;
 const HINT_ART = `<svg viewBox="0 0 40 56" aria-hidden="true"><rect x="6" y="2" width="28" height="52" rx="6" class="h-phone"/><circle cx="20" cy="22" r="7" class="h-spot"/><circle cx="12" cy="9" r="2.2" class="h-cam"/></svg>`;
 const TAU = Math.PI * 2;
 const STOP = Symbol("stop");
+// How long a race waits on a rival's faces when another animal's are here to race instead.
+const RIVAL_MS = 2000;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, k) => a + (b - a) * k;
 const smooth = (k) => (k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k));
 const rnd = (a, b) => a + Math.random() * (b - a);
+// A wait cut short: past `ms` it fails, while what it waits on goes on loading.
+const soon = (promise, ms) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`late past ${ms} ms`)), ms))]);
 // The roster's art under /game/art/race/, which phones keep a day; bump ART_V when one changes.
 const ART_V = 2;
 const faceUrl = (kind, face, px) => px ? `/themes/px/${kind}${face === "canon" ? "" : face === "blink" ? "-closed" : "-happy"}-px.png` : `/mascot-${kind}-${face === "canon" ? "512-v3.png" : face === "blink" ? "closed-512.webp" : "happy-512.webp"}`;
@@ -86,10 +90,11 @@ export async function createRace(api) {
     return loading[kind];
   }));
   const first = kindOf(document.documentElement.dataset.mascot).id;
+  // The rival's faces are only a head start: a race whose rival is late races another.
+  loadFaces([kindOf(first).rival]).catch(() => {});
   try {
-    // 8-bit sizes every runner off the 말 sprite, so its texels land on the pixel grid. The rival's faces are only a head
-    // start: a race whose rival is late picks another.
-    await Promise.all([loadFaces([first, ...(px ? [DEFAULT_KIND] : [])]), loadFaces([kindOf(first).rival]).catch(() => {})]);
+    // 8-bit sizes every runner off the 말 sprite, so its texels land on the pixel grid.
+    await loadFaces([first, ...(px ? [DEFAULT_KIND] : [])]);
   } catch (error) {
     shell.remove();
     throw error;
@@ -1612,8 +1617,9 @@ export async function createRace(api) {
     const g = gen;
     const next = kindOf(kind).id;
     const wanted = raced && raced !== next ? raced : kindOf(next).rival;
-    // The pet's own faces are a must; a rival whose art is late races as an animal whose art is here.
-    const [mine, theirs] = await Promise.allSettled([loadFaces([next]), loadFaces([wanted])]);
+    // The pet's own faces are a must; a rival whose art is late races as an animal whose art is here, when there is one.
+    const spare = Object.keys(looks).some((k) => k !== next && k !== wanted);
+    const [mine, theirs] = await Promise.allSettled([loadFaces([next]), spare ? soon(loadFaces([wanted]), RIVAL_MS) : loadFaces([wanted])]);
     if (mine.status === "rejected") throw mine.reason;
     const rival = theirs.status === "fulfilled" ? wanted : Object.keys(looks).find((k) => k !== next);
     if (!rival) throw theirs.reason;

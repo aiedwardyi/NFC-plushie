@@ -1,13 +1,54 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { request } from "node:http";
+import { join } from "node:path";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
+import { createApp } from "../src/app.js";
+import { openDatabase } from "../src/db.js";
+import { fakeUids } from "../src/pages.js";
 
 /* The three scenes and their app.js rooms run here against stub pages: a hand-turned clock for timers and frames,
    plain elements, and a Pixi where every object is a stub except the app, whose render() a test can make throw. */
 
 const app = readFileSync(new URL("../public/app.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const settled = () => new Promise((resolve) => setImmediate(resolve));
+
+// A new pet's first farm open as the server sends it, fetched before any test swaps the timers for its own clock.
+const OPENED = await (async () => {
+  const [uid] = fakeUids;
+  const dir = mkdtempSync(join(process.cwd(), ".test-data-"));
+  const db = openDatabase(dir);
+  const server = createApp({ db, now: () => Date.parse("2026-05-01T10:00:00+09:00"), rng: () => 0, demoUids: [] }).listen(0, "localhost");
+  await new Promise((resolve) => server.once("listening", resolve));
+  try {
+    const jar = {};
+    // Plain http without a pool: nothing of it may still be running once a test's clock takes the timers.
+    const go = (path, body) => new Promise((resolve, reject) => {
+      const headers = { Cookie: Object.entries(jar).map(([k, v]) => `${k}=${v}`).join("; "), ...(body ? { "Content-Type": "application/json" } : {}) };
+      const req = request({ host: "localhost", port: server.address().port, path, method: body ? "POST" : "GET", agent: false, headers }, (res) => {
+        for (const sc of res.headers["set-cookie"] || []) {
+          const [, k, v] = /^([^=]+)=([^;]*)/.exec(sc);
+          jar[k.trim()] = v.trim();
+        }
+        let text = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => { text += chunk; });
+        res.on("end", () => resolve(text));
+      });
+      req.on("error", reject);
+      req.end(body ? JSON.stringify(body) : undefined);
+    });
+    await go(`/t?uid=${uid}`);
+    await go("/name", { uid, name: "Mochi" });
+    await go(`/t?uid=${uid}`);
+    return JSON.parse(await go("/farm", { uid, act: "open" }));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+})();
 
 // Timers and animation frames on a clock the test turns; frames also drive any started Pixi ticker, as Pixi does.
 function makeClock(env) {
@@ -104,6 +145,7 @@ function element(env, tag = "div") {
     naturalHeight: 512,
     isConnected: true,
     classList: classes(),
+    children: [],
     kids: {},
     ups: {},
     attrs: {},
@@ -538,4 +580,31 @@ test("a race whose rival's art is late races an animal whose art is here", async
   clickOn(env.shell().querySelector(".r-pick"), ".r-go");
   for (let i = 0; i < 600 && !saves.length; i++) await env.clock.run(50, 50);
   assert.deepEqual(saves, ["sheep"]);
+});
+
+test("집으로 gives the pet back by hand: a page that has forgotten the farm's finished slide still shows the pet", async () => {
+  const env = installPage();
+  const pet = element(env);
+  for (const face of ["canon", "blink", "react"]) pet.querySelector(`[data-frame="${face}"]`).src = `/mascot-horse-${face}.png`;
+  const api = {
+    win: element(env), pet, basket: element(env), uid: fakeUids[0],
+    size: () => ({ W: 384, H: 600 }), coinBox: () => element(env), picking: () => false, still: () => false,
+    say() {}, sfx() {}, buzz() {}, level() {}, hearts() {}, levelPop() {}, coins() {}, acted() {}, act: never,
+    fail(error) { throw error; },
+  };
+  const { createFarm } = await import("../public/game/farm.js");
+  const farm = await settle(env, createFarm(api));
+  if (farm.open) await settle(env, farm.open());
+  const r = { ...OPENED, created: false };
+  await settle(env, farm.play ? farm.play(r, "open") : farm.enter(r, "open"));
+  await env.clock.run(1000, 50);
+  assert.ok(env.animations.some((a) => a.target === pet && a.options.fill === "forwards"), "the farm slid the pet away");
+  // The collector has been: finished animations still show their last frame but are no longer listed.
+  env.forget = true;
+  if (farm.exit) farm.exit();
+  else farm.leave();
+  await env.clock.run(3000, 50);
+  const holding = env.animations.filter((a) => a.target === pet && a.playState !== "idle" && a.options.fill === "forwards");
+  assert.deepEqual(holding.map((a) => a.frames.at(-1)), []);
+  assert.equal(pet.style.visibility, "");
 });
