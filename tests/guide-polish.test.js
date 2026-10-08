@@ -42,17 +42,17 @@ test("coach controls hide only while a step is visible without moving the topbar
   assert.match(rule[1], /pointer-events: none/);
   assert.doesNotMatch(rule[1], /display:|position:|height:|width:/);
   const source = read("app.js").match(/const coach = \(function coachLayer\(\) \{[\s\S]*?\n\}\)\(\);/)[0];
-  const classes = new Set();
-  const classList = {
+  const listOf = (classes) => ({
     add: (...names) => names.forEach((name) => classes.add(name)),
     remove: (...names) => names.forEach((name) => classes.delete(name)),
     contains: (name) => classes.has(name),
     toggle: (name, on) => on ? classes.add(name) : classes.delete(name),
-  };
+  });
+  const classes = new Set();
   const coach = runInNewContext(`${source}; coach`, {
     document: {
-      documentElement: { dataset: {}, classList },
-      createElement: () => ({ classList, setAttribute() {}, addEventListener() {}, append() {} }),
+      documentElement: { dataset: {}, classList: listOf(classes) },
+      createElement: () => ({ classList: listOf(new Set()), setAttribute() {}, addEventListener() {}, append() {} }),
       body: { append() {} },
     },
     window: { requestAnimationFrame: () => 1, cancelAnimationFrame() {} },

@@ -625,6 +625,45 @@ test("a race whose rival's art is late races an animal whose art is here", async
   assert.deepEqual(saves, ["sheep"]);
 });
 
+test("a race or 기 모으기 opened again right after leaving a pending open waits for it, then makes a stage of its own", async () => {
+  {
+    const env = installPage();
+    const { createRace } = await import("../public/game/race.js");
+    const race = await settle(env, createRace({ still: () => true, sfx() {}, buzz() {}, bonus: () => 0, finish: never }));
+    const first = race.open({}, "horse", null);
+    race.exit();
+    const again = race.open({}, "horse", null);
+    assert.equal(await outcome(env, first), "gave up");
+    assert.equal(await outcome(env, again), "ready", "the race");
+    let out = null;
+    race.play("screen").then((value) => { out = value; });
+    await env.clock.run(600, 50);
+    assert.equal(env.shell().hidden, false);
+    env.document.key("Escape");
+    await env.clock.run(400, 50);
+    assert.equal(out, "quit");
+    assert.deepEqual(env.errors, []);
+  }
+  {
+    const env = installPage();
+    const win = element(env);
+    const pet = element(env);
+    for (const face of ["canon", "blink", "react"]) pet.querySelector(`[data-frame="${face}"]`).src = `/mascot-horse-${face}.png`;
+    const { createGimo } = await import("../public/game/gimo.js");
+    const g = await settle(env, createGimo({ win, pet, say() {}, sfx() {}, buzz() {}, still: () => true, bonus: () => 0, drone: { start() {}, stop() {}, set() {} }, onLaunch: never }));
+    const first = g.open();
+    g.exit();
+    const again = g.open();
+    assert.equal(await outcome(env, first), "gave up");
+    assert.equal(await outcome(env, again), "ready", "기 모으기");
+    g.play("screen", 0);
+    assert.equal(pet.style.visibility, "hidden", "the new stage holds the pet");
+    g.exit("quit");
+    assert.equal(pet.style.visibility, "");
+    assert.deepEqual(env.errors, []);
+  }
+});
+
 test("집으로 gives the pet back by hand: a page that has forgotten the farm's finished slide still shows the pet", async () => {
   const env = installPage();
   const pet = element(env);

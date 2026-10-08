@@ -1731,18 +1731,24 @@ export async function createRace(api) {
   });
   observer.observe(shell);
 
-  // One open at a time; exit() lets a pending one go.
+  // One open at a time: one asked for while another is still being made waits for that one, then makes its own;
+  // exit() lets a pending one go.
   let opening = null;
 
   return {
     get phase() { return phase; },
     tap,
     exit,
-    open(race, kind, raced) {
-      opening ||= make(race, kind, raced).finally(() => {
+    async open(race, kind, raced) {
+      const g = gen;
+      while (opening) await opening.catch(() => {});
+      if (g !== gen) throw STOP;
+      opening = make(race, kind, raced);
+      try {
+        await opening;
+      } finally {
         opening = null;
-      });
-      return opening;
+      }
     },
     // On screen at once, after open(); settles once, with "quit" or "aborted", however the race is left.
     play(input) {

@@ -930,22 +930,27 @@ export async function createGimo(api) {
     facesFrom = "";
   }
 
-  // The stage for a game, or the last round's while the window keeps its size; one open at a time, and exit() lets a pending one go.
+  // The stage for a game, or the last round's while the window keeps its size. One open at a time: one asked for while
+  // another is still being made waits for that one, then makes its own; exit() lets a pending one go.
   let opening = null;
-  function open() {
-    opening ||= (async () => {
-      const g = gen;
+  async function open() {
+    const g = gen;
+    while (opening) await opening.catch(() => {});
+    if (g !== gen) throw STOP;
+    opening = (async () => {
       if (!built || changed()) {
         teardown();
         await setupStage();
       } else {
         await loadFaces();
       }
-      if (g !== gen) throw STOP;
-    })().finally(() => {
+    })();
+    try {
+      await opening;
+    } finally {
       opening = null;
-    });
-    return opening;
+    }
+    if (g !== gen) throw STOP;
   }
 
   // Everything up to the first await shows at once: play() puts the game on screen in the same task the app takes it.

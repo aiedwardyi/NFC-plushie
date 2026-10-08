@@ -33,8 +33,8 @@ async function setup(t, options = {}, dir = mkdtempSync(join(process.cwd(), ".te
     });
     return { status: res.status, text: await res.text() };
   }
-  async function read(query = "") {
-    const res = await fetch(url(`/diag${query}`));
+  async function read(query = "", auth = `Bearer ${KEY}`) {
+    const res = await fetch(url(`/diag${query}`), { headers: auth === null ? {} : { Authorization: auth } });
     const text = await res.text();
     return { status: res.status, type: res.headers.get("content-type") || "", text, json: /json/.test(res.headers.get("content-type")) ? JSON.parse(text) : null };
   }
@@ -161,24 +161,25 @@ test("one address gets 120 events a minute; past that its batches are dropped, o
   assert.equal(ctx.rows().at(-1).detail, "next minute");
 });
 
-test("reading needs DIAG_KEY: unset is the plain 404, a wrong key 403, the right key the newest rows", async (t) => {
+test("reading needs DIAG_KEY as a Bearer header: unset is the plain 404, a wrong key or one in the URL 403, the right key the newest rows", async (t) => {
   quiet(t);
   const off = await setup(t, { diagKey: "" });
   await off.send(batch([ev("error", "kept for the log")]));
   assert.equal(off.rows().length, 1);
-  for (const query of ["", `?key=${KEY}`, "?key="]) {
-    const res = await off.read(query);
+  for (const auth of [null, `Bearer ${KEY}`, "Bearer"]) {
+    const res = await off.read("", auth);
     assert.equal(res.status, 404);
     assert.match(res.text, /인형 속에서 기다리고 있어요/);
   }
   const ctx = await setup(t);
   await ctx.send(batch([ev("error", "first"), ev("stall", "timer gap 4000ms", 2000)]));
-  for (const query of ["", "?key=", "?key=lead", "?key=lead-only-not", `?key=${KEY.toUpperCase()}`, `?key=${KEY}&key=${KEY}`]) {
-    const res = await ctx.read(query);
-    assert.equal(res.status, 403, query);
+  const wrong = [null, "Bearer", "Bearer lead", "Bearer lead-only-not", `Bearer ${KEY.toUpperCase()}`, KEY, `Basic ${KEY}`].map((auth) => ["", auth]);
+  for (const [query, auth] of [...wrong, [`?key=${KEY}`, null]]) {
+    const res = await ctx.read(query, auth);
+    assert.equal(res.status, 403, `${query} ${auth}`);
     assert.deepEqual(res.json, { ok: false });
   }
-  const res = await ctx.read(`?key=${KEY}`);
+  const res = await ctx.read();
   assert.equal(res.status, 200);
   assert.deepEqual(res.json.rows.map((r) => [r.event, r.detail]), [["stall", "timer gap 4000ms"], ["error", "first"]]);
   assert.deepEqual(res.json.rows[0], {
@@ -194,22 +195,22 @@ test("reading filters by since and uid and returns at most the newest 500", asyn
     if (b % 4 === 0) ctx.advance(MIN);
     await ctx.send(batch(Array.from({ length: 30 }, (_, i) => ev("console", `b${b}-${i}`)), { uid: b % 2 ? B : A }));
   }
-  const all = await ctx.read(`?key=${KEY}`);
+  const all = await ctx.read();
   assert.equal(all.json.rows.length, DIAG.read);
   assert.equal(all.json.rows[0].detail, "b19-29");
   assert.equal(all.json.rows.at(-1).detail, "b3-10");
   // The last 4 batches came in the fifth minute.
   const since = new Date(T0 + 5 * MIN).toISOString();
-  const late = await ctx.read(`?key=${KEY}&since=${since}`);
+  const late = await ctx.read(`?since=${since}`);
   assert.equal(late.json.rows.length, 120);
   assert.ok(late.json.rows.every((r) => r.at >= since));
-  const kst = await ctx.read(`?key=${KEY}&since=${encodeURIComponent("2026-10-08T10:05:00+09:00")}`);
+  const kst = await ctx.read(`?since=${encodeURIComponent("2026-10-08T10:05:00+09:00")}`);
   assert.equal(kst.json.rows.length, 120);
-  const one = await ctx.read(`?key=${KEY}&uid=${B.toLowerCase()}&since=${since}`);
+  const one = await ctx.read(`?uid=${B.toLowerCase()}&since=${since}`);
   assert.equal(one.json.rows.length, 60);
   assert.ok(one.json.rows.every((r) => r.uid === B));
-  for (const query of ["&since=yesterday", "&since=", "&uid=nope", "&uid=", `&uid=${A}&uid=${B}`]) {
-    const res = await ctx.read(`?key=${KEY}${query}`);
+  for (const query of ["?since=yesterday", "?since=", "?uid=nope", "?uid=", `?uid=${A}&uid=${B}`]) {
+    const res = await ctx.read(query);
     assert.equal(res.status, 400, query);
     assert.deepEqual(res.json, { ok: false });
   }

@@ -91,8 +91,9 @@ export function mountDiag(app, { db, key, now }) {
 
   // Without DIAG_KEY there is nothing to read: the request falls through to the page's 404.
   if (!key) return;
+  // The key comes as a Bearer header, never in the URL, where access logs and history would keep it.
   app.get("/diag", (req, res) => {
-    const given = typeof req.query.key === "string" ? req.query.key : "";
+    const given = /^Bearer (.+)$/.exec(req.get("authorization") || "")?.[1] || "";
     if (!timingSafeEqual(Buffer.from(hash(given)), Buffer.from(hash(key)))) return res.status(403).json({ ok: false });
     const { since, uid } = req.query;
     const from = since === undefined ? 0 : typeof since === "string" ? Date.parse(since) : NaN;
