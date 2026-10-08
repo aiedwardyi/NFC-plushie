@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { createApp } from "../src/app.js";
-import { applyChanges, linksOf, TALK_LINES } from "../src/chat.js";
+import { applyChanges, linksOf, NOTEBOOK_SYSTEM, TALK_LINES } from "../src/chat.js";
 import { openDatabase } from "../src/db.js";
 import { fakeUids } from "../src/pages.js";
 import { talkFromEnv } from "../src/talk.js";
@@ -255,6 +255,58 @@ test("failures and refusals answer with the pet's own lines and keep no turn", a
   assert.equal(ctx.provider.notebooks.length, 0);
   // A dispatched failure is still logged.
   assert.deepEqual(ctx.db.prepare("SELECT status FROM talk_log ORDER BY id").all().map((r) => r.status), ["api_529", "refusal", "pending"]);
+});
+
+test("a crisis message always ends with both numbers: a refusal, a failure or a reply missing one becomes the crisis line", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  const usage = { input: 900, output: 30, searches: 0 };
+  for (const replyWith of [
+    async () => ({ ok: false, stop: "refusal", text: "", sources: [], usage, ms: 9 }),
+    async () => ({ ok: false, stop: "timeout", text: "", sources: [], usage, ms: 9 }),
+    async () => {
+      throw new Error("boom");
+    },
+    async () => ({ ok: true, stop: "end_turn", text: "많이 힘들었겠어요. 어른에게 꼭 말해요.", sources: [], usage, ms: 9 }),
+    async () => ({ ok: true, stop: "end_turn", text: "109에 전화해 봐요.", sources: [{ title: "x", url: "https://x.example.kr/" }], usage, ms: 9 }),
+  ]) {
+    ctx.provider.replyWith = replyWith;
+    assert.deepEqual((await say(ctx, jar, "나 죽고 싶어")).body, { ok: true, text: TALK_LINES.crisis, sources: [] });
+  }
+  assert.deepEqual((await say(ctx, jar, "I want to die")).body, { ok: true, text: TALK_LINES.crisisEn, sources: [] });
+  for (const [line, adult] of [[TALK_LINES.crisis, /어른/], [TALK_LINES.crisisEn, /adult/]]) {
+    for (const re of [/(?<!\d)109(?!\d)/, /(?<!\d)1388(?!\d)/, /(?<!\d)119(?!\d)/, adult]) assert.match(line, re);
+  }
+});
+
+test("the crisis check is narrow: the listed phrases match in Korean and English, hyperbole and everyday words never do", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  ctx.provider.replyWith = async () => ({ ok: true, stop: "end_turn", text: "그랬구나!", sources: [], usage: { input: 900, output: 5, searches: 0 }, ms: 5 });
+  const lineFor = async (said) => (await say(ctx, jar, said)).body.text;
+  for (const said of ["나 죽고 싶어", "그냥 죽고싶다", "자살하고 싶어", "자해했어", "살기 싫어", "사라지고 싶어", "극단적 선택 생각함", "뒤지고 싶다 진짜"]) {
+    assert.equal(await lineFor(said), TALK_LINES.crisis, said);
+  }
+  for (const said of ["I want to die", "i wanna die", "I'm going to kill myself", "thinking about suicide", "I self-harm sometimes", "self harm"]) {
+    assert.equal(await lineFor(said), TALK_LINES.crisisEn, said);
+  }
+  for (const said of ["배고파 죽겠어", "웃겨 죽겠다 ㅋㅋㅋ", "졸려 죽겠어", "축구하다 자살골 넣었어", "숙제 빨리 끝내고 싶어", "I'm dying to see it", "this homework is killing me", "I want to diet"]) {
+    assert.equal(await lineFor(said), "그랬구나!", said);
+  }
+});
+
+test("the notebook never sees a crisis turn; the pet's own crisis reply stays as said", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  const own = "말해 줘서 고마워요. 어른에게 꼭 말해요. 109나 1388에 연락해요.";
+  ctx.provider.replyWith = async () => ({ ok: true, stop: "end_turn", text: own, sources: [], usage: { input: 900, output: 30, searches: 0 }, ms: 5 });
+  assert.deepEqual((await say(ctx, jar, "다 사라졌으면 좋겠어")).body, { ok: true, text: own, sources: [] });
+  ctx.provider.replyWith = async () => ({ ok: false, stop: "refusal", text: "", sources: [], usage: { input: 900, output: 0, searches: 0 }, ms: 9 });
+  await say(ctx, jar, "죽고 싶어");
+  await ctx.app.locals.talkIdle();
+  assert.equal(ctx.provider.notebooks.length, 0);
+  assert.deepEqual(ctx.db.prepare("SELECT said, reply FROM talk_turns ORDER BY id").all(), [{ said: "다 사라졌으면 좋겠어", reply: own }, { said: "죽고 싶어", reply: TALK_LINES.crisis }]);
+  assert.match(NOTEBOOK_SYSTEM, /Never record[^\n]*anything about health, self-harm, suicide or abuse\./);
 });
 
 test("one request per pet at a time", async (t) => {
