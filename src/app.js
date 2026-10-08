@@ -801,7 +801,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
       res.redirect(303, "/dev");
     });
   }
-  if (talk) mountTalk(app, { db, talk, now, getRow, owns: (row, req) => decisions.canRename(row, req.cookies.owner_token || null, hash) });
+  if (talk) mountTalk(app, { db, talk, now, getRow, animalOf, owns: (row, req) => decisions.canRename(row, req.cookies.owner_token || null, hash) });
   app.use((req, res) => res.status(404).send(page(null, "<p>이 친구는 인형 속에서 기다리고 있어요. 인형에 폰을 톡 대 주세요.</p>", { theme: req.theme })));
   app.use((error, req, res, next) => {
     const status = error.status >= 400 && error.status < 500 ? error.status : 500;

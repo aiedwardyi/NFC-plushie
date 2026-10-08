@@ -376,6 +376,21 @@ test("the system prompt: persona first, then context with asked-today questions 
   assert.match(system, /\[메모\][^\n]*\n- 딸기를 좋아함/);
 });
 
+test("the pet knows its animal: [정보] names the saved kind in Korean, else this phone's switch", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  const animal = async (j) => {
+    await say(ctx, j, "너는 무슨 동물이야?");
+    return /\n\[정보\]\n(?:[^\n]+\n)*?동물: ([^\n]+)\n/.exec(ctx.provider.replies.at(-1).system)?.[1];
+  };
+  for (const [kind, name] of [["rabbit", "토끼"], ["dragon", "용"], ["horse", "말"]]) {
+    ctx.db.prepare("UPDATE plushies SET kind = ? WHERE uid = ?").run(kind, A);
+    assert.equal(await animal(jar), name, kind);
+  }
+  ctx.db.prepare("UPDATE plushies SET kind = NULL WHERE uid = ?").run(A);
+  assert.equal(await animal({ ...jar, mascot: "sheep" }), "양");
+});
+
 test("the notebook updates after the reply, never before it", async (t) => {
   const ctx = await setup(t);
   const jar = await meet(ctx, A, "Mochi");

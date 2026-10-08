@@ -1,3 +1,4 @@
+import { kindOf } from "../public/kinds.js";
 import { costOf, NOTEBOOK_MODEL } from "./talk.js";
 import { PET, currentMood, levelForXp, seoulDayKey } from "./pet.js";
 import { themeOf } from "./pages.js";
@@ -54,7 +55,7 @@ function seoulClock(t) {
 
 const oneLine = (s) => String(s).replace(/\s+/g, " ").trim();
 
-const PERSONA = `당신은 주인의 작은 POKKEY 인형 친구예요. 당신의 이름은 아래 [정보]의 '이름'이에요. 주인은 인형을 토닥이며 함께 지내는 사람이에요. 아이일 수도, 어른일 수도 있어요.
+const PERSONA = `당신은 주인의 작은 POKKEY 인형 친구예요. 당신의 이름은 아래 [정보]의 '이름'이고, 당신은 [정보]의 '동물' 인형이에요. 주인은 인형을 토닥이며 함께 지내는 사람이에요. 아이일 수도, 어른일 수도 있어요.
 당신은 귀엽지만 아주 똑똑해요. 무엇을 물어도 정확하고 쓸모 있게 대답해요.
 
 말하기
@@ -111,7 +112,7 @@ export function linksOf(text) {
   return { text: line.trim() || "여기 있어요!", links };
 }
 
-export function replySystem({ t, name, level, mood, world, asked, notes }) {
+export function replySystem({ t, name, animal, level, mood, world, asked, notes }) {
   const feel = mood <= PET.moodLonelyAt ? "조금 외로워요" : mood >= 70 ? "아주 좋아요" : "괜찮아요";
   const lines = [
     PERSONA,
@@ -119,6 +120,7 @@ export function replySystem({ t, name, level, mood, world, asked, notes }) {
     "[정보]",
     `지금: ${seoulClock(t)}`,
     `이름: ${JSON.stringify(oneLine(name))}`,
+    `동물: ${animal}`,
     `레벨: ${level}`,
     `기분: ${feel}`,
     `사는 곳: ${WORLDS[world] || WORLDS.classic}`,
@@ -214,7 +216,7 @@ export function applyChanges(db, uid, changes, { noteIds, today, t }) {
   }
 }
 
-export function mountTalk(app, { db, talk, now, owns, getRow }) {
+export function mountTalk(app, { db, talk, now, owns, getRow, animalOf }) {
   const { provider, uids } = talk;
   const busy = new Set();
   const jobs = new Map();
@@ -296,6 +298,7 @@ export function mountTalk(app, { db, talk, now, owns, getRow }) {
       const system = replySystem({
         t,
         name: row.pet_name,
+        animal: kindOf(animalOf(row, req)).name,
         level: levelForXp(row.xp ?? 0),
         mood: currentMood({ moodValue: row.mood_value ?? 70, moodUpdatedAt: row.mood_updated_at ?? t }, t),
         world: themeOf(req.theme).id,
