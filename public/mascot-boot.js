@@ -50,18 +50,25 @@
     }
     document.documentElement.setAttribute("data-mascot", kind);
     if (kind === base) return;
-    var imgs = document.querySelectorAll("img.pet-frame");
-    for (var i = 0; i < imgs.length; i++) {
-      var src = imgs[i].getAttribute("src") || "";
-      if (src.indexOf("mascot-" + base) !== -1) {
-        imgs[i].setAttribute("src", src.split("mascot-" + base).join("mascot-" + kind));
+    var swap = function () {
+      var imgs = document.querySelectorAll("img.pet-frame");
+      for (var i = 0; i < imgs.length; i++) {
+        var src = imgs[i].getAttribute("src") || "";
+        if (src.indexOf("mascot-" + base) !== -1) {
+          imgs[i].setAttribute("src", src.split("mascot-" + base).join("mascot-" + kind));
+        }
       }
-    }
-    var btns = document.querySelectorAll(".mascot-tog");
-    for (var j = 0; j < btns.length; j++) {
-      var on = btns[j].getAttribute("data-mascot") === kind;
-      btns[j].classList.toggle("is-active", on);
-      btns[j].setAttribute("aria-pressed", on ? "true" : "false");
-    }
+      var btns = document.querySelectorAll(".mascot-tog");
+      for (var j = 0; j < btns.length; j++) {
+        var on = btns[j].getAttribute("data-mascot") === kind;
+        btns[j].classList.toggle("is-active", on);
+        btns[j].setAttribute("aria-pressed", on ? "true" : "false");
+      }
+    };
+    swap();
+    // The pet and its toggle come after this script, so swap them as the parser adds them, before the first paint.
+    var parsing = new MutationObserver(swap);
+    parsing.observe(document.documentElement, { childList: true, subtree: true });
+    document.addEventListener("DOMContentLoaded", function () { parsing.disconnect(); });
   } catch (e) {}
 })();

@@ -123,6 +123,7 @@ test("race persists wins, preserves losses and caps each rival independently", a
   const saved = JSON.parse(ctx.row().race);
   assert.deepEqual(saved, { ...fresh, sheep: { level: 20, best: 20 } });
   // The saved animal picks the side, not this browser's toggle.
+  assert.equal((await ctx.request("/kind", { jar, body: { uid: A, kind: "horse", fill: true } })).status, 200);
   assert.equal((await play(ctx, { ...jar, mascot: "sheep" }, { ...body, rival: "horse" })).status, 400);
   assert.equal((await ctx.request("/kind", { jar, body: { uid: A, kind: "sheep" } })).status, 200);
   const swapped = await play(ctx, jar, { ...body, rival: "horse" });

@@ -66,12 +66,13 @@ test("pet grows: tap, harvest, feed 당근, race on the boost, send the rest, bu
   };
   const pantry = () => parseFarm(ctx.row().farm).pantry;
 
-  // The plushie's first tap meets the pet, then it gets its name.
+  // The plushie's first tap meets the pet, then it gets its name and its page fills the animal.
   updateJar(jar, (await ctx.request(`/t?uid=${A}`, { jar })).setCookies);
   const named = await ctx.request("/name", { jar, body: { uid: A, name: "모찌" } });
   assert.equal(named.status, 303);
   updateJar(jar, named.setCookies);
   updateJar(jar, (await ctx.request(`/t?uid=${A}`, { jar })).setCookies);
+  await call("/kind", { kind: "horse", fill: true });
   assert.equal(ctx.row().kind, "horse");
 
   // A real tap: the day's first, so 40 XP.

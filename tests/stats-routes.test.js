@@ -77,6 +77,8 @@ test("the owner's first named visit saves the animal from the mascot cookie", as
   await meet(ctx, A, "Mochi", { mascot: "sheep" });
   assert.equal(ctx.row(A).kind, "sheep");
   const plain = await meet(ctx, B, "Pippo");
+  assert.equal(ctx.row(B).kind, null);
+  await ctx.request("/kind", { jar: plain, body: { uid: B, kind: "horse", fill: true } });
   assert.equal(ctx.row(B).kind, "horse");
   await ctx.request(`/t?uid=${B}`, { jar: { ...plain, mascot: "sheep" } });
   assert.equal(ctx.row(B).kind, "horse");
@@ -95,6 +97,28 @@ test("a stranger's visit saves nothing; the owner's next one fills an old row", 
   }
   await ctx.request(`/t?uid=${A}&view=1`, { jar: { ...jar, mascot: "sheep" } });
   assert.equal(ctx.row().kind, "sheep");
+});
+
+test("without the mascot cookie the page fills an old row's animal, never a saved one", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  ctx.set("kind = NULL");
+  const home = await ctx.request(`/t?uid=${A}`, { jar });
+  assert.equal(ctx.row().kind, null);
+  assert.doesNotMatch(home.html, /name="pet-kind"/);
+  for (const who of [{}, { owner_token: "nope" }]) {
+    assert.deepEqual(await kind(ctx, who, { kind: "sheep", fill: true }), { status: 403, body: { ok: false } });
+  }
+  const out = await kind(ctx, jar, { kind: "sheep", fill: true });
+  assert.deepEqual([out.status, out.body.kind, out.body.name, totals(out.body.stats)], [200, "sheep", "양", [50, 60, 40, 70]]);
+  assert.equal(ctx.row().kind, "sheep");
+  const again = await ctx.request(`/t?uid=${A}&view=1`, { jar });
+  assert.match(again.html, /<meta name="pet-kind" content="sheep">/);
+  assert.match(again.html, /<b class="st-animal" data-stat-animal>양<\/b>/);
+  assert.equal((await kind(ctx, jar, { kind: "horse" })).body.kind, "horse");
+  const kept = await kind(ctx, jar, { kind: "sheep", fill: true });
+  assert.deepEqual([kept.body.kind, kept.body.name, totals(kept.body.stats)], ["horse", "말", [50, 40, 70, 60]]);
+  assert.equal(ctx.row().kind, "horse");
 });
 
 test("/kind is the owner's alone and answers with the new sheet", async (t) => {

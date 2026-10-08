@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 import { DEFAULT_KIND, KINDS, KIND_IDS, kindFiles, kindOf } from "../public/kinds.js";
 import { KIND_CSS, THEMES } from "../src/pages.js";
@@ -40,6 +40,14 @@ for (const kind of KINDS) {
     assert.deepEqual(missing, []);
   });
 }
+
+test("the race roster's art carries a version, so phones drop their cached silhouettes", () => {
+  const race = readFileSync(new URL("../public/game/race.js", import.meta.url), "utf8");
+  assert.ok(/^const ART_V = \d+;$/m.test(race), "ART_V");
+  const urls = [...race.matchAll(/\/game\/art\/race\/[^\n]*?\.webp(\?v=\$\{ART_V\})?/g)];
+  assert.ok(urls.length);
+  for (const [url, version] of urls) assert.ok(version, url);
+});
 
 test("/kinds.css points every kind at its own sprites and world previews", () => {
   for (const kind of KINDS) {

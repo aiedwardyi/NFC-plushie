@@ -158,6 +158,15 @@ test("only the admin chip's owner may pick: other chips, strangers and bad value
   assert.deepEqual([ctx.row(A), ctx.row(B)], [a, b]);
 });
 
+test("the page's fill never changes the admin's pick", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  await post(ctx, "/demo/kind", jar, { uid: A, kind: "tiger" });
+  const fill = await post(ctx, "/kind", jar, { uid: A, kind: "sheep", fill: true });
+  assert.deepEqual([fill.status, fill.body.kind, fill.body.name, totals(fill.body.stats)], [200, "tiger", "호랑이", baseOf("tiger")]);
+  assert.equal(ctx.row().kind, "tiger");
+});
+
 test("a pick before naming is kept when the pet gets its name", async (t) => {
   const ctx = await setup(t);
   const jar = await meet(ctx, A);
@@ -201,7 +210,7 @@ test("demo off: the picker routes are not there", async (t) => {
   for (const [path, body] of [["/demo/kind", { kind: "tiger" }], ["/demo/edition", { edition: "rare" }]]) {
     assert.equal((await ctx.request(path, { jar, body: { uid: A, ...body } })).status, 404);
   }
-  assert.equal(ctx.row().kind, "horse");
+  assert.equal(ctx.row().kind, null);
 });
 
 for (const kind of KINDS) {

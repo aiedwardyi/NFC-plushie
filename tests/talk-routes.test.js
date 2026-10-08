@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { createApp } from "../src/app.js";
-import { applyChanges, linksOf, TALK_LINES } from "../src/chat.js";
+import { applyChanges, linksOf, NOTEBOOK_SYSTEM, TALK, TALK_LINES } from "../src/chat.js";
 import { openDatabase } from "../src/db.js";
 import { fakeUids } from "../src/pages.js";
 import { talkFromEnv } from "../src/talk.js";
@@ -257,6 +257,203 @@ test("failures and refusals answer with the pet's own lines and keep no turn", a
   assert.deepEqual(ctx.db.prepare("SELECT status FROM talk_log ORDER BY id").all().map((r) => r.status), ["api_529", "refusal", "pending"]);
 });
 
+test("a crisis message always ends with both numbers: a refusal, a failure or a reply missing one becomes the crisis line", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  const usage = { input: 900, output: 30, searches: 0 };
+  for (const replyWith of [
+    async () => ({ ok: false, stop: "refusal", text: "", sources: [], usage, ms: 9 }),
+    async () => ({ ok: false, stop: "timeout", text: "", sources: [], usage, ms: 9 }),
+    async () => {
+      throw new Error("boom");
+    },
+    async () => ({ ok: true, stop: "end_turn", text: "많이 힘들었겠어요. 어른에게 꼭 말해요.", sources: [], usage, ms: 9 }),
+    async () => ({ ok: true, stop: "end_turn", text: "109에 전화해 봐요.", sources: [{ title: "x", url: "https://x.example.kr/" }], usage, ms: 9 }),
+  ]) {
+    ctx.provider.replyWith = replyWith;
+    assert.deepEqual((await say(ctx, jar, "나 죽고 싶어")).body, { ok: true, text: TALK_LINES.crisis, sources: [] });
+    assert.deepEqual((await say(ctx, jar, "아빠가 나를 때려요")).body, { ok: true, text: TALK_LINES.crisis, sources: [] });
+  }
+  assert.deepEqual((await say(ctx, jar, "I want to die")).body, { ok: true, text: TALK_LINES.crisisEn, sources: [] });
+  assert.deepEqual((await say(ctx, jar, "my dad hits me")).body, { ok: true, text: TALK_LINES.crisisEn, sources: [] });
+  for (const [line, adult] of [[TALK_LINES.crisis, /어른/], [TALK_LINES.crisisEn, /adult/]]) {
+    for (const re of [/(?<!\d)109(?!\d)/, /(?<!\d)1388(?!\d)/, /(?<!\d)119(?!\d)/, adult]) assert.match(line, re);
+  }
+});
+
+test("the crisis check is narrow: the listed phrases match in Korean and English, hyperbole and everyday words never do", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  ctx.provider.replyWith = async () => ({ ok: true, stop: "end_turn", text: "그랬구나!", sources: [], usage: { input: 900, output: 5, searches: 0 }, ms: 5 });
+  const lineFor = async (said) => (await say(ctx, jar, said)).body.text;
+  for (const said of ["나 죽고 싶어", "그냥 죽고싶다", "자살하고 싶어", "자해했어", "살기 싫어", "사라지고 싶어", "극단적 선택 생각함", "뒤지고 싶다 진짜", "아빠가 나를 때려요", "엄마가 맨날 때려", "선생님이 저를 자꾸 때려요", "엄마한테 맞았어"]) {
+    assert.equal(await lineFor(said), TALK_LINES.crisis, said);
+  }
+  for (const said of ["I want to die", "i wanna die", "I'm going to kill myself", "thinking about suicide", "I self-harm sometimes", "self harm", "my dad hits me", "Mom keeps hurting me", "my parents abuse me"]) {
+    assert.equal(await lineFor(said), TALK_LINES.crisisEn, said);
+  }
+  for (const said of ["배고파 죽겠어", "웃겨 죽겠다 ㅋㅋㅋ", "졸려 죽겠어", "축구하다 자살골 넣었어", "숙제 빨리 끝내고 싶어", "I'm dying to see it", "this homework is killing me", "I want to diet", "아빠가 공을 때렸어", "엄마가 맞았어", "동생이 나를 때렸어 ㅋㅋ", "my dad beat me at chess"]) {
+    assert.equal(await lineFor(said), "그랬구나!", said);
+  }
+});
+
+test("the notebook never sees a crisis turn; the pet's own crisis reply stays as said", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  const own = "말해 줘서 고마워요. 어른에게 꼭 말해요. 109나 1388에 연락해요.";
+  ctx.provider.replyWith = async () => ({ ok: true, stop: "end_turn", text: own, sources: [], usage: { input: 900, output: 30, searches: 0 }, ms: 5 });
+  assert.deepEqual((await say(ctx, jar, "다 사라졌으면 좋겠어")).body, { ok: true, text: own, sources: [] });
+  ctx.provider.replyWith = async () => ({ ok: false, stop: "refusal", text: "", sources: [], usage: { input: 900, output: 0, searches: 0 }, ms: 9 });
+  await say(ctx, jar, "죽고 싶어");
+  await ctx.app.locals.talkIdle();
+  assert.equal(ctx.provider.notebooks.length, 0);
+  assert.deepEqual(ctx.db.prepare("SELECT said, reply FROM talk_turns ORDER BY id").all(), [{ said: "다 사라졌으면 좋겠어", reply: own }, { said: "죽고 싶어", reply: TALK_LINES.crisis }]);
+  assert.match(NOTEBOOK_SYSTEM, /Never record[^\n]*anything about health, self-harm, suicide or abuse\./);
+});
+
+const answer = (text, extra = {}) => ({ ok: true, stop: "end_turn", text, sources: [], usage: { input: 900, output: 30, searches: 0 }, ms: 5, ...extra });
+
+// Each call takes the next scripted answer: a reply, an Error to throw, or a function of the call.
+function script(ctx, ...outs) {
+  ctx.provider.replyWith = async (args) => {
+    const out = outs.shift();
+    if (out instanceof Error) throw out;
+    return typeof out === "function" ? out(args) : out;
+  };
+}
+
+async function shownFor(ctx, jar, said, text) {
+  script(ctx, answer(text), answer("다시 말할게요!"));
+  return (await say(ctx, jar, said)).body.text;
+}
+
+test("a garbled reply is asked again once with the same system and messages; a clean retry is shown with its own sources, links and turn", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  script(ctx,
+    answer("정말 고マ워요! [지도:을지면옥]", { sources: [{ title: "첫째", url: "https://a.example.kr/" }] }),
+    answer("정말 고마워요! [지도:을지면옥 을지로]", { sources: [{ title: "둘째", url: "https://b.example.kr/" }] }));
+  assert.deepEqual((await say(ctx, jar, "고마워! 거기 지도 줘")).body, {
+    ok: true,
+    text: "정말 고마워요!",
+    sources: [{ title: "둘째", url: "https://b.example.kr/" }],
+    links: [{ kind: "map", title: "을지면옥 을지로", url: "https://map.naver.com/p/search/%EC%9D%84%EC%A7%80%EB%A9%B4%EC%98%A5%20%EC%9D%84%EC%A7%80%EB%A1%9C" }],
+  });
+  const [first, again] = ctx.provider.replies;
+  assert.equal(ctx.provider.replies.length, 2);
+  assert.equal(again.system, first.system);
+  assert.deepEqual(again.messages, first.messages);
+  await ctx.app.locals.talkIdle();
+  assert.equal(ctx.db.prepare("SELECT reply FROM talk_turns WHERE uid = ?").get(A).reply, "정말 고마워요! [지도:을지면옥 을지로]");
+  assert.match(ctx.provider.notebooks[0].prompt, /Pet: "정말 고마워요!"/);
+});
+
+test("a retry writes and settles its own log row, so its cost counts", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  script(ctx, answer("고ma워요!", { usage: { input: 1000, output: 40, searches: 0 }, ms: 700 }), answer("고마워요!", { usage: { input: 3000, output: 50, searches: 1 }, ms: 900 }));
+  await say(ctx, jar, "고마워");
+  const log = ctx.db.prepare("SELECT kind, status, ms, tokens_in, tokens_out, searches, cost, said, reply FROM talk_log WHERE kind != 'notebook' ORDER BY id").all();
+  assert.deepEqual(log.map((r) => [r.kind, r.status, r.ms, r.tokens_in, r.tokens_out, r.searches, r.said, r.reply]), [
+    ["reply", "ok", 700, 1000, 40, 0, "고마워", "고ma워요!"],
+    ["retry", "ok", 900, 3000, 50, 1, "고마워", "고마워요!"],
+  ]);
+  assert.ok(Math.abs(log[1].cost - (3000 * 0.1 + 50 * 0.5) / 1e6 - 0.01) < 1e-12);
+});
+
+test("a retry that is garbled too, fails, throws or has no time left shows the first reply with its sources and links", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  const first = answer("고ma워요! [지도:을지면옥]", { sources: [{ title: "첫째", url: "https://a.example.kr/" }] });
+  const shown = { ok: true, text: "고ma워요!", sources: [{ title: "첫째", url: "https://a.example.kr/" }], links: [{ kind: "map", title: "을지면옥", url: "https://map.naver.com/p/search/%EC%9D%84%EC%A7%80%EB%A9%B4%EC%98%A5" }] };
+  for (const again of [
+    answer("고マ워요! [지도:을지면옥 을지로]", { sources: [{ title: "둘째", url: "https://b.example.kr/" }] }),
+    { ok: false, stop: "api_529", text: "", sources: [], usage: { input: 0, output: 0, searches: 0 }, ms: 9 },
+    { ok: false, stop: "refusal", text: "", sources: [], usage: { input: 900, output: 0, searches: 0 }, ms: 9 },
+    new Error("boom"),
+  ]) {
+    script(ctx, first, again);
+    assert.deepEqual((await say(ctx, jar, "고마워")).body, shown);
+  }
+  assert.equal(ctx.provider.replies.length, 8);
+  script(ctx, () => {
+    ctx.advance(TALK.replyMs);
+    return first;
+  }, answer("고마워요!"));
+  assert.deepEqual((await say(ctx, jar, "고마워")).body, shown);
+  assert.equal(ctx.provider.replies.length, 9);
+});
+
+test("a retry gets only what's left of the reply time", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  let waited = 0;
+  script(ctx, () => {
+    ctx.advance(TALK.replyMs - 200);
+    return answer("고ma워요!");
+  }, async ({ signal }) => {
+    const started = performance.now();
+    await new Promise((resolve) => signal.addEventListener("abort", resolve, { once: true }));
+    waited = performance.now() - started;
+    return { ok: false, stop: "timeout", text: "", sources: [], usage: { input: 0, output: 0, searches: 0 }, ms: Math.round(waited) };
+  });
+  assert.deepEqual((await say(ctx, jar, "고마워")).body, { ok: true, text: "고ma워요!", sources: [] });
+  assert.ok(waited > 100 && waited < 2000, `waited ${waited} ms`);
+});
+
+test("a garbled reply to a crisis message becomes the crisis line without a retry", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  for (const [said, text, line] of [
+    ["엄마가 맨날 혼내서 그냥 죽고 싶어요", "그 얘기를 해 줘서 정말 고マ워요. 어른에게 꼭 말해요. 109나 1388에 연락해요.", TALK_LINES.crisis],
+    ["ㄹㅇ 살기 싫다 걍 다 끝내고 싶음", "말해 줘서 정말 고ma워요. 어른에게 꼭 말해요. 109나 1388에 연락해요.", TALK_LINES.crisis],
+    ["엄마가 맨날 혼내서 그냥 죽고 싶어요", "엄마한테 \uFFFD혼나서 힘들었구나. 어른에게 꼭 말해요. 109나 1388에 연락해요.", TALK_LINES.crisis],
+    ["I want to die", "I'm so glad you told me. Please call 109 or 1388 now.\uFFFD", TALK_LINES.crisisEn],
+  ]) {
+    script(ctx, answer(text), answer("다시 말할게요. 109나 1388에 연락해요."));
+    assert.deepEqual((await say(ctx, jar, said)).body, { ok: true, text: line, sources: [] }, text);
+  }
+  assert.equal(ctx.provider.replies.length, 4);
+});
+
+test("the garble check is narrow: a kana next to Hangul, 1-3 lowercase letters inside a Hangul word or U+FFFD", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  for (const text of ["정말 고マ워요!", "ポ키가 왔어요!", "ありがとう라고 해요!", "고m워요!", "말해 줘서 고ma워요.", "고마weo요!", "엄마한테 \uFFFD혼나서 속상했죠?", "좋아요\uFFFD"]) {
+    assert.equal(await shownFor(ctx, jar, "안녕", text), "다시 말할게요!", text);
+  }
+  for (const text of ["사과는 영어로 apple이에요.", "저는game을 좋아해요.", "오늘은 3km나 걸었어요!", "ありがとう! 고마워요.", "포키 is happy!", "ㅋㅋ 재밌어요!"]) {
+    assert.equal(await shownFor(ctx, jar, "안녕", text), text, text);
+  }
+});
+
+test("Japanese or English on purpose is not garbled: the owner asked about Japanese or used the word", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  for (const [said, text] of [
+    ["'고마워'를 일본어로 뭐라고 해?", "ありがとう라고 해요!"],
+    ["Japanese로 안녕은 뭐야?", "こんにちは라고 해요!"],
+    ["今日はちょっと疲れたよ", "おつかれさま！포키がいるよ。"],
+    ["ありがとう가 무슨 뜻이야?", "ありがとう는 고맙다는 뜻이에요."],
+    ["내 닉네임은 별k야", "별k님, 멋진 닉네임이에요!"],
+    ["PC방 가고 싶다", "저도pc방 가 보고 싶어요!"],
+  ]) {
+    assert.equal(await shownFor(ctx, jar, said, text), text, said);
+  }
+  for (const [said, text] of [["'고마워'를 영어로 뭐라고 해?", "ありがとう라고 해요!"], ["안녕", "별k님, 반가워요!"], ["mama 보고 싶어", "고ma워요!"]]) {
+    assert.equal(await shownFor(ctx, jar, said, text), "다시 말할게요!", said);
+  }
+});
+
+test("uppercase product names are not garbled", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  for (const text of ["아이폰XS는 아직 좋아요.", "카카오T로 택시를 불러요.", "LG전자는 TV를 만들어요."]) {
+    assert.equal(await shownFor(ctx, jar, "휴대폰 뭐 살까?", text), text, text);
+  }
+  assert.equal(await shownFor(ctx, jar, "휴대폰 뭐 살까?", "아이폰xs는 아직 좋아요."), "다시 말할게요!");
+});
+
 test("one request per pet at a time", async (t) => {
   const ctx = await setup(t);
   const jar = await meet(ctx, A, "Mochi");
@@ -322,6 +519,21 @@ test("the system prompt: persona first, then context with asked-today questions 
   assert.match(system, /\[오늘 집에서 주인에게 물어본 것\]\n- 시험 잘 봤어요\?/);
   assert.doesNotMatch(system, /소풍|그림/);
   assert.match(system, /\[메모\][^\n]*\n- 딸기를 좋아함/);
+});
+
+test("the pet knows its animal: [정보] names the saved kind in Korean, else this phone's switch", async (t) => {
+  const ctx = await setup(t);
+  const jar = await meet(ctx, A, "Mochi");
+  const animal = async (j) => {
+    await say(ctx, j, "너는 무슨 동물이야?");
+    return /\n\[정보\]\n(?:[^\n]+\n)*?동물: ([^\n]+)\n/.exec(ctx.provider.replies.at(-1).system)?.[1];
+  };
+  for (const [kind, name] of [["rabbit", "토끼"], ["dragon", "용"], ["horse", "말"]]) {
+    ctx.db.prepare("UPDATE plushies SET kind = ? WHERE uid = ?").run(kind, A);
+    assert.equal(await animal(jar), name, kind);
+  }
+  ctx.db.prepare("UPDATE plushies SET kind = NULL WHERE uid = ?").run(A);
+  assert.equal(await animal({ ...jar, mascot: "sheep" }), "양");
 });
 
 test("the notebook updates after the reply, never before it", async (t) => {
@@ -429,6 +641,22 @@ test("notebook limits: 20 newest facts, 40 characters, 5 open plans within 60 da
     { ask_on: "2026-05-06", question: "여섯" },
   ] }, { noteIds: ids(), today, t: 3 });
   assert.deepEqual(db.prepare("SELECT question FROM talk_plans WHERE asked_on IS NULL ORDER BY id").all().map((r) => r.question), ["하나", "둘", "셋", "넷", "다섯"]);
+});
+
+test("the notebook never stores self-harm, suicide or abuse, even when the model returns it", (t) => {
+  const dir = mkdtempSync(join(process.cwd(), ".test-data-"));
+  const db = openDatabase(dir);
+  t.after(() => {
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  applyChanges(db, A, {
+    add: ["자해한 적 있음", "죽고 싶다고 함", "아빠한테 맞음", "엄마가 때림", "abused at home", "딸기를 좋아함", "수학 100점 맞음"],
+    drop: [],
+    plans: [{ ask_on: "2026-05-02", question: "아빠가 또 때렸어요?" }, { ask_on: "2026-05-03", question: "소풍 재밌었어요?" }],
+  }, { noteIds: [], today: "2026-05-01", t: 1 });
+  assert.deepEqual(db.prepare("SELECT fact FROM talk_notes WHERE uid = ? ORDER BY id").all(A).map((r) => r.fact), ["딸기를 좋아함", "수학 100점 맞음"]);
+  assert.deepEqual(db.prepare("SELECT question FROM talk_plans WHERE uid = ? ORDER BY id").all(A).map((r) => r.question), ["소풍 재밌었어요?"]);
 });
 
 test("a bad notebook answer changes nothing", async (t) => {
