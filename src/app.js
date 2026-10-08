@@ -90,6 +90,8 @@ function petState(row, t) {
 }
 
 export function createApp({ db, decisions = binding, production = process.env.NODE_ENV === "production", now = Date.now, rng = Math.random, demoUids = parseDemoUids(process.env.DEMO_UIDS), openUids = parseDemoUids(process.env.OPEN_UIDS), guestUids = parseDemoUids(process.env.GUEST_UIDS), rareUids = parseDemoUids(process.env.RARE_UIDS), legendaryUids = parseDemoUids(process.env.LEGENDARY_UIDS), talk = null }) {
+  // Open pets let any browser in, but a new 안심 코드 still goes only to the browser holding the owner token.
+  const owns = binding.canRename;
   const anyone = [...new Set([...openUids, ...guestUids])];
   if (anyone.length) {
     const base = decisions;
@@ -388,6 +390,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     const result = db.transaction(() => {
       const row = getRow(serial);
       const state = decisions.resolveTap(row, req.cookies.owner_token || null, hash);
+      const keyed = !openUids.includes(serial) || owns(row, req.cookies.owner_token || null, hash);
       const t = now();
       const today = seoulDayKey(t);
       const stamp = new Date(t).toISOString();
@@ -426,7 +429,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
           const skipped = getRow(serial);
           const asleep = view && Boolean(skipped.pet_name) && skipped.slept_at !== null;
           const pet = petView(skipped, petState(skipped, t), { rewarded: false }, t, { morning, asleep, view });
-          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found), theme, talk: talks(serial), guest, card: cardOf(skipped, req) }) };
+          return { html: petPage(skipped, null, { celebrate: flash, pet, demo, found: parseFound(skipped.gift_found), theme, talk: talks(serial), guest, keyed, card: cardOf(skipped, req) }) };
         }
         if (!afterTap.pet_name) {
           raiseMirror();
@@ -466,7 +469,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
         }
         // A follow-up waits for a visit with nothing to celebrate.
         const ask = talks(serial) && !visual && !morning && !visit && !away && combo <= 1 ? takeQuestion(db, serial, today) : "";
-        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo, visit, away, farmRow: visit ? getRow(serial) : fresh }), demo, found: parseFound(fresh.gift_found), theme, talk: talks(serial), ask, guest, card: cardOf(getRow(serial), req) }) };
+        return { html: petPage(fresh, null, { celebrate: visual, pet: petView(fresh, st, out, t, { ...extra, morning, combo, visit, away, farmRow: visit ? getRow(serial) : fresh }), demo, found: parseFound(fresh.gift_found), theme, talk: talks(serial), ask, guest, keyed, card: cardOf(getRow(serial), req) }) };
       }
       if (state === "STRANGER") return { html: strangerPage(row, "", { demo, theme, card: cardOf(row, req) }) };
       throw new Error("Invalid binding result");
@@ -714,7 +717,7 @@ export function createApp({ db, decisions = binding, production = process.env.NO
     const reply = db.transaction(() => {
       const row = getRow(uid);
       // A guest pet never gets a code, so dropping it from GUEST_UIDS still locks everyone out.
-      if (!decisions.canRename(row, req.cookies.owner_token || null, hash) || !row.pet_name || guestUids.includes(uid)) return null;
+      if (!owns(row, req.cookies.owner_token || null, hash) || !row.pet_name || guestUids.includes(uid)) return null;
       const code = recoveryCode();
       db.prepare("UPDATE plushies SET recovery_code_hash = ? WHERE uid = ?").run(hash(code), uid);
       return { ok: true, code };

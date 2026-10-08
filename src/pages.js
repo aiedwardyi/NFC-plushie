@@ -503,7 +503,7 @@ function homeExtras(row, pet, found, mascot, talk, keyed) {
   };
 }
 
-export function petPage(row, code = null, { celebrate = "", pet = null, mascot = DEFAULT_KIND, demo = "", found = [], theme = "classic", talk = false, ask = "", guest = false, card = null } = {}) {
+export function petPage(row, code = null, { celebrate = "", pet = null, mascot = DEFAULT_KIND, demo = "", found = [], theme = "classic", talk = false, ask = "", guest = false, keyed = true, card = null } = {}) {
   mascot = row.kind || mascot;
   const firstMeet = celebrate === "claim" || celebrate === "named";
   let greeting = row.pet_name
@@ -537,7 +537,7 @@ export function petPage(row, code = null, { celebrate = "", pet = null, mascot =
   const talking = talk && Boolean(row.pet_name);
   const mic = talking ? `<button type="button" class="talk-mic" data-talk-mic aria-label="말 걸기" aria-expanded="false" aria-pressed="false" hidden>${ICONS.mic}</button>` : "";
   const dialog = `<p class="intro"${pet ? petAttr : ""}>${greeting}</p>${moments}${giftHtml}${mic}`;
-  const extras = row.pet_name ? homeExtras(row, pet, found, mascot, talking, !guest) : { dock: "", sheets: "" };
+  const extras = row.pet_name ? homeExtras(row, pet, found, mascot, talking, keyed && !guest) : { dock: "", sheets: "" };
   return page(
     row,
     `${recovery}${prompt}`,

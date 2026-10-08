@@ -164,6 +164,22 @@ test("a guest pet never gets a code, so dropping it from GUEST_UIDS still locks 
   assert.equal(ctx.row().recovery_code_hash, null);
 });
 
+test("an open pet lets any browser in, but only the owner's browser sees or gets a new code", async (t) => {
+  const ctx = await setup(t, { openUids: [A] });
+  const { jar } = await meet(ctx, A, "Mochi");
+  const before = ctx.row().recovery_code_hash;
+  for (const path of [`/t?uid=${A}&view=1`, `/t?uid=${A}`]) {
+    const home = (await ctx.request(path, { jar: {} })).html;
+    assert.match(home, /data-sheet="record"/);
+    assert.doesNotMatch(home, /class="recovery|data-recovery|새 안심 코드/);
+  }
+  const out = await renew(ctx, {});
+  assert.deepEqual([out.status, out.body], [403, { ok: false }]);
+  assert.equal(ctx.row().recovery_code_hash, before);
+  assert.match((await ctx.request(`/t?uid=${A}&view=1`, { jar })).html, /data-recovery/);
+  assert.equal((await renew(ctx, jar)).status, 200);
+});
+
 test("only the owner's 우리 기록 ends with the 안심 코드 card, and no page carries a code", async (t) => {
   const ctx = await setup(t);
   const { jar, first } = await meet(ctx, A, "Mochi");
