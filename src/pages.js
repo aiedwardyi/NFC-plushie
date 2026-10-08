@@ -84,11 +84,13 @@ export function themeOf(value) {
 // The 자개 previews were redrawn with the gold sun, so their cached copies need a new URL.
 const THUMB_V = { najeon: "?v=2" };
 
-// Each kind's 8-bit sprites and world previews, set wherever data-mascot names it, so a theme keeps one rule per frame.
-export const KIND_CSS = `${KINDS.map(({ id }) => {
+// Each kind's 8-bit sprites, world previews and art metrics, set wherever data-mascot names it, so a theme keeps one rule per frame.
+export const KIND_CSS = `${KINDS.map((kind) => {
+  const { id } = kind;
   const px = ["", "-away", "-closed", "-happy", "-munch", "-yawn"].map((pose) => `--px${pose}: url("/themes/px/${id}${pose}-px.png");`);
   const thumbs = THEMES.map((t) => `--thumb-${t.id}: url("/themes/thumbs/${t.id}-${id}.webp${THUMB_V[t.id] || ""}");`);
-  return `[data-mascot="${id}"] { ${[...px, ...thumbs].join(" ")} }`;
+  const art = ["mouth", "lift", "shift"].map((key) => `--${key}: ${kind[key]};`);
+  return `[data-mascot="${id}"] { ${[...px, ...thumbs, ...art].join(" ")} }`;
 }).join("\n")}\n`;
 
 // Any kind in the manifest; anything else reads as 말.

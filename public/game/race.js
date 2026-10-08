@@ -538,6 +538,7 @@ export async function createRace(api) {
       spin = TAU * (u * u * (3 - 2 * u));
       pivot = at[Math.round(hipRow * 0.55)];
     }
+    let left = Infinity;
     for (let k = 0; k < ROWS; k++) {
       let [x, y, a, wide] = at[k];
       const hw = (w / 2) * wide;
@@ -552,6 +553,7 @@ export async function createRace(api) {
         [lx, ly] = [ox + (lx - ox) * c - (ly - oy) * n, oy + (lx - ox) * n + (ly - oy) * c];
         [rx, ry] = [ox + (rx - ox) * c - (ry - oy) * n, oy + (rx - ox) * n + (ry - oy) * c];
       }
+      left = Math.min(left, lx, rx);
       p[k * 4] = lx;
       p[k * 4 + 1] = ly;
       p[k * 4 + 2] = rx;
@@ -568,6 +570,7 @@ export async function createRace(api) {
       r.shadow.alpha = 0.55 * (1 - lift * 0.6);
       r.tip = [at[ROWS - 1][0], at[ROWS - 1][1]];
       r.head = [at[0][0], at[0][1]];
+      r.reach = hx - left;
     }
   }
 
@@ -758,7 +761,7 @@ export async function createRace(api) {
     big.textContent = "";
     agi = Math.max(0, Number(api.bonus?.("agi")) || 0);
     $(".r-pick").innerHTML = `<p class="r-eyebrow">${venue}</p><h2>달리기 시합</h2>
-      <ul class="r-roster">${Object.keys(PETS).filter((p) => p !== own).map((p) => `<li><button type="button" data-rival="${p}"><img src="/game/art/race/${p}.webp?v=${ART_V}" alt=""><b>${PETS[p]}</b><small>Lv.${state[p]?.level || 1}</small></button></li>`).join("")}</ul>
+      <ul class="r-roster">${Object.keys(PETS).filter((p) => p !== own).map((p) => `<li><button type="button" data-rival="${p}"><img src="${px ? faceUrl(p, "canon", true) : `/game/art/race/${p}.webp?v=${ART_V}`}" alt=""><b>${PETS[p]}</b><small>Lv.${state[p]?.level || 1}</small></button></li>`).join("")}</ul>
       <p class="r-versus"></p>
       ${agi > 0 ? `<p class="r-bonus">민첩 +${agi >= 1 ? Math.round(agi) : agi}%</p>` : ""}
       <button type="button" class="r-go">시작</button>`;
@@ -1147,6 +1150,12 @@ export async function createRace(api) {
     return L.ch - ((feet - L.hy) * (px ? 1 : 1.12)) / L.f;
   }
 
+  // How far the camera sinks under the result card, whatever its height, so the rival's level-up tag (60 px: the tag and a jog's hop) clears it.
+  function sink() {
+    const card = $(".r-card");
+    return cam.lift - (card.offsetTop + card.offsetHeight + 60 - Y(D.rival, L.size)) / (px ? L.f : sOf(D.rival));
+  }
+
   function follow(dt) {
     let focus;
     let speed = 0;
@@ -1165,6 +1174,8 @@ export async function createRace(api) {
     const k = phase === "finish" && result?.close ? 90 : 38;
     cam.vx += (k * (target - cam.x) + 2 * Math.sqrt(k) * (speed - cam.vx)) * dt;
     cam.x += cam.vx * dt;
+    // The count's pan swings the pair left; however far its art reaches past the hip, the owner's runner stays on screen.
+    if (phase === "count") cam.x = Math.min(cam.x, runners[0].x + (W * cam.vp - 4 - (runners[0].reach || 0)) / sOf(D.me));
     let dzGoal = -0.12;
     if (phase === "count") dzGoal = lerp(-0.12, 0.06, smooth((clock - phaseAt) / 3));
     else if (phase === "run" && model) {
@@ -1184,7 +1195,7 @@ export async function createRace(api) {
     else if (phase === "count") lift = still ? 0 : crane() * (1 - smooth((clock - phaseAt) / 2.4));
     else if (phase === "run" && !still) lift = (me.hipH - L.size * (1 - HIP)) * 0.25;
     // Under the card the pair sits low in frame so the rival's level-up tag clears it.
-    else if (phase === "result") lift = -L.size * 0.45;
+    else if (phase === "result") lift = Math.min(-L.size * 0.45, sink());
     cam.liftV += (30 * (lift - cam.lift) - 11 * cam.liftV) * dt;
     cam.lift += cam.liftV * dt;
     cam.shake *= Math.pow(0.004, dt);
@@ -1547,8 +1558,11 @@ export async function createRace(api) {
         const side = px && phase === "pick" && !r.id;
         const s = L.size * sOf(r.d);
         el.style.translate = side ? "-100% -50%" : "";
-        el.style.left = `${Math.round(r.head[0] + (side ? -s * 0.42 : phase === "pick" ? (r.id ? 16 : -18) : 0))}px`;
-        el.style.top = `${Math.round(r.head[1] + (side ? s * 0.3 : -10))}px`;
+        el.style.left = `${Math.round(r.head[0] + (side ? -s * (looks[r.kind].crop.aspect / 2 + 0.1) : phase === "pick" ? (r.id ? 16 : -18) : 0))}px`;
+        // The runners jog on under the result card, and a hop can carry the rival's tag up under it: it stops at the card's edge.
+        const card = flex && r.id ? $(".r-card") : null;
+        const top = r.head[1] + (side ? s * 0.3 : -10);
+        el.style.top = `${Math.round(card ? Math.max(top, card.offsetTop + card.offsetHeight + el.offsetHeight + 6) : top)}px`;
       }
     }
   }

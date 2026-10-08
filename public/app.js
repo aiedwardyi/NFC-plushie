@@ -2411,13 +2411,15 @@ const care = (function careLoop() {
   }
 
   async function feed(beat) {
+    // The kind's mouth from /kinds.css, or the 말's where the page has none.
+    const mouth = Number(getComputedStyle(root).getPropertyValue("--mouth")) || 0.52;
     const a = art();
     const b = box();
     const sip = a.bite === "sip";
     const s = b.w * (sip ? 0.3 : 0.27);
-    // Food tops out just under the mouth so the munch face stays visible; the carton's straw tip sits in it.
+    // Food tops out just under the kind's mouth so the munch face stays visible; the carton's straw tip sits in it.
     const x = sip ? b.x + b.w / 2 - s * 0.38 : b.x + b.w / 2 - s / 2;
-    const y = sip ? b.y + b.h * 0.5 - s * 0.03 : b.y + b.h * (world() === "8bit" ? 0.56 : 0.535);
+    const y = sip ? b.y + b.h * (mouth - 0.02) - s * 0.03 : b.y + b.h * (mouth + (world() === "8bit" ? 0.04 : 0.015));
     const el = prop(a.food(), s, x, y, sip ? 1.2 : 1);
     const fall = b.y + b.h * 0.6;
     sound("drop");

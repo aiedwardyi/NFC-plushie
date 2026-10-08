@@ -2828,13 +2828,19 @@ html.has-reveal body::after { visibility: hidden; }
 
 .want,
 .zzz { --pet: min(68cqw, 72cqh); }
+/* The kind's lift and shift (/kinds.css) clear its ears; where the window cuts both short, the bubble shrinks by the smaller cut. */
 .want {
+  --aim-x: calc(50cqw + var(--pet) * (.3 + var(--shift, 0)));
+  --aim-y: calc(90cqh - var(--pet) * (.98 + var(--lift, 0)) - 13.75cqmin);
+  --x: min(var(--aim-x), 100cqw - 25cqmin - 8px);
+  --y: max(var(--aim-y), 10px);
+  --size: max(20cqmin, 25cqmin - max(0px, min(var(--aim-x) - var(--x), var(--y) - var(--aim-y))));
   position: absolute;
-  left: calc(50cqw + var(--pet) * .3);
-  top: calc(90cqh - var(--pet) * .98 - 13.75cqmin);
+  left: calc(var(--x) + 25cqmin - var(--size));
+  top: var(--y);
   z-index: 4;
-  width: 25cqmin;
-  height: 25cqmin;
+  width: var(--size);
+  height: var(--size);
   min-height: 0;
   margin: 0;
   padding: 0;
@@ -4079,7 +4085,7 @@ html[data-theme="najeon"] .talk-bar {
 .r-pick h2 { margin: 2px 0 12px; font-size: 24px; font-weight: 900; letter-spacing: -.02em; color: inherit; }
 .r-roster { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px 4px; margin: 0 0 12px; padding: 0; list-style: none; }
 .r-roster button { display: grid; justify-items: center; gap: 1px; width: 100%; min-height: 0; margin: 0; padding: 5px 0 4px; border-radius: 12px; background: none; color: inherit; box-shadow: none; }
-.r-roster img { width: 30px; height: 36px; object-fit: contain; }
+.r-roster img { height: 36px; }
 .r-roster b { font-size: 11px; font-weight: 800; }
 .r-roster small { font-size: 9px; font-weight: 700; opacity: .6; white-space: nowrap; }
 .r-roster [aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--g-accent); background: rgba(var(--g-aura), .18); }

@@ -1552,11 +1552,13 @@ export async function createFarm(api) {
     for (let h = 0; h < 6; h++) emit(T.art.heart, { x: S.petC.x + rnd(-30, 30), y: S.petC.y - petH * 0.7, vx: rnd(-20, 20), vy: rnd(-90, -60), life: 1.2, s0: 0.3, s1: 0.5 });
   }
 
-  // The pet takes a crop in its paw and eats it in three bites, lifting it to its mouth (texture y 262 of 512) each time.
+  // The pet takes a crop in its paw and eats it in three bites, lifting it to its kind's mouth each time.
   async function munch(crop, from) {
     await hold(hop(xOf(0.2), yOf(0.875), 300, 16, 1));
-    const CHIN = -0.42 * petH;
-    const MOUTH = -0.475 * petH;
+    // The kind's mouth from /kinds.css, or the 말's where the page has none.
+    const mouth = Number(getComputedStyle(document.documentElement).getPropertyValue("--mouth")) || 0.52;
+    const MOUTH = (mouth - 1) * petH;
+    const CHIN = MOUTH + 0.055 * petH;
     const handAt = (y) => S.farm.toLocal(S.hand.toGlobal(new P.Point(0, y)));
     const holdAt = handAt(CHIN);
     const item = sprite(itemTex(crop), S.fx, from.x, from.y, 0.5, 0.5, flySize(crop, 30));

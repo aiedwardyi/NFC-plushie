@@ -51,6 +51,7 @@ function carePage() {
     document: { documentElement: element(), querySelector: (sel) => ({ ".dock[data-want]": dock, "[data-window]": win })[sel] || null, createElement: () => element() },
     facePet() {},
     floatHearts() {},
+    getComputedStyle: () => ({ getPropertyValue: () => "" }),
     lineReady: false,
     lineTimer: 0,
     navigator: {},
