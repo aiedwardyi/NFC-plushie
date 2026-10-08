@@ -35,6 +35,12 @@ const petColumns = [
   "kind TEXT",
   "stats TEXT",
   "edition TEXT",
+  "city TEXT",
+  "city_pid TEXT",
+  "city_day TEXT",
+  "city_tickets INTEGER",
+  "city_week TEXT",
+  "city_wins INTEGER",
 ];
 
 export function migratePetColumns(db, migrationMs = Date.now()) {
@@ -120,8 +126,22 @@ export function openDatabase(dataDir = process.env.DATA_DIR || "./data") {
       detail TEXT NOT NULL,
       context TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS city_matches (
+      id TEXT PRIMARY KEY,
+      game TEXT NOT NULL,
+      challenger TEXT NOT NULL,
+      defender TEXT NOT NULL REFERENCES plushies(uid) ON DELETE CASCADE,
+      card TEXT NOT NULL,
+      at INTEGER NOT NULL,
+      expires INTEGER NOT NULL,
+      won INTEGER NULL,
+      done_at INTEGER NULL,
+      seen INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS city_matches_defender ON city_matches(defender, done_at);
   `);
   db.pragma("foreign_keys = ON");
   migratePetColumns(db);
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS plushies_city_pid ON plushies(city_pid)");
   return db;
 }
