@@ -344,7 +344,8 @@ export async function createFarm(api) {
   let guideDone = false;
   let guideStep = 0;
   let guideTimer = 0;
-  try { guideDone = localStorage.getItem(guideKey) === "1"; } catch {}
+  // "1" once this hint ran, "tour" while the pet's guide teaches the pick instead.
+  try { guideDone = localStorage.getItem(guideKey) !== null; } catch {}
   const tweens = [];
   const parts = [];
   const tickers = new Set();

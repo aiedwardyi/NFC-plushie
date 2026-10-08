@@ -2239,6 +2239,8 @@ const care = (function careLoop() {
   }
 
   function hush() {
+    // The opening may stop before its edition line, so the edition goes on now.
+    revealEdition();
     talkHook?.taken();
     sayToken += 1;
     window.clearTimeout(lineTimer);
@@ -5060,6 +5062,8 @@ const farm = (function farmRoom() {
   }
 
   function takeLine() {
+    // Like hush(): the opening's edition line may never come.
+    revealEdition();
     seq += 1;
     sayToken += 1;
     window.clearTimeout(lineTimer);
@@ -6134,7 +6138,6 @@ const coach = (function coachLayer() {
   let tapBase = 0;
   // The farm's own first-time hint gives way to the farm tour; a skip before its first pick hands it back.
   const FARM_HINT = `farm-guide:${uid}`;
-  let hint = false;
 
   const verb = () => m.careVerb(dock.dataset.want);
   // The pet wants 잠 only between 22 and 05 in Seoul.
@@ -6196,7 +6199,13 @@ const coach = (function coachLayer() {
       after: 3000,
       skip: () => Boolean(document.querySelector(".f-basket .fb-empty")),
     },
-    shop: { target: () => document.querySelector(".f-basket .fb-coins"), line: () => "코인으로 새 씨앗을 사요", done: "click", farm: true },
+    // Before Lv 3 the coins only say when the shop opens, so the line says it too.
+    shop: {
+      target: () => document.querySelector(".f-basket .fb-coins"),
+      line: () => (document.querySelector(".f-basket .fb-coins.is-shop") ? "코인으로 새 씨앗을 사요" : "코인을 모아 둬요! Lv 3부터 새 씨앗을 살 수 있어요"),
+      done: "click",
+      farm: true,
+    },
     "farm-bye": { line: () => "인형을 폰에 톡 대면 한 번에 다 거둬요!", farm: true, after: 2500 },
     "farm-home": { target: () => dock.querySelector("[data-farm]"), line: () => "집으로 가서 오락실도 구경해요!", done: "click", farm: true, after: 2500 },
   };
@@ -6329,9 +6338,9 @@ const coach = (function coachLayer() {
     save();
     hide();
     window.clearTimeout(timer);
-    if (!hint || guide.done.includes("crop")) return;
+    if (guide.done.includes("crop")) return;
     try {
-      localStorage.removeItem(FARM_HINT);
+      if (localStorage.getItem(FARM_HINT) === "tour") localStorage.removeItem(FARM_HINT);
     } catch {
       /* private mode */
     }
@@ -6390,8 +6399,8 @@ const coach = (function coachLayer() {
   function begin() {
     if (m.nextStep(guide, m.FARM_STEPS) && !guide.done.includes("crop")) {
       try {
-        hint = localStorage.getItem(FARM_HINT) !== "1";
-        localStorage.setItem(FARM_HINT, "1");
+        // "tour" marks a hint the tour holds, so a later page can still hand it back.
+        if (localStorage.getItem(FARM_HINT) === null) localStorage.setItem(FARM_HINT, "tour");
       } catch {
         /* private mode */
       }
@@ -6402,6 +6411,11 @@ const coach = (function coachLayer() {
       for (const type of ["pointerdown", "pointerup", "click", "dblclick", "contextmenu"]) window.addEventListener(type, guard, true);
       window.addEventListener("keydown", (event) => {
         if (event.key !== "Escape" || !shown) return;
+        // Esc on the step's own sheet shuts it like its ×, which ends that step, not the tour.
+        if (sheetOpen && STEPS[shown].sheet?.() === sheetOpen) {
+          finish(shown);
+          return;
+        }
         event.preventDefault();
         event.stopPropagation();
         end();

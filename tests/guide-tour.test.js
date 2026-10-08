@@ -33,14 +33,16 @@ function el(extra = {}) {
 }
 
 // The guide's own tour run against a stub page and a hand-turned clock: the test sets the page, the farm and the dialog.
-async function page({ named = false, done = null } = {}) {
+async function page({ named = false, done = null, store = new Map() } = {}) {
   assert.ok(tour, "the guide is in app.js");
-  const store = new Map(done ? [[KEY, JSON.stringify({ done, skipped: false })]] : []);
-  const s = { now: 0, calm: true, rect: null, grow: null, coming: false, tapped: 0, basket: "", typing: false };
+  if (done) store.set(KEY, JSON.stringify({ done, skipped: false }));
+  const s = { now: 0, calm: true, rect: null, grow: null, coming: false, tapped: 0, basket: "", typing: false, shop: false };
   const timers = [];
   const said = [];
   const replay = [];
   const shown = [];
+  const skips = [];
+  const keys = [];
   const root = { dataset: {}, classList: classes() };
   const btn = (name) => el({ name });
   const dock = el({
@@ -54,6 +56,7 @@ async function page({ named = false, done = null } = {}) {
     if (sel === ".f-basket .fb-crop") return s.basket === "crops" ? btn("crop") : null;
     if (sel.startsWith(".f-basket .fb-act")) return s.basket === "crops" ? btn("send") : null;
     if (sel === ".f-basket .fb-empty") return s.basket === "empty" ? btn("empty") : null;
+    if (sel === ".f-basket .fb-coins.is-shop") return s.shop ? btn("coins") : null;
     if (sel === ".f-basket .fb-coins") return btn("coins");
     return null;
   };
@@ -67,7 +70,7 @@ async function page({ named = false, done = null } = {}) {
     window: {
       setTimeout: (fn, ms) => timers.push({ at: s.now + ms, fn }) && timers.length,
       clearTimeout() {},
-      addEventListener() {},
+      addEventListener: (type, fn) => type === "keydown" && keys.push(fn),
     },
     performance: { now: () => s.now },
     localStorage: {
@@ -86,7 +89,7 @@ async function page({ named = false, done = null } = {}) {
     demoSheet: null,
     talkHook: null,
     farm: { calm: () => s.calm, cropRect: () => s.rect, growRect: () => s.grow, coming: () => s.coming, tapped: () => s.tapped },
-    coach: { show: () => shown.push(root.dataset.coach), hide() {}, pulse() {}, owns: () => false, skipped() {} },
+    coach: { show: () => shown.push(root.dataset.coach), hide() {}, pulse() {}, owns: () => false, skipped: (fn) => skips.push(fn) },
     prefersReducedMotion: () => false,
     closeSheet() {},
     model: () => Promise.resolve(guideModel),
@@ -101,7 +104,15 @@ async function page({ named = false, done = null } = {}) {
     shown,
     on: () => root.dataset.coach || null,
     replay: () => replay.forEach((fn) => fn()),
+    skip: () => skips.forEach((fn) => fn()),
+    sheet: (open) => (sandbox.sheetOpen = open ? arcade : null),
+    key(name) {
+      const event = { key: name, stopped: false, preventDefault() {}, stopPropagation() { this.stopped = true; } };
+      keys.forEach((fn) => fn(event));
+      return event;
+    },
     done: () => JSON.parse(store.get(KEY) || "null")?.done || [],
+    skipped: () => JSON.parse(store.get(KEY) || "null")?.skipped === true,
     run(ms) {
       const end = s.now + ms;
       for (;;) {
@@ -232,4 +243,41 @@ test("a plushie tap during the farm tour reloads into the farm cover: no step sh
   const home = await page({ done: ["care"] });
   home.run(800);
   assert.deepEqual(home.shown, ["pet"]);
+});
+
+test("a skip before the farm tour's first pick hands the farm's own hint back, on a resumed page too; a hint the farm already gave stays done", async () => {
+  const store = new Map();
+  await page({ named: true, store });
+  // A reload resumes the tour, and the owner skips before the pick.
+  (await page({ store })).skip();
+  assert.equal(store.get(`farm-guide:${UID}`), undefined);
+  const seen = new Map([[`farm-guide:${UID}`, "1"]]);
+  (await page({ named: true, store: seen })).skip();
+  assert.equal(seen.get(`farm-guide:${UID}`), "1");
+});
+
+test("before Lv 3 the farm tour's shop step says when the shop opens; from Lv 3 it points at buying seeds", async () => {
+  for (const open of [false, true]) {
+    const p = await page({ done: ["care", "pet", "farm", "crop", "send"] });
+    p.s.shop = open;
+    p.root.classList.add("f-on");
+    p.run(800);
+    assert.deepEqual([p.on(), p.said.at(-1)], ["shop", open ? "코인으로 새 씨앗을 사요" : "코인을 모아 둬요! Lv 3부터 새 씨앗을 살 수 있어요"], `open ${open}`);
+  }
+});
+
+test("Esc on the 오락실 sheet in the race step shuts it like its × and the tour goes on; Esc on any other step skips the tour", async () => {
+  const p = await page({ done: ["care", "pet", "farm", "arcade"] });
+  p.sheet(true);
+  p.run(800);
+  assert.equal(p.on(), "race");
+  // Left unstopped, so the sheet's own Esc shuts it.
+  assert.deepEqual([p.key("Escape").stopped, p.done().includes("race"), p.skipped()], [false, true, false]);
+  p.sheet(false);
+  p.run(1000);
+  assert.equal(p.said.at(-1), "언제든 인형을 폰에 톡 대면 내가 깨어나요!");
+  const q = await page({ done: ["care"] });
+  q.run(800);
+  assert.equal(q.on(), "pet");
+  assert.deepEqual([q.key("Escape").stopped, q.skipped()], [true, true]);
 });
