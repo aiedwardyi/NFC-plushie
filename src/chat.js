@@ -35,6 +35,14 @@ function crisisLine(text) {
 
 const hotlines = (text) => /(?<!\d)109(?!\d)/.test(text) && /(?<!\d)1388(?!\d)/.test(text);
 
+// Haiku 5.5 sometimes garbles one syllable (고マ워요, 고ma워요, U+FFFD); Japanese the owner asked about or a word they used is on purpose.
+function garbled(text, said) {
+  if (text.includes("\uFFFD")) return true;
+  if (/[가-힣][\u3040-\u30FF]|[\u3040-\u30FF][가-힣]/.test(text) && !/[\u3040-\u30FF]|일본|日本|japan|히라가나|가타카나|hiragana|katakana/i.test(said)) return true;
+  const words = new Set(said.toLowerCase().match(/[a-z]+/g));
+  return Array.from(text.matchAll(/(?<=[가-힣])[a-z]{1,3}(?=[가-힣])/g)).some(([w]) => !words.has(w));
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEKDAYS = "일월화수목금토";
 const WORLDS = { classic: "클래식 방", "8bit": "8비트 세상", milk: "딸기우유 세상", najeon: "자개 세상" };
@@ -236,6 +244,21 @@ export function mountTalk(app, { db, talk, now, owns, getRow, animalOf }) {
     console.log(`talk ${kind} ${status} ${out.ms ?? 0}ms calls=${out.calls ?? 1} in=${usage.input} out=${usage.output} search=${usage.searches}`);
   }
 
+  // A garbled first reply still beats the error line when the retry can't do better.
+  async function askAgain(uid, said, ask, deadline, first) {
+    const at = now();
+    if (at >= deadline) return first;
+    const id = logCall(uid, "retry", provider.model, said, at);
+    try {
+      const out = await provider.reply({ ...ask, signal: AbortSignal.timeout(deadline - at) });
+      settle(id, "retry", out, provider.model, out.ok ? out.text : null);
+      return out.ok && !garbled(out.text, said) ? out : first;
+    } catch {
+      console.log("talk retry failed");
+      return first;
+    }
+  }
+
   function forget(t) {
     const before = t - TALK.keepTextMs;
     db.prepare("UPDATE talk_log SET said = NULL, reply = NULL WHERE at < ? AND (said IS NOT NULL OR reply IS NOT NULL)").run(before);
@@ -307,8 +330,10 @@ export function mountTalk(app, { db, talk, now, owns, getRow, animalOf }) {
       });
       const out = await provider.reply({ system, messages, signal: AbortSignal.timeout(TALK.replyMs) });
       settle(logId, "reply", out, provider.model, out.ok ? out.text : null);
-      // A refusal, a failure or a reply missing a number never answers a crisis message.
-      const reply = crisis && !(out.ok && hotlines(out.text)) ? { ok: true, text: crisis, sources: [] } : out;
+      const glitch = out.ok && garbled(out.text, said);
+      // A refusal, a failure, a garbled reply or a reply missing a number never answers a crisis message.
+      const reply = crisis && !(out.ok && !glitch && hotlines(out.text)) ? { ok: true, text: crisis, sources: [] }
+        : glitch ? await askAgain(uid, said, { system, messages }, t + TALK.replyMs, out) : out;
       if (!reply.ok) return res.json({ ok: false, line: out.stop === "refusal" ? TALK_LINES.refusal : TALK_LINES.error });
       const born = getRow(uid)?.created_at;
       if (born === row.created_at) {
