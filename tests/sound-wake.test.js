@@ -35,6 +35,7 @@ test("the want sound and the load-time celebration buzzes wait for the first tou
   assert.ok(reunion, "reunionJump exists");
   assert.match(reunion[0], /celebrateBuzz\(\[40, 60, 40\], \(\) => pet\.classList\.contains\("is-reunion-jump"\)\)/);
   const claim = app.match(/if \(kind === "claim"\) \{[\s\S]*?\n  \}/);
+  assert.ok(claim, "claim branch exists");
   assert.match(claim[0], /celebrateBuzz\(\[30, 40, 30, 40, 80\]/);
 });
 

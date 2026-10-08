@@ -2,7 +2,7 @@
 (function mascotDemoToggle() {
   const KEY = "pokkey-mascot";
   const MAX_AGE = String(400 * 24 * 60 * 60);
-  const KINDS = (document.querySelector("script[data-mascots]")?.dataset.mascots || "").split(" ");
+  const KINDS = (document.querySelector("script[data-mascots]")?.dataset.mascots || "").split(" ").filter(Boolean);
 
   function readKind() {
     const saved = document.querySelector('meta[name="pet-kind"]');
@@ -4620,7 +4620,10 @@ const farm = (function farmRoom() {
     playSfx(`care-${kit()}-press`);
     pantry("buy", { crop: buy.dataset.buy }).then(({ reply }) => {
       buying = false;
-      if (!reply) return;
+      if (!reply) {
+        paintShop();
+        return;
+      }
       ready?.bought(reply);
       dropSeed(buy, reply.crop);
       paintShop();
