@@ -206,7 +206,7 @@ function visitStart({ celebrate = false } = {}) {
     "let ready = null;",
     // The start deadline has its own test; here a wait is as long as the test makes it.
     "const START_MS = 10000;",
-    "function within(promise) { return promise; }",
+    "function inTime(promise) { return promise; }",
     "function prepare() { s.engine.then((g) => { ready = g; }, () => {}); log.push('prepare'); return s.engine; }",
     "function enter(st, r, how) { isOpen = true; log.push(`enter ${how}`); return s.entered; }",
     { re: /\n  const uncover = [^\n]+\n/, optional: true },

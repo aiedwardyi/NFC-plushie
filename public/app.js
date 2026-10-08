@@ -3954,7 +3954,7 @@ function loadPixi() {
 const START_MS = 10000;
 
 // A wait that gives up after `ms`: nothing a room waits on before its scene shows may hold the page.
-function within(promise, ms) {
+function inTime(promise, ms) {
   return new Promise((resolve, reject) => {
     const timer = window.setTimeout(() => reject(new Error("timed out")), ms);
     promise.then((value) => {
@@ -4169,7 +4169,7 @@ const arcade = (function arcadeRoom() {
       out = await g.play(mode, Number(dock.dataset.giBest) || 0);
       // A round again keeps its stage; a window that changed size meanwhile gets a new one first, within the same bound.
       while (out === "again") {
-        await within(g.open(), START_MS);
+        await inTime(g.open(), START_MS);
         out = await g.play(mode, Number(dock.dataset.giBest) || 0);
       }
     } catch {
@@ -4201,7 +4201,7 @@ const arcade = (function arcadeRoom() {
     const reader = listening && Promise.race([listening, new Promise((resolve) => window.setTimeout(() => resolve(null), NFC_WAIT_MS))]);
     // After a failed load, this tap tries again.
     const opened = prepare().then((g) => (held === tap ? g.open().then(() => g) : g));
-    Promise.all([within(opened, START_MS), reader]).then(([g, nfc]) => {
+    Promise.all([inTime(opened, START_MS), reader]).then(([g, nfc]) => {
       const mine = held === tap;
       if (mine) {
         held = null;
@@ -4346,7 +4346,7 @@ const racing = (function raceRoom() {
     const listening = "NDEFReader" in window ? combo.listen() : null;
     const reader = listening && Promise.race([listening, new Promise((done) => setTimeout(() => done(null), NFC_WAIT_MS))]);
     const opened = prepare().then((g) => (held === tap ? g.open(state, root.dataset.mascot, raced).then(() => g) : g));
-    Promise.all([within(opened, START_MS), reader]).then(([g, nfc]) => {
+    Promise.all([inTime(opened, START_MS), reader]).then(([g, nfc]) => {
       const mine = held === tap;
       if (mine) {
         held = null;
@@ -4802,7 +4802,7 @@ const farm = (function farmRoom() {
     if (r.picked.length) tapped += 1;
     preload();
     // The stage is made under the visit's cover: the farm takes the home only once it can be drawn, or the cover goes.
-    within(prepare().then((st) => st.open().then(() => st)), START_MS).then((st) => {
+    inTime(prepare().then((st) => st.open().then(() => st)), START_MS).then((st) => {
       opening = false;
       if (isOpen || careHold.asleep || st !== ready) {
         uncover();
@@ -4859,7 +4859,7 @@ const farm = (function farmRoom() {
       if (!reply || !opening) return { st, status, reply };
       return st.open().then(() => ({ st, status, reply }));
     }));
-    within(made, START_MS).then(({ st, status, reply }) => {
+    inTime(made, START_MS).then(({ st, status, reply }) => {
       opening = false;
       button.classList.remove("is-loading");
       if (!reply) {

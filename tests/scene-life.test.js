@@ -317,7 +317,7 @@ function source(text, pieces) {
 }
 const roomOf = (name) => app.match(new RegExp(`\\nconst \\w+ = \\(function ${name}\\(\\) \\{[\\s\\S]*?\\n\\}\\)\\(\\);\\n`))?.[0] || "";
 // The start deadline and its wait, where app.js has them.
-const deadline = () => source(app, [{ re: /\nconst START_MS = \d+;\n/, optional: true }, { re: /\nfunction within\(promise, ms\) \{[\s\S]*?\n\}\n/, optional: true }]);
+const deadline = () => source(app, [{ re: /\nconst START_MS = \d+;\n/, optional: true }, { re: /\nfunction inTime\(promise, ms\) \{[\s\S]*?\n\}\n/, optional: true }]);
 const never = () => new Promise(() => {});
 
 // A click on `el` whose target matches `selector`, the way a tap on that child of it lands.
