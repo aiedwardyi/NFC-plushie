@@ -1797,15 +1797,12 @@ export async function createFarm(api) {
   async function xpFlight(r) {
     if (r.xpGain <= 0) return;
     const box = win.getBoundingClientRect();
-    const pin = (document.querySelector(".level-pin") || win).getBoundingClientRect();
     const el = domAdd("f-xp f-delivery", `+${r.xpGain} XP`, document.body);
     const x0 = box.left + fitted.x + W * 0.64 * fitted.s;
     const y0 = box.top + fitted.y + H * 0.4 * fitted.s;
     el.style.left = `${x0}px`;
     el.style.top = `${y0}px`;
-    const dx = pin.left + pin.width / 2 - x0;
-    const dy = pin.top + pin.height / 2 - y0;
-    await hold(domAnim(el, [{ transform: "translate(-50%, 0) scale(1.4)", opacity: 1 }, { transform: `translate(calc(-50% + ${dx}px), ${dy}px) scale(.6)`, opacity: 1 }], { duration: calm ? 300 : 850, easing: "ease-in-out" }));
+    await hold(domAnim(el, [{ transform: "translate(-50%, 0) scale(1.4)", opacity: 1 }, { transform: "translate(-50%, -36px) scale(1)", opacity: 0 }], { duration: calm ? 300 : 850, easing: "ease-in-out" }));
     el.remove();
     game("result", { gain: 0.9 });
     flushRound();

@@ -4556,7 +4556,7 @@ const farm = (function farmRoom() {
     hearts: (n) => care.hearts(n),
     levelPop() {
       if (prefersReducedMotion()) return;
-      for (const el of document.querySelectorAll(".level-badge, .level-pin")) {
+      for (const el of document.querySelectorAll(".level-badge")) {
         el.animate([{ transform: "scale(1)" }, { transform: "scale(1.45)" }, { transform: "scale(1)" }], { duration: 480, easing: "cubic-bezier(.3,1.4,.5,1)" });
       }
     },
@@ -6167,13 +6167,15 @@ const coach = (function coachLayer() {
       from = null;
     }
     box = next;
+    const dialog = dialogBox?.getBoundingClientRect();
+    const side = dialog && r.top >= dialog.bottom;
     // The tip rests on the target's near edge, so the hand never covers what it points at; a big target takes it inside.
-    const down = r.top + r.height / 2 > window.innerHeight * 0.5;
+    const down = !side && r.top + r.height / 2 > window.innerHeight * 0.5;
     const reach = r.height > 120 ? r.height * 0.38 : 7;
     const tipX = r.left + r.width * 0.58;
-    const tipY = down ? r.top + reach : r.top + r.height - reach;
+    const tipY = side ? r.top + r.height / 2 : down ? r.top + reach : r.top + r.height - reach;
     const text = label?.() || "";
-    const key = [box.x, box.y, box.w, box.h, tipX, tipY, down, text].map((v) => (typeof v === "number" ? v.toFixed(1) : v)).join();
+    const key = [box.x, box.y, box.w, box.h, tipX, tipY, down, side, dialog?.top, dialog?.bottom, text].map((v) => (typeof v === "number" ? v.toFixed(1) : v)).join();
     if (key === drawn) return;
     drawn = key;
     const radius = `${Math.min(box.w, box.h) / 2}px`;
@@ -6187,6 +6189,17 @@ const coach = (function coachLayer() {
     finger.style.left = `${tipX}px`;
     finger.style.top = `${tipY}px`;
     finger.classList.toggle("is-down", down);
+    hand.style.transform = side ? `rotate(${tipX > window.innerWidth / 2 ? 90 : -90}deg)` : "";
+    if (dialog?.width) {
+      const h = hand.getBoundingClientRect();
+      // Reserve the full tap travel, including the SVG stroke, outside the dialog.
+      const gap = 18;
+      if (h.right + gap > dialog.left && h.left - gap < dialog.right && h.bottom + gap > dialog.top && h.top - gap < dialog.bottom) {
+        const above = dialog.top - gap - h.bottom;
+        const below = dialog.bottom + gap - h.top;
+        finger.style.top = `${tipY + (Math.abs(above) < Math.abs(below) ? above : below)}px`;
+      }
+    }
     tag.textContent = text;
     tag.style.left = `${box.x + box.w / 2}px`;
     tag.style.top = `${box.y - 6}px`;

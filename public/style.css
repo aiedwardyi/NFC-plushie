@@ -4266,6 +4266,7 @@ html.has-coach .coach-ring.is-pulse { animation: coach-pulse .5s cubic-bezier(.3
   box-shadow: inset 0 0 0 1.5px var(--coach-skip-line), 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 /* The pet's line reads above the scrim; the dock's own want ring rests while the coach points. */
+html.has-coach .topbar :is(.theme-btn, .level-pin) { visibility: hidden; opacity: 0; pointer-events: none; }
 html.has-coach body:not(.has-sheet) .dialog { z-index: 131; }
 html.has-coach .dock-btn.is-want .dock-cap::after { animation: none; opacity: 0; }
 /* A soft wait: only a quiet ring on the growing plot and its time left; nothing is dimmed or blocked. */
